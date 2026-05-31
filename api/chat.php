@@ -92,6 +92,7 @@ switch ($action) {
     case 'pin_msg':         doPinMsg();         break;
     case 'pinned':          doPinned();         break;
     case 'chat_users':      doChatUsers();      break;
+    case 'room_candidates': doRoomCandidates(); break;
     case 'save_chat_user':  doSaveChatUser();   break;
     case 'remove_chat_user': doRemoveChatUser(); break;
     case 'public_rooms':   doPublicRooms();   break;
@@ -952,6 +953,21 @@ function doPinned(): void {
 // ═════════════════════════════════════════════════════
 //  CHAT USER MANAGEMENT (admin only)
 // ═════════════════════════════════════════════════════
+
+function doRoomCandidates(): void {
+    global $pdo, $uid;
+    $q = trim($_GET['q'] ?? '');
+    $sql = "SELECT id, full_name AS name, role FROM employees
+            WHERE is_active=1 AND (role IN ('admin','super_admin') OR chat_access=1) AND id!=?";
+    $params = [$uid];
+    if ($q) { $sql .= " AND full_name LIKE ?"; $params[] = "%{$q}%"; }
+    $sql .= " ORDER BY full_name LIMIT 50";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$r) $r['id'] = (int)$r['id'];
+    echo json_encode(['users' => $rows]);
+}
 
 function doChatUsers(): void {
     global $pdo, $isAdmin;

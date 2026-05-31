@@ -594,11 +594,11 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
 }
 .mob-back-btn{display:none;align-items:center;justify-content:center;
   width:36px;height:36px;border:none;background:none;color:var(--t2);font-size:22px;cursor:pointer}
-/* Room context button */
-.room-item{position:relative}
-.room-ctx-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);
-  width:26px;height:26px;border:none;background:none;color:var(--t3);font-size:13px;
-  border-radius:50%;cursor:pointer;display:none;align-items:center;justify-content:center;transition:background .15s}
+/* Room context button — Telegram style: replaces time on hover */
+.room-ctx-btn{width:24px;height:24px;border:none;background:none;color:var(--t3);font-size:12px;
+  border-radius:50%;cursor:pointer;display:none;align-items:center;justify-content:center;
+  transition:background .15s;flex-shrink:0;margin-top:2px}
+.room-item:hover .room-time{display:none}
 .room-item:hover .room-ctx-btn{display:flex}
 .room-ctx-btn:hover{background:var(--border);color:var(--t1)}
 /* Chat users manager modal */
@@ -1010,6 +1010,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySele
 let rooms        = [];
 let currentRoom  = null;
 let lastMsgId    = 0;
+let currentMembers = [];
 let replyToId    = null;
 let replyToText  = '';
 let replyToSender= '';
@@ -1054,8 +1055,11 @@ function renderRoomList(filter=''){
         <div class="room-name">${r.type!=='group'?`<span class="room-type-icon">${typeIcon(r.type)}</span>`:''}${esc(name)}</div>
         <div class="room-preview">${prev}</div>
       </div>
-      <div class="room-meta"><span class="room-time">${ts}</span>${unread}</div>
-      <button class="room-ctx-btn" title="Действия" onclick="roomCtxMenu(event,${r.id})"><i class="fas fa-ellipsis-v"></i></button>
+      <div class="room-meta">
+        <span class="room-time">${ts}</span>
+        <button class="room-ctx-btn" title="Действия" onclick="roomCtxMenu(event,${r.id})"><i class="fas fa-ellipsis-v"></i></button>
+        ${unread}
+      </div>
     </div>`;
   }).join('');
 }
@@ -1493,6 +1497,7 @@ async function loadMembers(){
   if(!currentRoom) return;
   const d = await api('room_members',{room_id:currentRoom.id});
   const members = d.members||[];
+  currentMembers = members;
   // Update my room role
   const me = members.find(m=>m.user_id===ME.id);
   _myRoomRole = me?.room_role || 'member';
@@ -1530,20 +1535,25 @@ function toggleMembersPanel(){
   $id('membersPanel').classList.toggle('open',membersPanel);
 }
 
-function openAddMemberModal(){
+async function openAddMemberModal(){
   closeOverlay('createRoomOverlay');
-  const existing = new Set(
-    [...$id('membersList').querySelectorAll('.member-nm')].map(el=>el.textContent.replace(' (Вы)','').trim())
-  );
-  $id('addMemberList').innerHTML = ALL_ADMINS
-    .filter(a=>a.id!==ME.id && !existing.has(a.name))
-    .map(a=>`<div class="member-select-item">
+  openOverlay('addMemberOverlay');
+  $id('addMemberList').innerHTML = '<div style="padding:16px;text-align:center;color:var(--t3)">Загрузка…</div>';
+  const d2 = await api('room_candidates');
+  const allUsers = d2.users || [];
+  // Get currently existing member IDs
+  const existingIds = new Set(currentMembers.map(m => m.user_id || m.id));
+  existingIds.add(ME.id);
+  const toShow = allUsers.filter(u => !existingIds.has(u.id));
+  if (!toShow.length) {
+    $id('addMemberList').innerHTML = '<div style="padding:16px;color:var(--t3);font-size:13px">Все пользователи уже в беседе</div>';
+    return;
+  }
+  $id('addMemberList').innerHTML = toShow.map(a=>`<div class="member-select-item">
       <input type="checkbox" id="am_${a.id}" value="${a.id}" data-name="${esc(a.name)}" data-role="${esc(a.role)}">
       <div class="member-avatar-sm" style="background:${avatarColor(a.name)}">${esc(avatarInitial(a.name))}</div>
       <div class="member-name-txt">${esc(a.name)}</div>
-      <div class="member-role-txt">${a.role==='super_admin'?'<i class="fas fa-star"></i> Супер-admin':'<i class="fas fa-crown"></i> Admin'}</div>
     </div>`).join('');
-  openOverlay('addMemberOverlay');
 }
 
 async function addSelectedMembers(){

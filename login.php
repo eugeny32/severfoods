@@ -303,7 +303,13 @@ body::after {
     </div>
 
     <div class="version">v<?= APP_VERSION ?> · <?= htmlspecialchars(APP_NAME) ?></div>
-</div>
+    <div style="text-align:center;margin-top:12px">
+        <a href="chat_login.php" style="font-size:12px;color:rgba(255,255,255,.45);text-decoration:none;display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:1px solid rgba(255,255,255,.12);border-radius:8px;transition:all .2s"
+           onmouseover="this.style.color='rgba(255,255,255,.75)';this.style.borderColor='rgba(255,255,255,.3)'"
+           onmouseout="this.style.color='rgba(255,255,255,.45)';this.style.borderColor='rgba(255,255,255,.12)'">
+            <i class="fas fa-comments"></i> Войти в мессенджер
+        </a>
+    </div>
 
 <script src="assets/js/qr-input.js"></script>
 <script>
