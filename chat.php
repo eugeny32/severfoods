@@ -530,6 +530,48 @@ body{
   position:absolute;bottom:10px;right:10px;
   width:88px;height:66px;border-radius:8px;
   object-fit:cover;border:2px solid rgba(255,255,255,.25);background:#111;
+  cursor:pointer;
+}
+/* Mobile: fullscreen call */
+@media(max-width:680px){
+  .call-win{
+    position:fixed;inset:0;bottom:0;right:0;
+    width:100vw !important;height:100vh !important;
+    height:-webkit-fill-available !important;
+    border-radius:0;
+    z-index:9000;
+    display:none;flex-direction:column;
+  }
+  .call-win.open{display:flex}
+  .call-vids{
+    flex:1;aspect-ratio:unset;min-height:0;
+    position:relative;
+  }
+  .vid-remote{
+    position:absolute;inset:0;
+    width:100%;height:100%;
+    object-fit:cover;
+  }
+  .vid-local{
+    position:absolute;
+    bottom:calc(80px + env(safe-area-inset-bottom));
+    right:16px;
+    width:90px;height:120px; /* portrait PiP */
+    border-radius:12px;
+    border:2px solid rgba(255,255,255,.4);
+    box-shadow:0 4px 16px rgba(0,0,0,.4);
+    z-index:10;
+  }
+  .call-info{padding:calc(12px + env(safe-area-inset-top)) 16px 8px}
+  .call-ctrls{
+    padding:16px 24px;
+    padding-bottom:calc(16px + env(safe-area-inset-bottom));
+    background:rgba(0,0,0,.6);
+    backdrop-filter:blur(10px);
+    flex-shrink:0;
+  }
+  .ccbtn{width:52px;height:52px;font-size:22px}
+  .ccbtn.end{width:60px;height:60px;font-size:26px}
 }
 .call-no-vid{
   width:100%;height:100%;display:flex;flex-direction:column;
@@ -1073,8 +1115,9 @@ body{
 
 <!-- Room context dropdown -->
 <div id="roomCtxDropdown" style="display:none;position:fixed;z-index:9999;
-  background:var(--surface);border:1px solid var(--border);border-radius:8px;
-  box-shadow:0 4px 20px rgba(0,0,0,.15);min-width:180px;overflow:hidden">
+  background:rgba(29,42,56,.97);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,.12);border-radius:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:190px;overflow:hidden">
 </div>
 
 <!-- ═══ JS DATA ═══ -->
@@ -1963,9 +2006,10 @@ function roomCtxMenu(e, roomId){
   }
   dd.innerHTML = items.map(it=>`
     <button onclick="${it.fn};hideRoomCtx()" style="display:flex;align-items:center;gap:10px;
-      width:100%;padding:10px 14px;border:none;background:none;text-align:left;cursor:pointer;
-      font-size:13px;${it.cls==='danger'?'color:#ef4444':'color:var(--t1)'}">
-      <i class="fas ${it.icon}" style="width:14px;text-align:center"></i>${it.label}
+      width:100%;padding:11px 16px;border:none;background:none;text-align:left;cursor:pointer;
+      font-size:13px;font-weight:500;transition:background .12s;
+      ${it.cls==='danger'?'color:#ff6b6b':'color:rgba(255,255,255,.9)'}">
+      <i class="fas ${it.icon}" style="width:14px;text-align:center;opacity:.75"></i>${it.label}
     </button>`).join('');
   const rect = e.currentTarget.getBoundingClientRect();
   // Show off-screen first to measure, then position correctly
@@ -2209,11 +2253,30 @@ function markRead(lastId){
 /* ════════════════════════════════════════════════════
    WebRTC CALLS
 ════════════════════════════════════════════════════ */
-const ICE = {iceServers:[
-  {urls:'stun:stun.l.google.com:19302'},
-  {urls:'stun:stun1.l.google.com:19302'},
-  {urls:'stun:stun.cloudflare.com:3478'},
-]};
+const ICE = {
+  iceServers:[
+    {urls:'stun:stun.l.google.com:19302'},
+    {urls:'stun:stun1.l.google.com:19302'},
+    {urls:'stun:stun2.l.google.com:19302'},
+    {urls:'stun:stun.cloudflare.com:3478'},
+    // Free public TURN (OpenRelay) — enables NAT traversal on mobile
+    {
+      urls: [
+        'turn:openrelayproject.org:3478',
+        'turn:openrelayproject.org:443',
+        'turn:openrelayproject.org:3478?transport=tcp'
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls:'turns:openrelayproject.org:443',
+      username:'openrelayproject',
+      credential:'openrelayproject'
+    }
+  ],
+  iceCandidatePoolSize: 10,
+};
 
 let pc=null,localStream=null,screenStream=null;
 let callId=null,callPeerId=null,callPeerName='',callIsVideo=true,isCaller=false;
@@ -2262,20 +2325,72 @@ async function startCallTo(toId, toName, video=true){
 }
 
 async function getStream(video){
-  try{ return await navigator.mediaDevices.getUserMedia({audio:true,video:video?{width:1280,height:720}:false}); }
-  catch(e){ if(video){ showToast('Камера недоступна, аудио','<i class="fas fa-exclamation-triangle"></i>'); return await navigator.mediaDevices.getUserMedia({audio:true,video:false}); } throw e; }
+  // iOS Safari requires facingMode instead of width/height constraints
+  const isMob = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const videoConstraints = video
+    ? (isMob ? {facingMode:'user'} : {width:{ideal:1280},height:{ideal:720}})
+    : false;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {echoCancellation:true, noiseSuppression:true, sampleRate:48000},
+      video: videoConstraints
+    });
+    return stream;
+  } catch(e) {
+    console.warn('[webrtc] getStream failed:', e.name, e.message);
+    if(video){
+      showToast('Камера недоступна, только аудио','<i class="fas fa-exclamation-triangle"></i>');
+      try { return await navigator.mediaDevices.getUserMedia({audio:true,video:false}); } catch(e2){ throw e2; }
+    }
+    throw e;
+  }
 }
+
+let _reconnTimer = null;
 
 function setupPC(){
   pc = new RTCPeerConnection(ICE);
-  pc.onicecandidate = e=>{ if(e.candidate) apiPost('signal',{call_id:callId,to_id:callPeerId,sig_type:'ice',payload:e.candidate}); };
-  pc.ontrack = e=>{
-    $id('vidRemote').srcObject = e.streams[0];
-    const hasV = e.streams[0].getVideoTracks().length>0;
-    $id('callNoVid').style.display = hasV?'none':'flex';
-    $id('vidRemote').style.display = hasV?'block':'none';
+
+  pc.onicecandidate = e=>{
+    if(e.candidate) apiPost('signal',{call_id:callId,to_id:callPeerId,sig_type:'ice',payload:e.candidate});
   };
-  pc.onconnectionstatechange = ()=>{ if(['disconnected','failed','closed'].includes(pc.connectionState)) hangUp(false); };
+
+  pc.ontrack = e=>{
+    const stream = e.streams[0];
+    const vidEl = $id('vidRemote');
+    vidEl.srcObject = stream;
+    // iOS Safari: must call play() explicitly
+    vidEl.play().catch(()=>{});
+    const hasV = stream.getVideoTracks().some(t=>t.enabled && t.readyState==='live');
+    $id('callNoVid').style.display = hasV?'none':'flex';
+    vidEl.style.display = hasV?'block':'none';
+    // Re-check video after small delay (track may not be live yet)
+    setTimeout(()=>{
+      const v2 = stream.getVideoTracks().some(t=>t.enabled && t.readyState==='live');
+      $id('callNoVid').style.display = v2?'none':'flex';
+      vidEl.style.display = v2?'block':'none';
+    }, 1000);
+  };
+
+  pc.onconnectionstatechange = ()=>{
+    const st = pc?.connectionState;
+    console.log('[webrtc] connectionState:', st);
+    if(st === 'connected'){
+      clearTimeout(_reconnTimer);
+    } else if(st === 'disconnected'){
+      // Give 8s for mobile to recover before hanging up
+      _reconnTimer = setTimeout(()=>{
+        if(pc?.connectionState !== 'connected') hangUp(false);
+      }, 8000);
+    } else if(st === 'failed'){
+      clearTimeout(_reconnTimer);
+      hangUp(false);
+    }
+  };
+
+  pc.oniceconnectionstatechange = ()=>{
+    console.log('[webrtc] iceConnectionState:', pc?.iceConnectionState);
+  };
 }
 
 function showCallWindow(name,video){
@@ -2283,8 +2398,13 @@ function showCallWindow(name,video){
   $id('callPeerNm').textContent = name;
   $id('callPeerAv').textContent = avatarInitial(name);
   $id('callPeerAv').style.background = avatarColor(name);
-  $id('vidLocal').srcObject = localStream;
-  $id('vidLocal').style.display = video?'block':'none';
+  const localVid = $id('vidLocal');
+  localVid.srcObject = localStream;
+  localVid.style.display = video?'block':'none';
+  // iOS requires explicit play() after srcObject assignment
+  localVid.play().catch(()=>{});
+  $id('callNoVid').style.display = 'flex'; // show placeholder until remote track arrives
+  $id('vidRemote').style.display = 'none';
   $id('callWin').classList.add('open');
   callStart=Date.now();
   clearInterval(callTmrInt);
@@ -2367,11 +2487,15 @@ async function hangUp(send=true){
 }
 
 function cleanup(){
+  clearTimeout(_reconnTimer);
   stopRing();
   if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null;}
   if(localStream) {localStream.getTracks().forEach(t=>t.stop()); localStream=null;}
   if(pc){pc.close();pc=null;}
-  $id('vidRemote').srcObject=null; $id('vidLocal').srcObject=null;
+  const rv=$id('vidRemote'), lv=$id('vidLocal');
+  if(rv){rv.srcObject=null; rv.style.display='none';}
+  if(lv){lv.srcObject=null;}
+  $id('callNoVid').style.display='flex';
   callId=callPeerId=callPeerName=null; isMuted=isCamOff=isScreen=isCaller=false; pendingInvite=null;
 }
 
