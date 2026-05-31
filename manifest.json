@@ -1,14 +1,40 @@
 {
-    "name": "Система питания СЕВЕР",
-    "short_name": "Столовая",
-    "description": "Система контроля питания для столовых",
-    "start_url": "/index.php",
-    "display": "standalone",
-    "background_color": "#003366",
-    "theme_color": "#003366",
-    "orientation": "portrait-primary",
-    "icons": [
-        { "src": "logo.png", "sizes": "192x192", "type": "image/png" },
-        { "src": "logo.png", "sizes": "512x512", "type": "image/png" }
-    ]
+  "name": "Система питания",
+  "short_name": "Питание",
+  "description": "Система учёта питания сотрудников",
+  "start_url": "/index.php",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#002756",
+  "background_color": "#002756",
+  "lang": "ru",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "assets/img/icons/icon-72x72.png",   "sizes": "72x72",   "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/img/icons/icon-96x96.png",   "sizes": "96x96",   "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/img/icons/icon-128x128.png", "sizes": "128x128", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/img/icons/icon-144x144.png", "sizes": "144x144", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/img/icons/icon-152x152.png", "sizes": "152x152", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/img/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/img/icons/icon-384x384.png", "sizes": "384x384", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/img/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Сканирование",
+      "short_name": "Скан",
+      "description": "Открыть сканер QR-кодов",
+      "url": "/index.php",
+      "icons": [{ "src": "assets/img/icons/icon-96x96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Мессенджер",
+      "short_name": "Чат",
+      "description": "Открыть мессенджер",
+      "url": "/chat.php",
+      "icons": [{ "src": "assets/img/icons/icon-96x96.png", "sizes": "96x96" }]
+    }
+  ],
+  "prefer_related_applications": false
 }
