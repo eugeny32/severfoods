@@ -2437,8 +2437,7 @@ function _onConnState(){
     clearTimeout(_reconnTimer);
     // iOS: re-attempt play() once media flows (ontrack can fire outside gesture)
     const rv=$id('vidRemote');
-    if(rv && rv.srcObject){ rv.play().catch(()=>{}); }
-    _onTrack({streams:[rv?.srcObject]});
+    if(rv && rv.srcObject){ rv.play().catch(()=>{}); _onTrack({streams:[rv.srcObject]}); }
   } else if(st === 'disconnected'){
     _reconnTimer = setTimeout(()=>{
       if(pc?.connectionState !== 'connected') hangUp(false);
