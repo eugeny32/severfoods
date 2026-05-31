@@ -50,7 +50,9 @@ try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_password VARCHAR(255) DE
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Мессенджер — <?= htmlspecialchars(APP_NAME) ?></title>
 <?= Csrf::meta() ?>
 <style>
@@ -58,7 +60,17 @@ try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_password VARCHAR(255) DE
    BASE
 ════════════════════════════════════════════════════ */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px}
+html{height:100%;height:-webkit-fill-available}
+body{
+  height:100%;height:-webkit-fill-available;
+  overflow:hidden;
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;
+  /* iOS safe area */
+  padding-top:env(safe-area-inset-top);
+  padding-bottom:env(safe-area-inset-bottom);
+  padding-left:env(safe-area-inset-left);
+  padding-right:env(safe-area-inset-right);
+}
 :root{
   --s:#17212b;--s2:#232e3c;--s3:#2b5278;--s4:#1c2733;
   --blue:#2b9cf2;--blue2:#1a8de0;--green:#4dcd5e;
@@ -74,7 +86,13 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
 /* ════════════════════════════════════════════════════
    LAYOUT
 ════════════════════════════════════════════════════ */
-.app{display:flex;height:100vh;background:var(--s)}
+.app{
+  display:flex;
+  height:100vh;height:-webkit-fill-available;
+  background:var(--s);
+  /* Account for safe areas inside the app container */
+  min-height:0;
+}
 
 /* ─── SIDEBAR ─── */
 .sidebar{
@@ -105,12 +123,13 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
 .search-icon{color:var(--t3);font-size:15px}
 
 .new-btn{
-  width:36px;height:36px;border-radius:50%;background:var(--blue);
-  border:none;color:#fff;font-size:20px;cursor:pointer;
+  width:40px;height:40px;border-radius:50%;background:var(--blue);
+  border:none;color:#fff;font-size:18px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;
-  transition:background .2s;
+  transition:background .2s;flex-shrink:0;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
 }
-.new-btn:hover{background:var(--blue2)}
+.new-btn:hover,.new-btn:active{background:var(--blue2)}
 
 /* Room list */
 .room-list{flex:1;overflow-y:auto}
@@ -121,6 +140,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
   display:flex;align-items:center;gap:12px;
   padding:10px 14px;cursor:pointer;transition:background .12s;
   border-bottom:1px solid var(--border);position:relative;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
 }
 .room-item:hover{background:var(--hover)}
 .room-item.active{background:var(--active)}
@@ -165,13 +185,15 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
 .topbar-info{flex:1;min-width:0}
 .topbar-name{font-weight:700;color:var(--t1);font-size:15px}
 .topbar-sub{font-size:12px;color:var(--t3);margin-top:1px}
-.topbar-actions{display:flex;gap:4px}
+.topbar-actions{display:flex;gap:2px;align-items:center}
 .topbar-btn{
-  width:36px;height:36px;border-radius:50%;background:none;border:none;
+  width:40px;height:40px;border-radius:50%;background:none;border:none;
   color:var(--t2);font-size:18px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;transition:background .15s;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  flex-shrink:0;
 }
-.topbar-btn:hover{background:var(--hover);color:var(--t1)}
+.topbar-btn:hover,.topbar-btn:active{background:var(--hover);color:var(--t1)}
 
 /* Messages */
 .messages-area{
@@ -295,7 +317,11 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
 /* Input area */
 .input-area{
   background:var(--s2);border-top:1px solid var(--border);
-  padding:10px 14px;display:flex;align-items:flex-end;gap:10px;flex-shrink:0;
+  padding:10px 14px;
+  padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  display:flex;align-items:flex-end;gap:10px;flex-shrink:0;
+  /* Prevent iOS from hiding input behind keyboard */
+  position:sticky;bottom:0;
 }
 .attach-btn,.send-btn-main{
   width:40px;height:40px;border-radius:50%;border:none;
@@ -310,10 +336,14 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
 .input-box{
   flex:1;min-height:40px;max-height:160px;overflow-y:auto;
   background:var(--s);border:none;border-radius:20px;
-  padding:10px 16px;color:var(--t1);font-size:14px;
+  padding:10px 16px;color:var(--t1);font-size:16px;/* 16px prevents iOS zoom */
   resize:none;outline:none;line-height:1.5;font-family:inherit;
+  -webkit-user-select:text;user-select:text;
+  touch-action:manipulation;
 }
 .input-box:empty::before{content:attr(data-placeholder);color:var(--t3);pointer-events:none}
+.attach-btn{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.send-btn-main{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 
 /* Upload preview */
 .upload-preview{
@@ -583,17 +613,110 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
 .fade-in{animation:fadeIn .2s ease}
 
 /* ════ RESPONSIVE ════ */
+.mob-back-btn{
+  display:none;align-items:center;justify-content:center;
+  width:40px;height:40px;border:none;background:none;
+  color:var(--t2);font-size:22px;cursor:pointer;flex-shrink:0;
+  -webkit-tap-highlight-color:transparent;
+}
+
 @media(max-width:680px){
+  /* Sidebar slides in from left, full-height */
   .sidebar{
-    position:absolute;left:0;top:0;bottom:0;z-index:200;
-    transform:translateX(-100%);transition:transform .25s;
+    position:fixed;left:0;top:0;bottom:0;
+    width:100vw !important;max-width:100vw !important;
+    z-index:300;
+    transform:translateX(-100%);
+    transition:transform .28s cubic-bezier(.4,0,.2,1);
+    /* Safe area */
+    padding-top:env(safe-area-inset-top);
+    padding-bottom:env(safe-area-inset-bottom);
   }
   .sidebar.mob-open{transform:translateX(0)}
-  .mob-back-btn{display:flex!important}
-  .members-panel{width:100%}
+
+  /* Main fills full screen */
+  .main{
+    width:100vw;
+    position:fixed;inset:0;
+    display:flex;flex-direction:column;
+  }
+
+  /* Chat view fills remaining height after topbar */
+  #chatView{
+    flex:1;
+    display:flex !important;
+    flex-direction:column;
+    min-height:0;
+  }
+
+  /* Messages area scrollable */
+  .messages-area{
+    flex:1 !important;
+    overflow-y:auto !important;
+    -webkit-overflow-scrolling:touch;
+    min-height:0;
+  }
+
+  /* Input area — sticky to bottom, above iOS home bar */
+  .input-area{
+    flex-shrink:0;
+    padding-bottom:calc(12px + env(safe-area-inset-bottom));
+  }
+
+  /* Topbar — safe area at top */
+  .chat-topbar{
+    padding-top:env(safe-area-inset-top);
+    flex-shrink:0;
+  }
+
+  /* Show back button */
+  .mob-back-btn{display:flex !important}
+
+  /* Members panel full width */
+  .members-panel{
+    position:fixed;right:0;top:0;bottom:0;
+    width:100vw;z-index:250;
+  }
+
+  /* Topbar actions — ensure all buttons visible, smaller */
+  .topbar-actions{
+    gap:4px;
+  }
+  .topbar-btn{
+    width:34px;height:34px;font-size:16px;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  /* Call buttons always visible on mobile */
+  #btnAudioCall,#btnVideoCall{display:flex !important}
+
+  /* Sidebar header — compact */
+  .sidebar-hdr{
+    padding:10px 10px 8px;
+    padding-top:calc(10px + env(safe-area-inset-top));
+    gap:8px;
+  }
+
+  /* No-room placeholder */
+  .no-room{display:none}
+
+  /* Overlay modals — full screen on mobile */
+  .overlay .modal{
+    position:fixed;
+    bottom:0;left:0;right:0;
+    border-radius:18px 18px 0 0;
+    max-width:100% !important;
+    margin:0;
+    max-height:92vh;
+    overflow-y:auto;
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .overlay{align-items:flex-end}
+
+  /* Room context — show on tap (handled via JS touch) */
+  .room-ctx-btn{display:none}
+  .room-avatar-wrap.ctx-open .room-ctx-btn{display:flex !important}
 }
-.mob-back-btn{display:none;align-items:center;justify-content:center;
-  width:36px;height:36px;border:none;background:none;color:var(--t2);font-size:22px;cursor:pointer}
 /* Room meta — badge under time */
 .room-meta{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;min-width:44px}
 /* Context menu on avatar */
@@ -1101,6 +1224,10 @@ async function openRoom(id){
   if (noRoomEl)   noRoomEl.style.display   = 'none';
   if (chatViewEl) chatViewEl.style.display = 'flex';
   if (!chatViewEl) { console.error('[chat] #chatView not found in DOM'); }
+  // On mobile — hide sidebar, show chat
+  if (isMobile()) {
+    $id('sidebar')?.classList.remove('mob-open');
+  }
 
   // ── Топбар ───────────────────────────────────────────
   const name = room.name || 'Личный чат';
@@ -2269,22 +2396,49 @@ function stopRing(){ clearInterval(_ri); try{_ac?.close();}catch(_){} _ac=null; 
 ════════════════════════════════════════════════════ */
 function closeMobileChat(){
   $id('sidebar')?.classList.add('mob-open');
-  const cv=$id('chatView'); if(cv) cv.style.display='none';
-  const nr=$id('noRoom');   if(nr) nr.style.display='flex';
+  // On mobile, hide chatView and show sidebar
+  if(window.innerWidth <= 680){
+    const cv=$id('chatView'); if(cv) cv.style.display='none';
+    const nr=$id('noRoom');   if(nr) nr.style.display='flex';
+  }
 }
+
+function isMobile(){ return window.innerWidth <= 680; }
+
+// Touch long-press for room context menu on mobile
+(function(){
+  let _ltTimer, _ltTarget;
+  document.addEventListener('touchstart', e=>{
+    const wrap = e.target.closest('.room-avatar-wrap');
+    if (!wrap) return;
+    _ltTarget = wrap;
+    _ltTimer = setTimeout(()=>{
+      const btn = wrap.querySelector('.room-ctx-btn');
+      if (btn) btn.click();
+    }, 500);
+  }, {passive:true});
+  document.addEventListener('touchend', ()=>{ clearTimeout(_ltTimer); }, {passive:true});
+  document.addEventListener('touchmove', ()=>{ clearTimeout(_ltTimer); }, {passive:true});
+})();
 
 /* ════════════════════════════════════════════════════
    INIT & POLLING LOOP
 ════════════════════════════════════════════════════ */
 async function init(){
+  // Mobile: show sidebar first
+  if (isMobile()) {
+    $id('sidebar')?.classList.add('mob-open');
+  }
+
   try {
     await pingPresence();
     await loadRooms();
 
-    // Открываем «Общий» канал по умолчанию
-    // ID может придти как number — ищем и числом, и сравниванием
-    const general = rooms.find(r => r.id === 1 || r.id === '1');
-    if (general) await openRoom(general.id);
+    // On desktop open general channel; on mobile wait for user tap
+    if (!isMobile()) {
+      const general = rooms.find(r => r.id === 1 || r.id === '1');
+      if (general) await openRoom(general.id);
+    }
   } catch(e) {
     console.error('[chat] init error:', e);
   }
