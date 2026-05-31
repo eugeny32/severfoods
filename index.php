@@ -60,7 +60,7 @@ $expiringEmps = getExpiringEmployees($pdo, 7);
 $vjgList      = getVjgList($pdo);
 $mealPointsList = getMealPoints($pdo, true); // active only
 $orgStats     = $pdo->query(
-    "SELECT TRIM(organization) as organization, COUNT(*) as cnt FROM employees WHERE is_active=1 GROUP BY TRIM(organization) ORDER BY TRIM(organization)"
+    "SELECT TRIM(organization) as organization, COUNT(*) as cnt FROM employees WHERE is_active=1 AND NOT (COALESCE(chat_access,0)=1 AND role IS NULL) GROUP BY TRIM(organization) ORDER BY TRIM(organization)"
 )->fetchAll();
 
 // Точки и статистика по ним
@@ -773,7 +773,7 @@ $allEmployeesJson = array_map(function($e) {
     window.points           = <?= json_encode($points,           JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.mealPointId      = <?= json_encode($meal_point_id) ?>;
     window.CURRENT_MEAL     = <?= json_encode($current_meal) ?>;
-    window.ORG_LIST         = <?= json_encode(array_column($pdo->query("SELECT DISTINCT TRIM(organization) as o FROM employees WHERE organization!='' ORDER BY o")->fetchAll(), 'o'), JSON_UNESCAPED_UNICODE) ?>;
+    window.ORG_LIST         = <?= json_encode(array_column($pdo->query("SELECT DISTINCT TRIM(organization) as o FROM employees WHERE organization!='' AND NOT (COALESCE(chat_access,0)=1 AND role IS NULL) ORDER BY o")->fetchAll(), 'o'), JSON_UNESCAPED_UNICODE) ?>;
 })();
 </script>
 <script src="assets/js/qr-input.js"></script>

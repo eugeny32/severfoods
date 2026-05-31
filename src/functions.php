@@ -334,7 +334,7 @@ function getEmployees(PDO $pdo, bool $onlyActive = true): array
     $sql = "SELECT id, full_name, birth_date, organization, department, position,
                    vjg_type, price, qr_expires_at, qr_status, is_active, qr_code, role
             FROM employees";
-    $conditions = ["(organization != 'Чат-пользователь' OR organization IS NULL)"];
+    $conditions = ["NOT (COALESCE(chat_access,0) = 1 AND role IS NULL)"];
     if ($onlyActive) $conditions[] = "is_active = 1";
     $sql .= " WHERE " . implode(" AND ", $conditions);
     $sql .= " ORDER BY full_name";
