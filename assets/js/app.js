@@ -384,23 +384,23 @@ function renderOrgRows(list) {
     const statusLabels = { active:'Активен', expired:'Истёк', blocked:'Заблок.' };
     return list.map(function(e) {
         const sc   = e.qr_status || 'active';
-        const warn = e.expiry_status === 'expired' ? '&#x1F534;' : (e.expiry_status === 'warning' ? '&#x1F7E1;' : '');
+        const warn = e.expiry_status === 'expired' ? '<i class="fas fa-circle" style="color:#e53935"></i>' : (e.expiry_status === 'warning' ? '<i class="fas fa-circle" style="color:#f59e0b"></i>' : '');
         const exp  = e.qr_expires_at
             ? '<div style="font-size:10px;color:#94a3b8;margin-top:2px">до ' + escHtml(e.qr_expires_at) + '</div>' : '';
         const nameJson = JSON.stringify(e.full_name).replace(/[<>&]/g, function(s){return s==='<'?'\u003c':s==='>'?'\u003e':'\u0026';});
 
         const safeName = escHtml(e.full_name).replace(/'/g, "\\'");
         let actions = '<button class="btn-sm green" title="Пропустить вручную"'
-            + ' onclick="openManualFromOrg(' + e.id + ',\'' + safeName + '\')">&#x1F6AA;</button>'
-            + '<a class="btn-sm" href="print_qr.php?id=' + e.id + '" target="_blank" title="Печать QR">&#x1F5A8;</a>';
+            + ' onclick="openManualFromOrg(' + e.id + ',\'' + safeName + '\')"><i class="fas fa-sign-out-alt"></i></button>'
+            + '<a class="btn-sm" href="print_qr.php?id=' + e.id + '" target="_blank" title="Печать QR"><i class="fas fa-print"></i></a>';
 
         if (window.isAdmin) {
             actions += '<button class="btn-sm" title="Редактировать"'
-                + ' onclick="closeModal(&quot;orgModal&quot;);openEditModal(' + e.id + ')">&#x270F;</button>';
+                + ' onclick="closeModal(&quot;orgModal&quot;);openEditModal(' + e.id + ')"><i class="fas fa-pencil-alt"></i></button>';
         }
         if (window.isSuperAdmin) {
             actions += '<button class="btn-sm danger" title="Удалить"'
-                + ' onclick="closeModal(&quot;orgModal&quot;);openDeleteModal(' + e.id + ',' + nameJson + ')">&#x1F5D1;</button>';
+                + ' onclick="closeModal(&quot;orgModal&quot;);openDeleteModal(' + e.id + ',' + nameJson + ')"><i class="fas fa-trash"></i></button>';
         }
 
         return '<tr>'

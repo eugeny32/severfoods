@@ -818,6 +818,7 @@ let _prevDate    = '';
 let _prevSender  = null;
 let allMsgsLoaded= false;
 let loadingMore  = false;
+let _initialLoading = false;
 
 /* ════════════════════════════════════════════════════
    ROOM LIST
@@ -842,7 +843,7 @@ function renderRoomList(filter=''){
     const activeClass = currentRoom?.id===r.id ? 'active' : '';
     return `<div class="room-item ${activeClass}" onclick="openRoom(${r.id})">
       <div class="room-avatar" style="background:${col}">
-        ${r.type==='direct'?`<span style="font-size:16px">${esc(init)}</span>`:esc(init)}
+        ${r.type==='direct'?`<span style="font-size:16px">${esc(init)}</span>`:init}
         ${isOnline?'<span class="online-dot"></span>':''}
       </div>
       <div class="room-body">
@@ -870,12 +871,13 @@ async function openRoom(id){
   const room = rooms.find(r => r.id === id || r.id === +id);
   if (!room) { console.warn('[chat] room not found:', id); return; }
 
-  currentRoom   = room;
-  lastMsgId     = 0;
-  _prevDate     = '';
-  _prevSender   = null;
-  allMsgsLoaded = false;
-  loadingMore   = false;
+  currentRoom      = room;
+  lastMsgId        = 0;
+  _prevDate        = '';
+  _prevSender      = null;
+  allMsgsLoaded    = false;
+  loadingMore      = false;
+  _initialLoading  = true;
 
   // ── Переключаем UI ───────────────────────────────────
   const noRoomEl   = $id('noRoom');
@@ -894,7 +896,7 @@ async function openRoom(id){
   const tbNmEl   = $id('tbName');
   const tbSubEl  = $id('tbSub');
   const leaveBtn = $id('btnLeave');
-  if (tbAvEl)  { tbAvEl.style.background = col; tbAvEl.textContent = init; }
+  if (tbAvEl)  { tbAvEl.style.background = col; tbAvEl.innerHTML = init; }
   if (tbNmEl)  tbNmEl.textContent  = name;
   if (tbSubEl) tbSubEl.innerHTML = room.type === 'direct'  ? '<i class="fas fa-comments"></i> Личный чат' :
                                       room.type === 'channel' ? '<i class="fas fa-bullhorn"></i> Канал'       : '<i class="fas fa-users"></i> Группа';
@@ -915,6 +917,7 @@ async function openRoom(id){
 
   // ── Загружаем данные ─────────────────────────────────
   await loadMessages(true);
+  _initialLoading = false;
   await loadMembers();
 
   // Мобильный: прячем сайдбар
@@ -1437,7 +1440,7 @@ async function pingPresence(){
 }
 
 async function pollMessages(){
-  if(!currentRoom) return;
+  if(!currentRoom || _initialLoading) return;
   const d = await api('messages', {room_id: currentRoom.id, after: lastMsgId});
   const msgs = d.messages || [];
   if(!msgs.length) return;
