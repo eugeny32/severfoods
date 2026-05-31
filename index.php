@@ -56,6 +56,19 @@ if ($is_super_admin) {
 
 // Сотрудники
 $allEmployees = getEmployees($pdo);
+
+// Чат-пользователи (только для суперадмина)
+$chatUsers = [];
+if ($is_super_admin) {
+    try {
+        $chatUsers = $pdo->query(
+            "SELECT id, full_name, chat_username, chat_access, is_active
+             FROM employees
+             WHERE COALESCE(chat_access,0)=1 AND role IS NULL
+             ORDER BY full_name"
+        )->fetchAll();
+    } catch (PDOException $e) { $chatUsers = []; }
+}
 $expiringEmps = getExpiringEmployees($pdo, 7);
 $vjgList      = getVjgList($pdo);
 $mealPointsList = getMealPoints($pdo, true); // active only
@@ -352,6 +365,9 @@ $allEmployeesJson = array_map(function($e) {
             <button class="tab-btn" data-tab="tabSchedule"><i class="fas fa-clock"></i> Расписание</button>
             <?php endif; ?>
             <button class="tab-btn" data-tab="tabQrPrint"><i class="fas fa-print"></i> Печать QR</button>
+            <?php if ($is_super_admin): ?>
+            <button class="tab-btn" data-tab="tabChatUsers"><i class="fas fa-comments"></i> Пользователи чата</button>
+            <?php endif; ?>
         </div>
 
         <!-- REPORTS -->
@@ -527,6 +543,54 @@ $allEmployeesJson = array_map(function($e) {
                 <a href="print_all_qr.php" target="_blank" class="btn btn-primary"><i class="fas fa-print"></i> Печать всех QR-кодов</a>
             </div>
         </div>
+
+        <?php if ($is_super_admin): ?>
+        <!-- CHAT USERS -->
+        <div id="tabChatUsers" class="tab-pane">
+            <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                <span style="color:var(--text-2);font-size:13px">Пользователи, зарегистрированные через чат-вход</span>
+                <span style="font-size:13px;color:var(--text-2)"><?= count($chatUsers) ?> пользователей</span>
+            </div>
+            <?php if (empty($chatUsers)): ?>
+            <div style="padding:20px;text-align:center;color:var(--text-2)">Нет чат-пользователей</div>
+            <?php else: ?>
+            <div style="overflow-x:auto">
+            <table class="emp-table">
+                <thead><tr>
+                    <th>Имя</th>
+                    <th>Логин чата</th>
+                    <th>Статус</th>
+                    <?php if ($is_super_admin): ?><th>Действия</th><?php endif; ?>
+                </tr></thead>
+                <tbody>
+                <?php foreach ($chatUsers as $cu): ?>
+                <tr id="cu-row-<?= $cu['id'] ?>">
+                    <td><?= htmlspecialchars($cu['full_name']) ?></td>
+                    <td><code style="font-size:12px">@<?= htmlspecialchars($cu['chat_username'] ?? '—') ?></code></td>
+                    <td>
+                        <span style="font-size:12px;padding:2px 8px;border-radius:10px;
+                            background:<?= $cu['chat_access'] ? 'rgba(34,197,94,.15)' : 'rgba(239,68,68,.15)' ?>;
+                            color:<?= $cu['chat_access'] ? '#22c55e' : '#ef4444' ?>">
+                            <?= $cu['chat_access'] ? 'Активен' : 'Отключён' ?>
+                        </span>
+                    </td>
+                    <?php if ($is_super_admin): ?>
+                    <td>
+                        <button class="btn-sm btn-danger" title="Удалить"
+                            onclick="deleteChatUser(<?= $cu['id'] ?>, '<?= htmlspecialchars(addslashes($cu['full_name'])) ?>')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                    <?php endif; ?>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
     </div>
     <?php endif; ?>
 </main>
@@ -775,6 +839,29 @@ $allEmployeesJson = array_map(function($e) {
     window.CURRENT_MEAL     = <?= json_encode($current_meal) ?>;
     window.ORG_LIST         = <?= json_encode(array_column($pdo->query("SELECT DISTINCT TRIM(organization) as o FROM employees WHERE organization!='' AND NOT (COALESCE(chat_access,0)=1 AND role IS NULL) ORDER BY o")->fetchAll(), 'o'), JSON_UNESCAPED_UNICODE) ?>;
 })();
+
+function deleteChatUser(id, name) {
+    if (!confirm('Удалить чат-пользователя «' + name + '»?')) return;
+    fetch('delete_employee.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+        },
+        body: JSON.stringify({ id }),
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            const row = document.getElementById('cu-row-' + id);
+            if (row) row.remove();
+        } else {
+            alert(d.message || 'Ошибка удаления');
+        }
+    })
+    .catch(() => alert('Ошибка сервера'));
+}
 </script>
 <script src="assets/js/qr-input.js"></script>
 <script src="assets/js/app.js?v=2"></script>
