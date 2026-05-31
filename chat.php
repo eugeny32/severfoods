@@ -1501,6 +1501,162 @@ async function leaveRoom(){
 }
 
 /* ════════════════════════════════════════════════════
+   ROOM SETTINGS
+════════════════════════════════════════════════════ */
+const RS_COLORS = ['#003366','#0055a5','#15803d','#7c3aed','#b45309','#0e7490','#be185d','#065f46','#1e3a5f','#92400e'];
+let _rsSelectedColor = '';
+
+function openRoomSettings(){
+  if(!currentRoom || currentRoom.type==='direct') return;
+  const canDelete = _myRoomRole==='owner' || ME.role==='super_admin';
+  $id('rsName').value = currentRoom.name || '';
+  $id('rsDesc').value = currentRoom.description || '';
+  _rsSelectedColor = currentRoom.avatar_color || RS_COLORS[0];
+  $id('rsColorPills').innerHTML = RS_COLORS.map(c=>
+    `<div class="rs-color-pill${c===_rsSelectedColor?' sel':''}" style="background:${c}" onclick="rsPickColor('${c}')"></div>`
+  ).join('');
+  $id('rsDangerZone').style.display = canDelete ? 'block' : 'none';
+  openOverlay('roomSettingsOverlay');
+}
+
+function rsPickColor(c){
+  _rsSelectedColor = c;
+  $id('rsColorPills').querySelectorAll('.rs-color-pill').forEach(el=>{
+    el.classList.toggle('sel', el.style.backgroundColor===c);
+  });
+}
+
+async function saveRoomSettings(){
+  if(!currentRoom) return;
+  const name = $id('rsName').value.trim();
+  const desc = $id('rsDesc').value.trim();
+  if(!name){ showToast('Введите название','<i class="fas fa-exclamation-triangle"></i>'); return; }
+  const d = await apiPost('update_room',{room_id:currentRoom.id, name, description:desc, avatar_color:_rsSelectedColor});
+  if(d.ok){
+    currentRoom.name=name; currentRoom.description=desc; currentRoom.avatar_color=_rsSelectedColor;
+    $id('tbName').textContent=name;
+    const av=$id('tbAvatar'); if(av) av.style.background=_rsSelectedColor;
+    closeOverlay('roomSettingsOverlay');
+    await loadRooms();
+    showToast('Сохранено','<i class="fas fa-check-circle"></i>');
+  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
+
+async function deleteRoom(){
+  if(!currentRoom) return;
+  if(!confirm(`Удалить комнату «${currentRoom.name}»? Это нельзя отменить.`)) return;
+  const d = await apiPost('delete_room',{room_id:currentRoom.id});
+  if(d.ok){
+    closeOverlay('roomSettingsOverlay');
+    currentRoom=null;
+    const cv=$id('chatView'); if(cv) cv.style.display='none';
+    const nr=$id('noRoom');   if(nr) nr.style.display='flex';
+    await loadRooms();
+    showToast('Комната удалена','<i class="fas fa-trash"></i>');
+  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
+
+/* ════════════════════════════════════════════════════
+   MEMBER ADMIN
+════════════════════════════════════════════════════ */
+async function kickMember(userId, userName){
+  if(!currentRoom) return;
+  if(!confirm(`Исключить ${userName} из комнаты?`)) return;
+  const d = await apiPost('kick_member',{room_id:currentRoom.id, user_id:userId});
+  if(d.ok){
+    await loadMembers();
+    showToast(`${userName} исключён(а)`,'<i class="fas fa-user-slash"></i>');
+  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
+
+async function setMemberRole(userId, role){
+  if(!currentRoom) return;
+  const d = await apiPost('set_member_role',{room_id:currentRoom.id, user_id:userId, role});
+  if(d.ok){
+    await loadMembers();
+    showToast(role==='admin'?'Назначен администратором':'Права администратора сняты','<i class="fas fa-star"></i>');
+  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
+
+/* ════════════════════════════════════════════════════
+   PINNED MESSAGES
+════════════════════════════════════════════════════ */
+async function loadPinned(){
+  if(!currentRoom) return;
+  const d = await api('pinned',{room_id:currentRoom.id});
+  const pin = d.pinned;
+  _pinnedMsgId = pin ? pin.id : null;
+  const bar=$id('pinnedBar'), txt=$id('pinnedText'), unpinBtn=$id('pinnedUnpinBtn');
+  if(!bar) return;
+  if(pin){
+    if(txt) txt.textContent=pin.sender_name+': '+(pin.body||'Файл');
+    if(unpinBtn) unpinBtn.style.display=['owner','admin'].includes(_myRoomRole)?'':'none';
+    bar.classList.add('show');
+  } else {
+    bar.classList.remove('show');
+  }
+}
+
+function scrollToPinned(){
+  if(!_pinnedMsgId) return;
+  const el=$id('messagesArea')?.querySelector(`[data-mid="${_pinnedMsgId}"]`);
+  if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+async function pinMsg(msgId){
+  if(!currentRoom) return;
+  const d = await apiPost('pin_msg',{room_id:currentRoom.id, msg_id:msgId});
+  if(d.ok){ await loadPinned(); showToast('Сообщение закреплено','<i class="fas fa-thumbtack"></i>'); }
+  else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
+
+async function unpinMsg(){
+  if(!currentRoom) return;
+  const d = await apiPost('pin_msg',{room_id:currentRoom.id, msg_id:null});
+  if(d.ok){ await loadPinned(); showToast('Сообщение откреплено','<i class="fas fa-thumbtack"></i>'); }
+  else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
+
+/* ════════════════════════════════════════════════════
+   EDIT MESSAGE
+════════════════════════════════════════════════════ */
+function startEditMsg(msgId){
+  const area=$id('messagesArea');
+  const msgEl=area?.querySelector(`[data-mid="${msgId}"]`);
+  const bub=msgEl?.querySelector('.msg-bub');
+  const textEl=bub?.querySelector('.msg-text');
+  if(!bub||!textEl) return;
+  const origText=textEl.textContent;
+  bub.innerHTML=`<div class="msg-edit-wrap">
+    <textarea class="msg-edit-input" id="editInput_${msgId}">${esc(origText)}</textarea>
+    <div class="msg-edit-btns">
+      <button class="edit-cancel" onclick="cancelEditMsg(${msgId},${JSON.stringify(origText)})">Отмена</button>
+      <button class="edit-save" onclick="saveEditMsg(${msgId})"><i class="fas fa-check"></i> Сохранить</button>
+    </div>
+  </div>`;
+  const inp=$id(`editInput_${msgId}`);
+  if(inp){inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);}
+}
+
+function cancelEditMsg(msgId, origText){
+  const area=$id('messagesArea');
+  const bub=area?.querySelector(`[data-mid="${msgId}"]`)?.querySelector('.msg-bub');
+  if(bub) bub.innerHTML=`<div class="msg-text">${esc(origText)}</div>`;
+}
+
+async function saveEditMsg(msgId){
+  const inp=$id(`editInput_${msgId}`);
+  if(!inp) return;
+  const text=inp.value.trim();
+  if(!text){showToast('Нельзя сохранить пустое сообщение','<i class="fas fa-exclamation-triangle"></i>');return;}
+  const d=await apiPost('edit_msg',{id:msgId,text});
+  if(d.ok){
+    const bub=$id('messagesArea')?.querySelector(`[data-mid="${msgId}"]`)?.querySelector('.msg-bub');
+    if(bub) bub.innerHTML=`<div class="msg-text">${esc(text)}</div><span class="msg-edited">(ред.)</span>`;
+  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
+
+/* ════════════════════════════════════════════════════
    DIRECT MESSAGE
 ════════════════════════════════════════════════════ */
 function buildDirectUserList(){
@@ -1541,182 +1697,6 @@ function openImgViewer(fileId, name){
   $id('imgViewer').classList.add('open');
 }
 function closeImgViewer(){ $id('imgViewer').classList.remove('open'); }
-
-/* ════════════════════════════════════════════════════
-   ROOM SETTINGS
-════════════════════════════════════════════════════ */
-const RS_COLORS = ['#003366','#0055a5','#15803d','#7c3aed','#b45309','#0e7490','#be185d','#065f46','#1e3a5f','#92400e'];
-let _rsSelectedColor = '';
-
-function openRoomSettings(){
-  if(!currentRoom || currentRoom.type==='direct') return;
-  const isOwnerOrSA = _myRoomRole==='owner' || ME.role==='super_admin';
-
-  $id('rsName').value = currentRoom.name || '';
-  $id('rsDesc').value = currentRoom.description || '';
-  _rsSelectedColor = currentRoom.avatar_color || RS_COLORS[0];
-
-  // Color pills
-  $id('rsColorPills').innerHTML = RS_COLORS.map(c=>
-    `<div class="rs-color-pill${c===_rsSelectedColor?' sel':''}" style="background:${c}" onclick="rsPickColor('${c}')"></div>`
-  ).join('');
-
-  // Danger zone only for owner/super_admin
-  $id('rsDangerZone').style.display = isOwnerOrSA ? 'block' : 'none';
-
-  openOverlay('roomSettingsOverlay');
-}
-
-function rsPickColor(c){
-  _rsSelectedColor = c;
-  $id('rsColorPills').querySelectorAll('.rs-color-pill').forEach(el=>{
-    el.classList.toggle('sel', el.style.background===c || el.style.backgroundColor===c);
-  });
-}
-
-async function saveRoomSettings(){
-  if(!currentRoom) return;
-  const name  = $id('rsName').value.trim();
-  const desc  = $id('rsDesc').value.trim();
-  const color = _rsSelectedColor;
-  if(!name){ showToast('Введите название','<i class="fas fa-exclamation-triangle"></i>'); return; }
-
-  const d = await apiPost('update_room',{room_id:currentRoom.id, name, description:desc, avatar_color:color});
-  if(d.ok){
-    currentRoom.name = name; currentRoom.description = desc; currentRoom.avatar_color = color;
-    $id('tbName').textContent = name;
-    const tbAvEl = $id('tbAvatar');
-    if(tbAvEl){ tbAvEl.style.background = color; }
-    closeOverlay('roomSettingsOverlay');
-    await loadRooms();
-    showToast('Сохранено','<i class="fas fa-check-circle"></i>');
-  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
-}
-
-async function deleteRoom(){
-  if(!currentRoom) return;
-  if(!confirm(`Удалить комнату «${currentRoom.name}»? Это действие нельзя отменить.`)) return;
-  const d = await apiPost('delete_room',{room_id:currentRoom.id});
-  if(d.ok){
-    closeOverlay('roomSettingsOverlay');
-    currentRoom = null;
-    const cv=$id('chatView'); if(cv) cv.style.display='none';
-    const nr=$id('noRoom');   if(nr) nr.style.display='flex';
-    await loadRooms();
-    showToast('Комната удалена','<i class="fas fa-trash"></i>');
-  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
-}
-
-/* ════════════════════════════════════════════════════
-   MEMBER ADMIN
-════════════════════════════════════════════════════ */
-async function kickMember(userId, userName){
-  if(!currentRoom) return;
-  if(!confirm(`Исключить ${userName} из комнаты?`)) return;
-  const d = await apiPost('kick_member',{room_id:currentRoom.id, user_id:userId});
-  if(d.ok){
-    await loadMembers();
-    showToast(`${userName} исключён(а)`,'<i class="fas fa-user-slash"></i>');
-  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
-}
-
-async function setMemberRole(userId, role){
-  if(!currentRoom) return;
-  const d = await apiPost('set_member_role',{room_id:currentRoom.id, user_id:userId, role});
-  if(d.ok){
-    await loadMembers();
-    showToast(role==='admin'?'Пользователь назначен администратором':'Права администратора сняты','<i class="fas fa-star"></i>');
-  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
-}
-
-/* ════════════════════════════════════════════════════
-   PINNED MESSAGES
-════════════════════════════════════════════════════ */
-async function loadPinned(){
-  if(!currentRoom) return;
-  const d = await api('pinned',{room_id:currentRoom.id});
-  const pin = d.pinned;
-  _pinnedMsgId = pin ? pin.id : null;
-  const bar = $id('pinnedBar');
-  const txt = $id('pinnedText');
-  const unpin = $id('pinnedUnpinBtn');
-  if(!bar) return;
-  if(pin){
-    const isAdmin = ['owner','admin'].includes(_myRoomRole);
-    if(txt) txt.textContent = pin.sender_name+': '+(pin.body||'📎 Файл');
-    if(unpin) unpin.style.display = isAdmin ? '' : 'none';
-    bar.classList.add('show');
-  } else {
-    bar.classList.remove('show');
-  }
-}
-
-function scrollToPinned(){
-  if(!_pinnedMsgId) return;
-  const el = $id('messagesArea')?.querySelector(`[data-mid="${_pinnedMsgId}"]`);
-  if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
-}
-
-async function pinMsg(msgId){
-  if(!currentRoom) return;
-  const d = await apiPost('pin_msg',{room_id:currentRoom.id, msg_id:msgId});
-  if(d.ok){ await loadPinned(); showToast('Сообщение закреплено','<i class="fas fa-thumbtack"></i>'); }
-  else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
-}
-
-async function unpinMsg(msgId){
-  if(!currentRoom) return;
-  const d = await apiPost('pin_msg',{room_id:currentRoom.id, msg_id:null});
-  if(d.ok){ await loadPinned(); showToast('Сообщение откреплено','<i class="fas fa-thumbtack"></i>'); }
-  else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
-}
-
-/* ════════════════════════════════════════════════════
-   EDIT MESSAGE
-════════════════════════════════════════════════════ */
-function startEditMsg(msgId){
-  const area = $id('messagesArea');
-  if(!area) return;
-  const msgEl = area.querySelector(`[data-mid="${msgId}"]`);
-  if(!msgEl) return;
-  const bub = msgEl.querySelector('.msg-bub');
-  const textEl = bub?.querySelector('.msg-text');
-  if(!bub || !textEl) return;
-
-  const origText = textEl.textContent;
-  bub.innerHTML = `
-    <div class="msg-edit-wrap">
-      <textarea class="msg-edit-input" id="editInput_${msgId}">${origText.replace(/</g,'&lt;')}</textarea>
-      <div class="msg-edit-btns">
-        <button class="edit-cancel" onclick="cancelEditMsg(${msgId},'${origText.replace(/'/g,"\\'").replace(/\n/g,'\\n')}')">Отмена</button>
-        <button class="edit-save"   onclick="saveEditMsg(${msgId})"><i class="fas fa-check"></i> Сохранить</button>
-      </div>
-    </div>`;
-  const inp = $id(`editInput_${msgId}`);
-  if(inp){ inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length); }
-}
-
-function cancelEditMsg(msgId, origText){
-  const area = $id('messagesArea');
-  const msgEl = area?.querySelector(`[data-mid="${msgId}"]`);
-  const bub = msgEl?.querySelector('.msg-bub');
-  if(bub) bub.innerHTML = `<div class="msg-text">${esc(origText.replace(/\\n/g,'\n'))}</div>`;
-}
-
-async function saveEditMsg(msgId){
-  const inp = $id(`editInput_${msgId}`);
-  if(!inp) return;
-  const text = inp.value.trim();
-  if(!text){ showToast('Сообщение не может быть пустым','<i class="fas fa-exclamation-triangle"></i>'); return; }
-
-  const d = await apiPost('edit_msg',{id:msgId, text});
-  if(d.ok){
-    const area = $id('messagesArea');
-    const msgEl = area?.querySelector(`[data-mid="${msgId}"]`);
-    const bub = msgEl?.querySelector('.msg-bub');
-    if(bub) bub.innerHTML = `<div class="msg-text">${esc(text)}</div><span class="msg-edited">(ред.)</span>`;
-  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
-}
 
 /* ════════════════════════════════════════════════════
    PRESENCE / POLL
