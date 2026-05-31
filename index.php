@@ -743,6 +743,6 @@ $allEmployeesJson = array_map(function($e) {
 })();
 </script>
 <script src="assets/js/qr-input.js"></script>
-<script src="assets/js/app.js"></script>
+<script src="assets/js/app.js?v=2"></script>
 </body>
 </html>

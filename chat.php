@@ -513,6 +513,47 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
 .toast.show{display:flex;animation:slideDown .25s ease}
 @keyframes slideDown{from{transform:translateX(-50%) translateY(-12px);opacity:0}to{transform:translateX(-50%) translateY(0);opacity:1}}
 
+/* ════ ROOM SETTINGS ════ */
+.rs-color-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.rs-color-pill{width:28px;height:28px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:border .15s;flex-shrink:0}
+.rs-color-pill.sel{border-color:#fff}
+.rs-danger-zone{margin-top:20px;padding-top:16px;border-top:1px solid rgba(229,57,53,.3)}
+.rs-danger-zone h4{font-size:12px;font-weight:700;color:#e53935;text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px}
+
+/* ════ PINNED MESSAGE ════ */
+.pinned-bar{
+  background:rgba(43,146,242,.1);border-bottom:1px solid rgba(43,146,242,.2);
+  padding:8px 16px;display:none;align-items:center;gap:10px;cursor:pointer;flex-shrink:0;
+}
+.pinned-bar.show{display:flex}
+.pinned-icon{color:var(--blue);font-size:14px;flex-shrink:0}
+.pinned-content{flex:1;min-width:0}
+.pinned-label{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.4px}
+.pinned-text{font-size:13px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pinned-close{background:none;border:none;color:var(--t3);font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0}
+.pinned-close:hover{color:var(--t1)}
+
+/* ════ INLINE EDIT ════ */
+.msg-edit-wrap{display:flex;flex-direction:column;gap:6px;min-width:200px}
+.msg-edit-input{
+  background:var(--s);border:1px solid var(--blue);border-radius:var(--r);
+  color:var(--t1);padding:8px 10px;font-family:inherit;font-size:14px;
+  outline:none;resize:none;min-height:60px;
+}
+.msg-edit-btns{display:flex;gap:6px;justify-content:flex-end}
+.msg-edit-btns button{padding:4px 12px;border-radius:6px;border:none;font-size:12px;font-weight:600;cursor:pointer}
+.edit-save{background:var(--blue);color:#fff}
+.edit-cancel{background:var(--s3);color:var(--t2)}
+
+/* ════ MEMBER ACTIONS ════ */
+.member-actions{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
+.mbtn{background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:4px 6px;border-radius:6px;transition:all .15s}
+.mbtn:hover{background:var(--hover);color:var(--t1)}
+.mbtn.danger:hover{background:rgba(229,57,53,.2);color:#e57373}
+
+/* ════ EDITED LABEL ════ */
+.msg-edited{font-size:10px;color:var(--t3);font-style:italic;margin-left:4px}
+
 /* ════ ANIMATIONS ════ */
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 .fade-in{animation:fadeIn .2s ease}
@@ -577,8 +618,19 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
         <button class="topbar-btn" id="btnAudioCall" title="Аудиозвонок" onclick="initiateCall(false)"><i class="fas fa-microphone"></i></button>
         <button class="topbar-btn" id="btnVideoCall" title="Видеозвонок" onclick="initiateCall(true)"><i class="fas fa-video"></i></button>
         <button class="topbar-btn" title="Участники" onclick="toggleMembersPanel()"><i class="fas fa-users"></i></button>
+        <button class="topbar-btn" id="btnRoomSettings" title="Настройки комнаты" onclick="openRoomSettings()" style="display:none"><i class="fas fa-cog"></i></button>
         <button class="topbar-btn" id="btnLeave" title="Покинуть" onclick="leaveRoom()" style="display:none"><i class="fas fa-sign-out-alt"></i></button>
       </div>
+    </div>
+
+    <!-- Pinned message bar -->
+    <div class="pinned-bar" id="pinnedBar" onclick="scrollToPinned()">
+      <span class="pinned-icon"><i class="fas fa-thumbtack"></i></span>
+      <div class="pinned-content">
+        <div class="pinned-label">Закреплено</div>
+        <div class="pinned-text" id="pinnedText"></div>
+      </div>
+      <button class="pinned-close" id="pinnedUnpinBtn" title="Открепить" onclick="event.stopPropagation();unpinMsg()"><i class="fas fa-times"></i></button>
     </div>
 
     <!-- Empty state (снаружи messagesArea, чтобы innerHTML='' не уничтожал его) -->
@@ -630,6 +682,38 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
 </div><!-- .app -->
 
 <!-- ═══ MODALS ═══ -->
+
+<!-- Room Settings -->
+<div class="overlay" id="roomSettingsOverlay">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr">
+      <div class="modal-title"><i class="fas fa-cog"></i> Настройки комнаты</div>
+      <button class="modal-close" onclick="closeOverlay('roomSettingsOverlay')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label>Название</label>
+        <input type="text" id="rsName" maxlength="100" placeholder="Название группы / канала">
+      </div>
+      <div class="form-field">
+        <label>Описание</label>
+        <textarea id="rsDesc" rows="2" maxlength="300" placeholder="Описание (необязательно)"></textarea>
+      </div>
+      <div class="form-field">
+        <label>Цвет аватара</label>
+        <div class="rs-color-pills" id="rsColorPills"></div>
+      </div>
+      <div class="rs-danger-zone" id="rsDangerZone" style="display:none">
+        <h4><i class="fas fa-exclamation-triangle"></i> Опасная зона</h4>
+        <button class="btn btn-danger" style="width:100%" onclick="deleteRoom()"><i class="fas fa-trash"></i> Удалить комнату навсегда</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeOverlay('roomSettingsOverlay')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveRoomSettings()"><i class="fas fa-save"></i> Сохранить</button>
+    </div>
+  </div>
+</div>
 
 <!-- New chat selector -->
 <div class="overlay" id="newChatOverlay">
@@ -819,6 +903,8 @@ let _prevSender  = null;
 let allMsgsLoaded= false;
 let loadingMore  = false;
 let _initialLoading = false;
+let _myRoomRole     = 'member';
+let _pinnedMsgId    = null;
 
 /* ════════════════════════════════════════════════════
    ROOM LIST
@@ -918,7 +1004,11 @@ async function openRoom(id){
   // ── Загружаем данные ─────────────────────────────────
   await loadMessages(true);
   _initialLoading = false;
-  await loadMembers();
+  await Promise.all([loadMembers(), loadPinned()]);
+
+  // Settings button visibility: show for non-direct rooms
+  const settingsBtn = $id('btnRoomSettings');
+  if (settingsBtn) settingsBtn.style.display = room.type !== 'direct' ? '' : 'none';
 
   // Мобильный: прячем сайдбар
   $id('sidebar')?.classList.remove('mob-open');
@@ -1238,8 +1328,13 @@ function ctxMenu(e, msgId, isOwn){
   const area = $id('messagesArea');
   const msgEl= area.querySelector(`[data-mid="${msgId}"]`);
   if(!msgEl) return;
-  const body  = msgEl.querySelector('.msg-text,.msg-deleted')?.textContent||'';
-  const sender= msgEl.querySelector('.msg-sender')?.textContent || ME.name;
+  const body   = msgEl.querySelector('.msg-text,.msg-deleted')?.textContent||'';
+  const sender = msgEl.querySelector('.msg-sender')?.textContent || ME.name;
+  const isAdmin = ['owner','admin'].includes(_myRoomRole);
+  const canDel  = isOwn || isAdmin;
+  const canEdit = isOwn;
+  const canPin  = isAdmin && currentRoom?.type !== 'direct';
+  const isPinned = _pinnedMsgId === msgId;
 
   const menu = document.createElement('div');
   menu.className = 'ctx-menu';
@@ -1247,7 +1342,9 @@ function ctxMenu(e, msgId, isOwn){
   menu.innerHTML = `
     <div class="ctx-item" onclick="startReply(${msgId},'${esc(sender)}','${esc(body.slice(0,80))}');closeCtx()"><i class="fas fa-reply"></i> Ответить</div>
     <div class="ctx-item" onclick="navigator.clipboard.writeText(${JSON.stringify(body)});closeCtx();showToast('Скопировано','<i class="fas fa-check-circle"></i>')"><i class="fas fa-copy"></i> Копировать</div>
-    ${isOwn?`<div class="ctx-item danger" onclick="deleteMsg(${msgId});closeCtx()"><i class="fas fa-trash"></i> Удалить</div>`:''}
+    ${canEdit?`<div class="ctx-item" onclick="startEditMsg(${msgId});closeCtx()"><i class="fas fa-pencil-alt"></i> Редактировать</div>`:''}
+    ${canPin?`<div class="ctx-item" onclick="${isPinned?`unpinMsg`:`pinMsg`}(${msgId});closeCtx()"><i class="fas fa-thumbtack"></i> ${isPinned?'Открепить':'Закрепить'}</div>`:''}
+    ${canDel?`<div class="ctx-item danger" onclick="deleteMsg(${msgId});closeCtx()"><i class="fas fa-trash"></i> Удалить</div>`:''}
   `;
   document.body.appendChild(menu);
   _ctx = menu;
@@ -1277,17 +1374,34 @@ async function loadMembers(){
   if(!currentRoom) return;
   const d = await api('room_members',{room_id:currentRoom.id});
   const members = d.members||[];
+  // Update my room role
+  const me = members.find(m=>m.user_id===ME.id);
+  _myRoomRole = me?.room_role || 'member';
+  const isOwner  = _myRoomRole === 'owner';
+  const isRoomAdmin = ['owner','admin'].includes(_myRoomRole);
   $id('membersList').innerHTML = members.map(m=>{
     const col  = avatarColor(m.user_name);
     const init = avatarInitial(m.user_name);
     const rl   = m.room_role==='owner'?'<i class="fas fa-crown"></i> Владелец':m.room_role==='admin'?'<i class="fas fa-star"></i> Админ':'Участник';
+    const isMe = m.user_id === ME.id;
+    const canKick = isRoomAdmin && !isMe && m.room_role !== 'owner';
+    const canPromote = isOwner && !isMe && m.room_role !== 'owner';
+    const promoteLabel = m.room_role === 'admin' ? '<i class="fas fa-arrow-down"></i>' : '<i class="fas fa-arrow-up"></i>';
+    const promoteTitle = m.room_role === 'admin' ? 'Снять администратора' : 'Сделать администратором';
+    const newRole = m.room_role === 'admin' ? 'member' : 'admin';
     return `<div class="member-row">
-      <div class="member-av" style="width:36px;height:36px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0">${esc(init)}</div>
+      <div style="width:36px;height:36px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;position:relative">
+        ${esc(init)}
+        ${m.online?'<span style="position:absolute;bottom:0;right:0;width:9px;height:9px;border-radius:50%;background:var(--green);border:2px solid var(--s2)"></span>':''}
+      </div>
       <div class="member-info">
-        <div class="member-nm">${esc(m.user_name)}${m.user_id===ME.id?' (Вы)':''}</div>
+        <div class="member-nm">${esc(m.user_name)}${isMe?' <span style="color:var(--t3);font-size:11px">(Вы)</span>':''}</div>
         <div class="member-rl">${rl}</div>
       </div>
-      <div class="member-status ${m.online?'online':''}"></div>
+      <div class="member-actions">
+        ${canPromote?`<button class="mbtn" title="${promoteTitle}" onclick="setMemberRole(${m.user_id},'${newRole}')">${promoteLabel}</button>`:''}
+        ${canKick?`<button class="mbtn danger" title="Исключить" onclick="kickMember(${m.user_id},'${esc(m.user_name)}')"><i class="fas fa-user-slash"></i></button>`:''}
+      </div>
     </div>`;
   }).join('');
 }
@@ -1427,6 +1541,182 @@ function openImgViewer(fileId, name){
   $id('imgViewer').classList.add('open');
 }
 function closeImgViewer(){ $id('imgViewer').classList.remove('open'); }
+
+/* ════════════════════════════════════════════════════
+   ROOM SETTINGS
+════════════════════════════════════════════════════ */
+const RS_COLORS = ['#003366','#0055a5','#15803d','#7c3aed','#b45309','#0e7490','#be185d','#065f46','#1e3a5f','#92400e'];
+let _rsSelectedColor = '';
+
+function openRoomSettings(){
+  if(!currentRoom || currentRoom.type==='direct') return;
+  const isOwnerOrSA = _myRoomRole==='owner' || ME.role==='super_admin';
+
+  $id('rsName').value = currentRoom.name || '';
+  $id('rsDesc').value = currentRoom.description || '';
+  _rsSelectedColor = currentRoom.avatar_color || RS_COLORS[0];
+
+  // Color pills
+  $id('rsColorPills').innerHTML = RS_COLORS.map(c=>
+    `<div class="rs-color-pill${c===_rsSelectedColor?' sel':''}" style="background:${c}" onclick="rsPickColor('${c}')"></div>`
+  ).join('');
+
+  // Danger zone only for owner/super_admin
+  $id('rsDangerZone').style.display = isOwnerOrSA ? 'block' : 'none';
+
+  openOverlay('roomSettingsOverlay');
+}
+
+function rsPickColor(c){
+  _rsSelectedColor = c;
+  $id('rsColorPills').querySelectorAll('.rs-color-pill').forEach(el=>{
+    el.classList.toggle('sel', el.style.background===c || el.style.backgroundColor===c);
+  });
+}
+
+async function saveRoomSettings(){
+  if(!currentRoom) return;
+  const name  = $id('rsName').value.trim();
+  const desc  = $id('rsDesc').value.trim();
+  const color = _rsSelectedColor;
+  if(!name){ showToast('Введите название','<i class="fas fa-exclamation-triangle"></i>'); return; }
+
+  const d = await apiPost('update_room',{room_id:currentRoom.id, name, description:desc, avatar_color:color});
+  if(d.ok){
+    currentRoom.name = name; currentRoom.description = desc; currentRoom.avatar_color = color;
+    $id('tbName').textContent = name;
+    const tbAvEl = $id('tbAvatar');
+    if(tbAvEl){ tbAvEl.style.background = color; }
+    closeOverlay('roomSettingsOverlay');
+    await loadRooms();
+    showToast('Сохранено','<i class="fas fa-check-circle"></i>');
+  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
+
+async function deleteRoom(){
+  if(!currentRoom) return;
+  if(!confirm(`Удалить комнату «${currentRoom.name}»? Это действие нельзя отменить.`)) return;
+  const d = await apiPost('delete_room',{room_id:currentRoom.id});
+  if(d.ok){
+    closeOverlay('roomSettingsOverlay');
+    currentRoom = null;
+    const cv=$id('chatView'); if(cv) cv.style.display='none';
+    const nr=$id('noRoom');   if(nr) nr.style.display='flex';
+    await loadRooms();
+    showToast('Комната удалена','<i class="fas fa-trash"></i>');
+  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
+
+/* ════════════════════════════════════════════════════
+   MEMBER ADMIN
+════════════════════════════════════════════════════ */
+async function kickMember(userId, userName){
+  if(!currentRoom) return;
+  if(!confirm(`Исключить ${userName} из комнаты?`)) return;
+  const d = await apiPost('kick_member',{room_id:currentRoom.id, user_id:userId});
+  if(d.ok){
+    await loadMembers();
+    showToast(`${userName} исключён(а)`,'<i class="fas fa-user-slash"></i>');
+  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
+
+async function setMemberRole(userId, role){
+  if(!currentRoom) return;
+  const d = await apiPost('set_member_role',{room_id:currentRoom.id, user_id:userId, role});
+  if(d.ok){
+    await loadMembers();
+    showToast(role==='admin'?'Пользователь назначен администратором':'Права администратора сняты','<i class="fas fa-star"></i>');
+  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
+
+/* ════════════════════════════════════════════════════
+   PINNED MESSAGES
+════════════════════════════════════════════════════ */
+async function loadPinned(){
+  if(!currentRoom) return;
+  const d = await api('pinned',{room_id:currentRoom.id});
+  const pin = d.pinned;
+  _pinnedMsgId = pin ? pin.id : null;
+  const bar = $id('pinnedBar');
+  const txt = $id('pinnedText');
+  const unpin = $id('pinnedUnpinBtn');
+  if(!bar) return;
+  if(pin){
+    const isAdmin = ['owner','admin'].includes(_myRoomRole);
+    if(txt) txt.textContent = pin.sender_name+': '+(pin.body||'📎 Файл');
+    if(unpin) unpin.style.display = isAdmin ? '' : 'none';
+    bar.classList.add('show');
+  } else {
+    bar.classList.remove('show');
+  }
+}
+
+function scrollToPinned(){
+  if(!_pinnedMsgId) return;
+  const el = $id('messagesArea')?.querySelector(`[data-mid="${_pinnedMsgId}"]`);
+  if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+async function pinMsg(msgId){
+  if(!currentRoom) return;
+  const d = await apiPost('pin_msg',{room_id:currentRoom.id, msg_id:msgId});
+  if(d.ok){ await loadPinned(); showToast('Сообщение закреплено','<i class="fas fa-thumbtack"></i>'); }
+  else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
+
+async function unpinMsg(msgId){
+  if(!currentRoom) return;
+  const d = await apiPost('pin_msg',{room_id:currentRoom.id, msg_id:null});
+  if(d.ok){ await loadPinned(); showToast('Сообщение откреплено','<i class="fas fa-thumbtack"></i>'); }
+  else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
+
+/* ════════════════════════════════════════════════════
+   EDIT MESSAGE
+════════════════════════════════════════════════════ */
+function startEditMsg(msgId){
+  const area = $id('messagesArea');
+  if(!area) return;
+  const msgEl = area.querySelector(`[data-mid="${msgId}"]`);
+  if(!msgEl) return;
+  const bub = msgEl.querySelector('.msg-bub');
+  const textEl = bub?.querySelector('.msg-text');
+  if(!bub || !textEl) return;
+
+  const origText = textEl.textContent;
+  bub.innerHTML = `
+    <div class="msg-edit-wrap">
+      <textarea class="msg-edit-input" id="editInput_${msgId}">${origText.replace(/</g,'&lt;')}</textarea>
+      <div class="msg-edit-btns">
+        <button class="edit-cancel" onclick="cancelEditMsg(${msgId},'${origText.replace(/'/g,"\\'").replace(/\n/g,'\\n')}')">Отмена</button>
+        <button class="edit-save"   onclick="saveEditMsg(${msgId})"><i class="fas fa-check"></i> Сохранить</button>
+      </div>
+    </div>`;
+  const inp = $id(`editInput_${msgId}`);
+  if(inp){ inp.focus(); inp.setSelectionRange(inp.value.length,inp.value.length); }
+}
+
+function cancelEditMsg(msgId, origText){
+  const area = $id('messagesArea');
+  const msgEl = area?.querySelector(`[data-mid="${msgId}"]`);
+  const bub = msgEl?.querySelector('.msg-bub');
+  if(bub) bub.innerHTML = `<div class="msg-text">${esc(origText.replace(/\\n/g,'\n'))}</div>`;
+}
+
+async function saveEditMsg(msgId){
+  const inp = $id(`editInput_${msgId}`);
+  if(!inp) return;
+  const text = inp.value.trim();
+  if(!text){ showToast('Сообщение не может быть пустым','<i class="fas fa-exclamation-triangle"></i>'); return; }
+
+  const d = await apiPost('edit_msg',{id:msgId, text});
+  if(d.ok){
+    const area = $id('messagesArea');
+    const msgEl = area?.querySelector(`[data-mid="${msgId}"]`);
+    const bub = msgEl?.querySelector('.msg-bub');
+    if(bub) bub.innerHTML = `<div class="msg-text">${esc(text)}</div><span class="msg-edited">(ред.)</span>`;
+  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
 
 /* ════════════════════════════════════════════════════
    PRESENCE / POLL
