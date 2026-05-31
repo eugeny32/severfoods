@@ -2289,31 +2289,18 @@ const ICE = {
   iceServers:[
     {urls:'stun:stun.l.google.com:19302'},
     {urls:'stun:stun1.l.google.com:19302'},
-    {urls:'stun:stun2.l.google.com:19302'},
     {urls:'stun:stun.cloudflare.com:3478'},
-    // Free public TURN (Metered OpenRelay) — required for NAT traversal on
-    // mobile / carrier-grade NAT. The old openrelayproject.org domain is dead;
-    // openrelay.metered.ca is the current working endpoint.
-    {
-      urls:'turn:openrelay.metered.ca:80',
-      username:'openrelayproject',
-      credential:'openrelayproject'
-    },
-    {
-      urls:'turn:openrelay.metered.ca:443',
-      username:'openrelayproject',
-      credential:'openrelayproject'
-    },
-    {
-      urls:'turn:openrelay.metered.ca:443?transport=tcp',
-      username:'openrelayproject',
-      credential:'openrelayproject'
-    },
-    {
-      urls:'turns:openrelay.metered.ca:443',
-      username:'openrelayproject',
-      credential:'openrelayproject'
-    }
+    // Metered OpenRelay — primary free TURN, UDP and TCP/TLS variants so at
+    // least one survives restrictive mobile carrier firewalls
+    {urls:'turn:openrelay.metered.ca:80',          username:'openrelayproject',credential:'openrelayproject'},
+    {urls:'turn:openrelay.metered.ca:443',          username:'openrelayproject',credential:'openrelayproject'},
+    {urls:'turn:openrelay.metered.ca:443?transport=tcp', username:'openrelayproject',credential:'openrelayproject'},
+    {urls:'turns:openrelay.metered.ca:443',         username:'openrelayproject',credential:'openrelayproject'},
+    // Metered's newer load-balanced relay (a.relay.metered.ca)
+    {urls:'turn:a.relay.metered.ca:80',             username:'openrelayproject',credential:'openrelayproject'},
+    {urls:'turn:a.relay.metered.ca:443',            username:'openrelayproject',credential:'openrelayproject'},
+    {urls:'turn:a.relay.metered.ca:443?transport=tcp', username:'openrelayproject',credential:'openrelayproject'},
+    {urls:'turns:a.relay.metered.ca:443',           username:'openrelayproject',credential:'openrelayproject'},
   ],
   iceCandidatePoolSize: 10,
 };
@@ -2386,10 +2373,12 @@ async function getStream(video){
 }
 
 let _reconnTimer = null;
+let _iceRestartCount = 0;
 
 function setupPC(){
   _iceBuffer = [];
   _remoteDescSet = false;
+  _iceRestartCount = 0;
   pc = new RTCPeerConnection(ICE);
 
   pc.onicecandidate = e=>{
@@ -2438,8 +2427,30 @@ function setupPC(){
     }
   };
 
-  pc.oniceconnectionstatechange = ()=>{
-    console.log('[webrtc] iceConnectionState:', pc?.iceConnectionState);
+  pc.oniceconnectionstatechange = async ()=>{
+    const ist = pc?.iceConnectionState;
+    console.log('[webrtc] iceConnectionState:', ist);
+    if(ist === 'failed'){
+      // Try ICE restart once before giving up — critical for mobile-to-mobile
+      // (carrier-grade NAT, first TURN allocation may fail or time out)
+      if(_iceRestartCount < 2 && pc){
+        _iceRestartCount++;
+        console.log('[webrtc] ICE failed, restarting (attempt', _iceRestartCount, ')');
+        pc.restartIce();
+        // Caller must renegotiate with a new offer containing iceRestart:true
+        if(isCaller){
+          try{
+            const offer = await pc.createOffer({iceRestart:true});
+            await pc.setLocalDescription(offer);
+            await apiPost('signal',{call_id:callId,to_id:callPeerId,sig_type:'restart',payload:offer});
+          } catch(e){ console.warn('[webrtc] restart offer failed', e); }
+        }
+      } else {
+        // Give up after 2 retries
+        clearTimeout(_reconnTimer);
+        hangUp(false);
+      }
+    }
   };
 }
 
@@ -2560,7 +2571,7 @@ function cleanup(){
   if(lv){lv.srcObject=null;}
   $id('callNoVid').style.display='flex';
   callId=callPeerId=callPeerName=null; isMuted=isCamOff=isScreen=isCaller=false; pendingInvite=null;
-  _iceBuffer=[]; _remoteDescSet=false;
+  _iceBuffer=[]; _remoteDescSet=false; _iceRestartCount=0;
 }
 
 async function handleSignal(sig){
@@ -2585,6 +2596,18 @@ async function handleSignal(sig){
         _iceBuffer.push(sig.payload);
       } else {
         try{ await pc.addIceCandidate(new RTCIceCandidate(sig.payload)); }catch(_){}
+      }
+      break;
+    case 'restart':
+      // Caller restarted ICE — callee applies new offer and re-answers
+      if(pc && !isCaller && sig.payload){
+        try{
+          await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+          _remoteDescSet = true;
+          const ans = await pc.createAnswer();
+          await pc.setLocalDescription(ans);
+          await apiPost('signal',{call_id:callId,to_id:callPeerId,sig_type:'answer',payload:ans});
+        } catch(e){ console.warn('[webrtc] restart answer failed', e); }
       }
       break;
     case 'reject':
@@ -2664,6 +2687,20 @@ async function init(){
   setInterval(async () => {
     try { await pingPresence(); await loadRooms(); } catch(_) {}
   }, 10000);
+
+  // iOS/Android: keyboard pushes content up — track visual viewport height
+  // so the input area stays glued to the top of the keyboard
+  if (window.visualViewport && isMobile()) {
+    const mainEl = $id('main');
+    const onVpResize = () => {
+      if (!mainEl) return;
+      // keyboardH > 0 when virtual keyboard is open
+      const keyboardH = Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
+      mainEl.style.bottom = keyboardH > 20 ? keyboardH + 'px' : '';
+    };
+    window.visualViewport.addEventListener('resize', onVpResize);
+    window.visualViewport.addEventListener('scroll', onVpResize);
+  }
 }
 
 // Запускаем после полной загрузки DOM
