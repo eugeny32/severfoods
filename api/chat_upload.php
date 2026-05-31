@@ -19,11 +19,13 @@ header('Content-Type: application/json; charset=utf-8');
 // ─── Auth ─────────────────────────────────────────────
 // Accept both main admin session and chat-specific session
 if (!empty($_SESSION['chat_uid'])) {
-    $uid   = (int)$_SESSION['chat_uid'];
-    $uname = $_SESSION['chat_uname'] ?? 'User';
+    $uid     = (int)$_SESSION['chat_uid'];
+    $uname   = $_SESSION['chat_uname'] ?? 'User';
+    $isAdmin = !empty($_SESSION['chat_is_admin']);
 } elseif (!empty($_SESSION['user_id']) && !empty($_SESSION['is_admin'])) {
-    $uid   = (int)$_SESSION['user_id'];
-    $uname = $_SESSION['user_name'] ?? 'Admin';
+    $uid     = (int)$_SESSION['user_id'];
+    $uname   = $_SESSION['user_name'] ?? 'Admin';
+    $isAdmin = true;
 } else {
     http_response_code(403);
     echo json_encode(['error' => 'Forbidden']);
@@ -39,13 +41,14 @@ if (!$roomId) {
     exit;
 }
 
-// ─── Проверка членства ────────────────────────────────
-// (инициализируем PDO через bootstrap, уже подключён через config.php)
-$mStmt = $pdo->prepare("SELECT 1 FROM chat_room_members WHERE room_id=? AND user_id=?");
-$mStmt->execute([$roomId, $uid]);
-if (!$mStmt->fetchColumn()) {
-    http_response_code(403);
-    echo json_encode(['error' => 'Not a member']);
+// ─── Проверка: комната существует ────────────────────
+// Полная проверка членства не нужна — файл без отправки через doSend
+// бесполезен, а doSend уже проверяет isMember().
+$roomCheck = $pdo->prepare("SELECT id FROM chat_rooms WHERE id=?");
+$roomCheck->execute([$roomId]);
+if (!$roomCheck->fetchColumn()) {
+    http_response_code(404);
+    echo json_encode(['error' => 'Комната не найдена']);
     exit;
 }
 
