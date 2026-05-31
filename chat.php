@@ -1968,14 +1968,26 @@ function roomCtxMenu(e, roomId){
       <i class="fas ${it.icon}" style="width:14px;text-align:center"></i>${it.label}
     </button>`).join('');
   const rect = e.currentTarget.getBoundingClientRect();
+  // Show off-screen first to measure, then position correctly
+  dd.style.visibility = 'hidden';
   dd.style.display = 'block';
-  dd.style.left = (rect.left - dd.offsetWidth + rect.width) + 'px';
-  dd.style.top  = rect.bottom + 'px';
-  // Keep within viewport
+  dd.style.left = '0px';
+  dd.style.top  = '0px';
   requestAnimationFrame(()=>{
-    const ddR = dd.getBoundingClientRect();
-    if (ddR.right > window.innerWidth) dd.style.left = (window.innerWidth - ddR.width - 8) + 'px';
-    if (ddR.bottom > window.innerHeight) dd.style.top = (rect.top - ddR.height) + 'px';
+    const w = dd.offsetWidth;
+    const h = dd.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // Prefer right-align to trigger; shift left if overflows right edge
+    let left = rect.right - w;
+    if (left < 8) left = 8;
+    if (left + w > vw - 8) left = vw - w - 8;
+    // Prefer below; flip above if overflows bottom
+    let top = rect.bottom + 4;
+    if (top + h > vh - 8) top = rect.top - h - 4;
+    dd.style.left = left + 'px';
+    dd.style.top  = top  + 'px';
+    dd.style.visibility = 'visible';
   });
 }
 function hideRoomCtx(){ $id('roomCtxDropdown').style.display='none'; }
@@ -2505,7 +2517,7 @@ async function searchUsers(){
   _searchTimer = setTimeout(async()=>{
     const q = $id('userSearchInput')?.value||'';
     if (q.length < 2){ $id('userSearchResults').innerHTML='<div style="padding:12px;color:var(--t3);font-size:13px">Введите минимум 2 символа</div>'; return; }
-    const d = await api('search_users&q='+encodeURIComponent(q));
+    const d = await api('search_users', {q});
     const list = d.users||[];
     if (!list.length){ $id('userSearchResults').innerHTML='<div style="padding:12px;color:var(--t3);font-size:13px">Никого не найдено</div>'; return; }
     $id('userSearchResults').innerHTML = list.map(u=>`
