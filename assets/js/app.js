@@ -97,7 +97,7 @@ function showNotif(data) {
     if (!notif) return;
 
     const type    = data.success ? 'success' : (data.code === 'ALREADY_ATE' ? 'warning' : 'error');
-    const icons   = { success:'✅', warning:'⚠️', error:'❌', info:'ℹ️' };
+    const icons   = { success:'<i class="fas fa-check-circle"></i>', warning:'<i class="fas fa-exclamation-triangle"></i>', error:'<i class="fas fa-times-circle"></i>', info:'<i class="fas fa-info-circle"></i>' };
     const icon    = icons[type] || '•';
 
     let title = data.message || '';
@@ -108,8 +108,8 @@ function showNotif(data) {
         sub = [
             emp.organization,
             data.meal_type ? getMealName(data.meal_type) : '',
-            data.price ? '💰 ' + data.price : '',
-            data.point ? '📍 ' + data.point : '',
+            data.price ? '<i class="fas fa-coins"></i> ' + data.price : '',
+            data.point ? '<i class="fas fa-map-marker-alt"></i> ' + data.point : '',
         ].filter(Boolean).join(' · ');
     }
 
@@ -155,14 +155,14 @@ function setScannerMode(active) {
     if (active) {
         pill?.classList.remove('off'); pill?.classList.add('on');
         dot?.classList.remove('off');
-        if (badge) { badge.className = 'mode-badge'; badge.textContent = '🎯 Режим сканирования'; }
+        if (badge) { badge.className = 'mode-badge'; badge.innerHTML = '<i class="fas fa-crosshairs"></i> Режим сканирования'; }
         if (manBtn) manBtn.style.display = 'none';
         inp.classList.add('scanner-active');
         inp.placeholder = 'Наведите сканер на QR-код…';
     } else {
         pill?.classList.remove('on'); pill?.classList.add('off');
         dot?.classList.add('off');
-        if (badge) { badge.className = 'mode-badge manual'; badge.textContent = '⌨️ Ручной ввод'; }
+        if (badge) { badge.className = 'mode-badge manual'; badge.innerHTML = '<i class="fas fa-keyboard"></i> Ручной ввод'; }
         if (manBtn) manBtn.style.display = 'inline-flex';
         inp.classList.remove('scanner-active');
         inp.placeholder = 'Введите QR-код вручную…';
@@ -339,7 +339,7 @@ function openOrgModal(org) {
     const bodyEl  = $('orgModalBody');
     if (!titleEl || !bodyEl) return;
 
-    titleEl.textContent = '👥 ' + org;
+    titleEl.innerHTML = '<i class="fas fa-users"></i> ' + org;
 
     // Нормализуем: trim + collapse spaces + decode HTML entities
     function normalizeOrg(s) {
@@ -357,7 +357,7 @@ function openOrgModal(org) {
         .sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'));
 
     if (!list.length) {
-        bodyEl.innerHTML = '<div class="empty"><div class="empty-icon">👤</div>Нет сотрудников</div>';
+        bodyEl.innerHTML = '<div class="empty"><div class="empty-icon"><i class="fas fa-user"></i></div>Нет сотрудников</div>';
     } else {
         bodyEl.innerHTML = `
             <div style="font-size:12px;color:var(--text-3);padding:0 0 10px;border-bottom:1px solid var(--border);margin-bottom:12px">
@@ -441,7 +441,7 @@ function renderEmployeeTable(list) {
     tbody.innerHTML = list.map(e => {
         const statusClass = e.qr_status || 'active';
         const statusLabels = { active:'Активен', expired:'Истёк', blocked:'Заблок.' };
-        const expiryWarn = e.expiry_status === 'expired' ? '🔴' : (e.expiry_status === 'warning' ? '🟡' : '');
+        const expiryWarn = e.expiry_status === 'expired' ? '<i class="fas fa-circle" style="color:#e53935"></i>' : (e.expiry_status === 'warning' ? '<i class="fas fa-circle" style="color:#f59e0b"></i>' : '');
 
         return `
         <tr>
@@ -457,11 +457,11 @@ function renderEmployeeTable(list) {
             <td>
                 <div class="emp-actions">
                     <button class="btn-sm green" title="Пропустить вручную"
-                        onclick="openManualModal(${e.id},'${escHtml(e.full_name.replace(/'/g,"\\'"))}')">🚪</button>
-                    <a class="btn-sm" href="print_qr.php?id=${e.id}" target="_blank" title="Печать QR">🖨️</a>
+                        onclick="openManualModal(${e.id},'${escHtml(e.full_name.replace(/'/g,"\\'"))}')"><i class='fas fa-sign-out-alt'></i></button>
+                    <a class="btn-sm" href="print_qr.php?id=${e.id}" target="_blank" title="Печать QR"><i class='fas fa-print'></i></a>
                     ${window.isAdmin ? `
-                        <button class="btn-sm" title="Редактировать" onclick="openEditModal(${e.id})">✏️</button>
-                        ${window.isSuperAdmin ? `<button class="btn-sm danger" title="Удалить" onclick="openDeleteModal(${e.id},'${escHtml(e.full_name.replace(/'/g,"\\'"))}')">🗑️</button>` : ''}
+                        <button class="btn-sm" title="Редактировать" onclick="openEditModal(${e.id})"><i class='fas fa-pencil-alt'></i></button>
+                        ${window.isSuperAdmin ? `<button class="btn-sm danger" title="Удалить" onclick="openDeleteModal(${e.id},'${escHtml(e.full_name.replace(/'/g,"\\'"))}')"><i class='fas fa-trash'></i></button>` : ''}
                     ` : ''}
                 </div>
             </td>
@@ -510,7 +510,7 @@ function confirmManualPass() {
 
 // ── Employee Modal (Add / Edit) ───────────────────────
 function openAddModal() {
-    $('empModalTitle').textContent = '➕ Добавление сотрудника';
+    $('empModalTitle').innerHTML = '<i class="fas fa-plus"></i> Добавление сотрудника';
     $('empForm').reset();
     $('editId').value = '';
     $('regenerateQrRow')?.setAttribute('style','display:none');
@@ -522,7 +522,7 @@ function openEditModal(id) {
     fetch('get_employee.php?id=' + id, { headers:{ 'X-Requested-With':'XMLHttpRequest' } })
     .then(r => r.json())
     .then(emp => {
-        $('empModalTitle').textContent = '✏️ Редактирование';
+        $('empModalTitle').innerHTML = '<i class="fas fa-pencil-alt"></i> Редактирование';
         $('editId').value       = emp.id;
         $('empFullName').value  = emp.full_name || '';
         $('empBirthDate').value = emp.birth_date || '';
@@ -614,7 +614,7 @@ function closeDeleteModal() { closeModal('deleteModal'); }
 function confirmDelete() {
     if (!deleteId) return;
     const btn = $('confirmDeleteBtn');
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ Удаляю…'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-hourglass-half"></i> Удаляю…'; }
 
     fetch('delete_employee.php', {
         method:  'POST',
@@ -706,7 +706,7 @@ function addScheduleRow(data) {
             </div>
         </td>
         <td><input type="number" name="sort_order" value="${data?.sort_order||0}" style="width:50px" min="0"></td>
-        <td><button type="button" class="btn-sm danger" onclick="this.closest('tr').remove()" title="Удалить">🗑️</button></td>
+        <td><button type="button" class="btn-sm danger" onclick="this.closest('tr').remove()" title="Удалить"><i class='fas fa-trash'></i></button></td>
     `;
     tbody.appendChild(tr);
 }
@@ -742,10 +742,10 @@ function saveSchedule() {
     .then(data => {
         const msgEl = $('scheduleMsg');
         if (data.success) {
-            if (msgEl) { msgEl.className='msg success'; msgEl.textContent='✅ Расписание сохранено!'; }
+            if (msgEl) { msgEl.className='msg success'; msgEl.innerHTML='<i class="fas fa-check-circle"></i> Расписание сохранено!'; }
             setTimeout(() => closeModal('scheduleModal'), 1500);
         } else {
-            if (msgEl) { msgEl.className='msg error'; msgEl.textContent='❌ '+data.message; }
+            if (msgEl) { msgEl.className='msg error'; msgEl.innerHTML='<i class="fas fa-times-circle"></i> '+data.message; }
         }
     })
     .catch(() => {
@@ -972,7 +972,7 @@ function addScheduleRowTab(data) {
             </div>
         </td>
         <td><input type="number" name="sort_order" value="${(data&&data.sort_order!=null)?data.sort_order:0}" style="width:50px" min="0"></td>
-        <td><button type="button" class="btn-sm danger" onclick="this.closest('tr').remove()" title="Удалить строку">🗑️</button></td>
+        <td><button type="button" class="btn-sm danger" onclick="this.closest('tr').remove()" title="Удалить строку"><i class='fas fa-trash'></i></button></td>
     `;
     tbody.appendChild(tr);
 }
@@ -1015,7 +1015,7 @@ function saveScheduleTab() {
     }
 
     const saveBtn = $('saveScheduleTab');
-    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Сохраняю…'; }
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fas fa-hourglass-half"></i> Сохраняю…'; }
 
     fetch('api_schedule.php', {
         method:  'POST',
@@ -1031,20 +1031,20 @@ function saveScheduleTab() {
         return r.json();
     })
     .then(data => {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Сохранить'; }
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fas fa-save"></i> Сохранить'; }
         if (!msg) return;
         if (data && data.success) {
             msg.className = 'msg success';
-            msg.textContent = '✅ ' + (data.message || 'Расписание сохранено');
+            msg.innerHTML = '<i class="fas fa-check-circle"></i> ' + (data.message || 'Расписание сохранено');
             setTimeout(() => { if (msg) msg.className = ''; }, 3000);
         } else {
             msg.className = 'msg error';
-            msg.textContent = '❌ ' + (data && data.message ? data.message : 'Неизвестная ошибка');
+            msg.innerHTML = '<i class="fas fa-times-circle"></i> ' + (data && data.message ? data.message : 'Неизвестная ошибка');
         }
     })
     .catch(err => {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Сохранить'; }
-        if (msg) { msg.className='msg error'; msg.textContent='❌ Ошибка соединения: '+err.message; }
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fas fa-save"></i> Сохранить'; }
+        if (msg) { msg.className='msg error'; msg.innerHTML='<i class="fas fa-times-circle"></i> Ошибка соединения: '+err.message; }
     });
 }
 

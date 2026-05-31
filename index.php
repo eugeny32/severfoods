@@ -118,8 +118,8 @@ $allEmployeesJson = array_map(function($e) {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#003366">
 <title><?= htmlspecialchars(APP_NAME) ?></title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍽️</text></svg>">
 <?= Csrf::meta() ?>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="stylesheet" href="assets/css/style.css">
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" defer></script>
 </head>
@@ -137,23 +137,23 @@ $allEmployeesJson = array_map(function($e) {
                 <?= getMealTypeIcon($current_meal) ?> <?= $current_meal_name ?>
             </span>
             <?php if ($is_admin): ?>
-            <span class="chip role-admin">👑 <?= htmlspecialchars($user_name) ?></span>
+            <span class="chip role-admin"><i class="fas fa-crown"></i> <?= htmlspecialchars($user_name) ?></span>
             <?php else: ?>
-            <span class="chip">👤 <?= htmlspecialchars($user_name) ?></span>
+            <span class="chip"><i class="fas fa-user"></i> <?= htmlspecialchars($user_name) ?></span>
             <?php endif; ?>
             <?php if ($meal_point_name && $meal_point_name !== 'Не выбрана'): ?>
-            <span class="chip point">📍 <?= htmlspecialchars($meal_point_name) ?></span>
+            <span class="chip point"><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($meal_point_name) ?></span>
             <?php endif; ?>
         </div>
         <div class="header-actions">
             <?php if ($is_admin): ?>
             <a href="chat.php" class="btn-logout" style="background:rgba(0,85,165,.15);color:var(--blue-400,#1a6fc4);border-color:rgba(0,85,165,.25)" title="Чат администраторов">
-                💬 Чат
+                <i class="fas fa-comments"></i> Чат
             </a>
             <?php endif; ?>
             <a href="?logout=1" class="btn-logout"
                 onclick="return confirm('Выйти из системы?')">
-                🚪 Выход
+                <i class="fas fa-sign-out-alt"></i> Выход
             </a>
         </div>
     </div>
@@ -161,7 +161,7 @@ $allEmployeesJson = array_map(function($e) {
 
 <!-- Floating QR status indicator -->
 <div id="qrStatusFloat">
-    <div class="qsf-pill qsf-layout" id="qsfLayout" title="Символ сконвертирован из RU в EN">⌨ RU→EN</div>
+    <div class="qsf-pill qsf-layout" id="qsfLayout" title="Символ сконвертирован из RU в EN"><i class="fas fa-keyboard"></i> RU→EN</div>
     <div class="qsf-pill qsf-idle"   id="qsfIdle"   title="До автофокуса на поле QR"></div>
 </div>
 
@@ -172,7 +172,7 @@ $allEmployeesJson = array_map(function($e) {
     <?php if ($flash): ?>
     <div class="notif <?= $flash['type'] ?>" style="margin-bottom:16px">
         <div class="notif-inner">
-            <div class="notif-icon"><?= $flash['type']==='success'?'✅':'❌' ?></div>
+            <div class="notif-icon"><?= $flash['type']==='success'?'<i class="fas fa-check-circle"></i>':'<i class="fas fa-times-circle"></i>' ?></div>
             <div class="notif-body">
                 <div class="notif-title"><?= htmlspecialchars($flash['msg']) ?></div>
             </div>
@@ -185,21 +185,21 @@ $allEmployeesJson = array_map(function($e) {
         <!-- ══ SCAN PANEL ══ -->
         <div class="card scan-panel">
             <div class="card-header">
-                <div class="card-title">📷 Сканирование QR-кода</div>
+                <div class="card-title"><i class="fas fa-camera"></i> Сканирование QR-кода</div>
                 <div class="scanner-toolbar">
                     <span class="scanner-pill on" id="scannerPill">
                         <span class="pulse-dot" id="scannerDot"></span>
                         <span id="scannerStatus">Активен</span>
                     </span>
-                    <button class="btn-sm" onclick="toggleScanner()" title="Вкл/Выкл сканер">⚙️</button>
-                    <button class="btn-camera" onclick="openCamera()">📷 Камера</button>
+                    <button class="btn-sm" onclick="toggleScanner()" title="Вкл/Выкл сканер"><i class="fas fa-cog"></i></button>
+                    <button class="btn-camera" onclick="openCamera()"><i class="fas fa-camera"></i> Камера</button>
                 </div>
             </div>
 
             <?php if (!$is_admin && $meal_point_name !== 'Не выбрана'): ?>
             <div class="point-banner">
                 <div>
-                    <div class="point-banner-name">📍 <?= htmlspecialchars($meal_point_name) ?></div>
+                    <div class="point-banner-name"><i class="fas fa-map-marker-alt"></i> <?= htmlspecialchars($meal_point_name) ?></div>
                     <?php if (!empty($schedule_today)): ?>
                     <div class="point-schedule">
                         <?php foreach ($schedule_today as $s): ?>
@@ -212,14 +212,14 @@ $allEmployeesJson = array_map(function($e) {
                     </div>
                     <?php endif; ?>
                 </div>
-                <a href="login.php" class="btn-outline">🔄 Сменить</a>
+                <a href="login.php" class="btn-outline"><i class="fas fa-sync-alt"></i> Сменить</a>
             </div>
             <?php endif; ?>
 
             <form id="scanForm" method="POST" autocomplete="off">
                 <div class="qr-label">
                     QR-код
-                    <span class="mode-badge" id="modeBadge">🎯 Режим сканирования</span>
+                    <span class="mode-badge" id="modeBadge"><i class="fas fa-crosshairs"></i> Режим сканирования</span>
                 </div>
                 <div class="qr-field">
                     <input type="text" name="qr_data" id="qrInput"
@@ -228,7 +228,7 @@ $allEmployeesJson = array_map(function($e) {
                         autofocus required>
                 </div>
                 <button type="submit" class="btn btn-primary" id="manualBtn"
-                    style="display:none;width:100%">🔍 Проверить вручную</button>
+                    style="display:none;width:100%"><i class="fas fa-search"></i> Проверить вручную</button>
             </form>
 
             <!-- Notification -->
@@ -237,7 +237,7 @@ $allEmployeesJson = array_map(function($e) {
             <!-- Stats -->
             <div style="margin-top:20px">
                 <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">
-                    📊 <?= $stats_title ?>
+                    <i class="fas fa-chart-bar"></i> <?= $stats_title ?>
                 </div>
                 <!-- Всего — отдельная строка над остальными -->
                 <div class="stat-tile total" style="margin-bottom:10px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between">
@@ -248,19 +248,19 @@ $allEmployeesJson = array_map(function($e) {
                 <div class="stats-row">
                     <div class="stat-tile">
                         <div class="stat-num" id="stat_breakfast"><?= $stats['breakfast'] ?></div>
-                        <div class="stat-lbl">🌅 Завтрак</div>
+                        <div class="stat-lbl"><i class="fas fa-cloud-sun"></i> Завтрак</div>
                     </div>
                     <div class="stat-tile">
                         <div class="stat-num" id="stat_lunch"><?= $stats['lunch'] ?></div>
-                        <div class="stat-lbl">☀️ Обед</div>
+                        <div class="stat-lbl"><i class="fas fa-sun"></i> Обед</div>
                     </div>
                     <div class="stat-tile">
                         <div class="stat-num" id="stat_dinner"><?= $stats['dinner'] ?></div>
-                        <div class="stat-lbl">🌙 Ужин</div>
+                        <div class="stat-lbl"><i class="fas fa-moon"></i> Ужин</div>
                     </div>
                     <div class="stat-tile">
                         <div class="stat-num" id="stat_night"><?= $stats['night'] ?></div>
-                        <div class="stat-lbl">⭐ Ночное</div>
+                        <div class="stat-lbl"><i class="fas fa-star"></i> Ночное</div>
                     </div>
                 </div>
             </div>
@@ -269,15 +269,15 @@ $allEmployeesJson = array_map(function($e) {
         <!-- ══ EMPLOYEE PANEL ══ -->
         <div class="card list-panel">
             <div class="card-header">
-                <div class="card-title">👥 Сотрудники (<?= count($allEmployees) ?>)</div>
+                <div class="card-title"><i class="fas fa-users"></i> Сотрудники (<?= count($allEmployees) ?>)</div>
                 <?php if ($is_admin): ?>
-                <button class="btn btn-primary" onclick="openAddModal()">➕ Добавить</button>
+                <button class="btn btn-primary" onclick="openAddModal()"><i class="fas fa-plus"></i> Добавить</button>
                 <?php endif; ?>
             </div>
 
             <?php if (!empty($expiringEmps)): ?>
             <div class="expiring-block">
-                <div class="expiring-header">⚠️ Истекающие QR-коды (7 дней)</div>
+                <div class="expiring-header"><i class="fas fa-exclamation-triangle"></i> Истекающие QR-коды (7 дней)</div>
                 <div class="expiring-list">
                     <?php foreach ($expiringEmps as $emp):
                         $exp = date('d.m.Y', strtotime($emp['qr_expires_at']));
@@ -288,10 +288,10 @@ $allEmployeesJson = array_map(function($e) {
                         <span class="expiring-date"><?= $exp ?></span>
                         <div style="display:flex;gap:6px;flex-shrink:0">
                             <button class="btn-sm green" title="Ручной пропуск"
-                                onclick="openManualModal(<?= $emp['id'] ?>,'<?= htmlspecialchars(addslashes($emp['full_name'])) ?>')">🚪</button>
+                                onclick="openManualModal(<?= $emp['id'] ?>,'<?= htmlspecialchars(addslashes($emp['full_name'])) ?>')"><i class="fas fa-sign-out-alt"></i></button>
                             <?php if ($is_admin): ?>
                             <button class="btn-sm" title="Редактировать"
-                                onclick="openEditModal(<?= $emp['id'] ?>)">✏️</button>
+                                onclick="openEditModal(<?= $emp['id'] ?>)"><i class="fas fa-pencil-alt"></i></button>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -302,11 +302,11 @@ $allEmployeesJson = array_map(function($e) {
 
             <!-- Search -->
             <div class="search-wrap">
-                <span class="search-icon">🔍</span>
+                <span class="search-icon"><i class="fas fa-search"></i></span>
                 <input type="text" id="searchInput" class="search-input"
                     placeholder="Поиск по ФИО, организации, отделу…"
                     autocomplete="off">
-                <button class="search-clear" id="searchClear">✕</button>
+                <button class="search-clear" id="searchClear"><i class="fas fa-times"></i></button>
             </div>
 
             <!-- Org chips -->
@@ -334,28 +334,28 @@ $allEmployeesJson = array_map(function($e) {
     <?php if ($is_admin): ?>
     <div class="admin-panel">
         <div class="tab-nav">
-            <button class="tab-btn active" data-tab="tabReports">📊 Отчёты</button>
-            <button class="tab-btn" data-tab="tabPoints">📍 Точки</button>
-            <button class="tab-btn" data-tab="tabStats">📈 Статистика</button>
+            <button class="tab-btn active" data-tab="tabReports"><i class="fas fa-chart-bar"></i> Отчёты</button>
+            <button class="tab-btn" data-tab="tabPoints"><i class="fas fa-map-marker-alt"></i> Точки</button>
+            <button class="tab-btn" data-tab="tabStats"><i class="fas fa-chart-line"></i> Статистика</button>
             <?php if ($is_admin): ?>
-            <button class="tab-btn" data-tab="tabSchedule">⏰ Расписание</button>
+            <button class="tab-btn" data-tab="tabSchedule"><i class="fas fa-clock"></i> Расписание</button>
             <?php endif; ?>
-            <button class="tab-btn" data-tab="tabQrPrint">🖨️ Печать QR</button>
+            <button class="tab-btn" data-tab="tabQrPrint"><i class="fas fa-print"></i> Печать QR</button>
         </div>
 
         <!-- REPORTS -->
         <div id="tabReports" class="tab-pane active">
             <form method="GET" action="reports.php" target="_blank" class="report-form">
                 <div class="form-group">
-                    <label>📅 Дата от</label>
+                    <label><i class="fas fa-calendar-alt"></i> Дата от</label>
                     <input type="date" name="start_date" value="<?= date('Y-m-d', strtotime('-7 days')) ?>">
                 </div>
                 <div class="form-group">
-                    <label>📅 Дата до</label>
+                    <label><i class="fas fa-calendar-alt"></i> Дата до</label>
                     <input type="date" name="end_date" value="<?= date('Y-m-d') ?>">
                 </div>
                 <div class="form-group">
-                    <label>🍽️ Тип питания</label>
+                    <label><i class="fas fa-utensils"></i> Тип питания</label>
                     <select name="meal_type">
                         <option value="all">Все</option>
                         <option value="breakfast">Завтрак</option>
@@ -366,7 +366,7 @@ $allEmployeesJson = array_map(function($e) {
                 </div>
                 <?php if ($is_super_admin): ?>
                 <div class="form-group">
-                    <label>📍 Точка</label>
+                    <label><i class="fas fa-map-marker-alt"></i> Точка</label>
                     <select name="point_id">
                         <option value="">Все точки</option>
                         <?php foreach ($points as $pt): ?>
@@ -380,8 +380,8 @@ $allEmployeesJson = array_map(function($e) {
                 <div class="form-group" style="justify-content:flex-end">
                     <label>&nbsp;</label>
                     <div style="display:flex;gap:8px">
-                        <button type="submit" class="btn btn-primary">📄 Показать</button>
-                        <a id="excelExportLink" href="#" onclick="openExcelExport(event)" class="btn btn-success" style="background:#1d6f42">📊 Excel</a>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-file-alt"></i> Показать</button>
+                        <a id="excelExportLink" href="#" onclick="openExcelExport(event)" class="btn btn-success" style="background:#1d6f42"><i class="fas fa-chart-bar"></i> Excel</a>
                     </div>
                 </div>
             </form>
@@ -390,7 +390,7 @@ $allEmployeesJson = array_map(function($e) {
         <!-- POINTS -->
         <div id="tabPoints" class="tab-pane">
             <div style="font-size:13px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px">
-                📍 Статистика по точкам сегодня
+                <i class="fas fa-map-marker-alt"></i> Статистика по точкам сегодня
             </div>
             <?php if (!empty($allPointStats)): ?>
             <div class="points-grid">
@@ -404,15 +404,15 @@ $allEmployeesJson = array_map(function($e) {
                 <?php endforeach; ?>
             </div>
             <?php else: ?>
-            <div class="empty"><div class="empty-icon">📍</div>Нет данных за сегодня</div>
+            <div class="empty"><div class="empty-icon"><i class="fas fa-map-marker-alt"></i></div>Нет данных за сегодня</div>
             <?php endif; ?>
 
             <?php if ($is_super_admin): ?>
             <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
                 <div style="font-size:13px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px">
-                    ⚙️ Управление точками
+                    <i class="fas fa-cog"></i> Управление точками
                 </div>
-                <a href="meal_points.php" class="btn btn-primary">🏗️ Управление точками</a>
+                <a href="meal_points.php" class="btn btn-primary"><i class="fas fa-tools"></i> Управление точками</a>
             </div>
             <?php endif; ?>
         </div>
@@ -421,7 +421,7 @@ $allEmployeesJson = array_map(function($e) {
         <div id="tabStats" class="tab-pane">
             <div class="stats-cols">
                 <div class="stats-block">
-                    <h4>📊 Питания по дням недели (7 дней)</h4>
+                    <h4><i class="fas fa-chart-bar"></i> Питания по дням недели (7 дней)</h4>
                     <div class="week-chart">
                         <?php
                         $maxW = max(array_values($weeklyStats) ?: [1]);
@@ -441,9 +441,9 @@ $allEmployeesJson = array_map(function($e) {
                     </div>
                 </div>
                 <div class="stats-block">
-                    <h4>🏆 Активные сотрудники (30 дней)</h4>
+                    <h4><i class="fas fa-trophy"></i> Активные сотрудники (30 дней)</h4>
                     <?php if (empty($topEmployees)): ?>
-                    <div class="empty"><div class="empty-icon">🏆</div>Нет данных</div>
+                    <div class="empty"><div class="empty-icon"><i class="fas fa-trophy"></i></div>Нет данных</div>
                     <?php else: ?>
                     <div class="top-list">
                         <?php foreach ($topEmployees as $i => $emp):
@@ -470,19 +470,19 @@ $allEmployeesJson = array_map(function($e) {
             <div class="schedule-tab-inner">
                 <div class="schedule-top-bar">
                     <div class="form-group" style="flex:0 0 280px;min-width:200px">
-                        <label>📍 Точка питания</label>
+                        <label><i class="fas fa-map-marker-alt"></i> Точка питания</label>
                         <select id="schedulePointTab" onchange="loadScheduleTab()">
                             <option value="">— Выберите точку —</option>
                         </select>
                     </div>
                     <div style="display:flex;gap:8px;align-items:flex-end">
-                        <button class="btn btn-secondary" id="addScheduleRowTab">➕ Добавить приём</button>
-                        <button class="btn btn-primary"   id="saveScheduleTab">💾 Сохранить</button>
+                        <button class="btn btn-secondary" id="addScheduleRowTab"><i class="fas fa-plus"></i> Добавить приём</button>
+                        <button class="btn btn-primary"   id="saveScheduleTab"><i class="fas fa-save"></i> Сохранить</button>
                     </div>
                 </div>
                 <div id="scheduleTabMsg"></div>
                 <div id="scheduleTabEmpty" style="display:none">
-                    <div class="empty"><div class="empty-icon">⏰</div>Выберите точку питания для редактирования расписания</div>
+                    <div class="empty"><div class="empty-icon"><i class="fas fa-clock"></i></div>Выберите точку питания для редактирования расписания</div>
                 </div>
                 <div id="scheduleTabTableWrap" style="display:none;margin-top:16px;overflow-x:auto">
                     <table class="schedule-table" style="min-width:680px">
@@ -501,7 +501,7 @@ $allEmployeesJson = array_map(function($e) {
                     </table>
                 </div>
                 <div id="scheduleTabLoading" style="display:none">
-                    <div class="empty"><div class="empty-icon">⏳</div>Загрузка расписания…</div>
+                    <div class="empty"><div class="empty-icon"><i class="fas fa-hourglass-half"></i></div>Загрузка расписания…</div>
                 </div>
             </div>
         </div>
@@ -513,7 +513,7 @@ $allEmployeesJson = array_map(function($e) {
                 Распечатайте QR-коды для сотрудников. Вы можете напечатать все QR сразу или по одному.
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap">
-                <a href="print_all_qr.php" target="_blank" class="btn btn-primary">🖨️ Печать всех QR-кодов</a>
+                <a href="print_all_qr.php" target="_blank" class="btn btn-primary"><i class="fas fa-print"></i> Печать всех QR-кодов</a>
             </div>
         </div>
     </div>
@@ -526,12 +526,12 @@ $allEmployeesJson = array_map(function($e) {
 <div class="modal-overlay" id="scheduleModal">
     <div class="modal-box wide">
         <div class="modal-header">
-            <div class="modal-title">⏰ Расписание питания</div>
-            <button class="modal-close" onclick="closeModal('scheduleModal')">✕</button>
+            <div class="modal-title"><i class="fas fa-clock"></i> Расписание питания</div>
+            <button class="modal-close" onclick="closeModal('scheduleModal')"><i class="fas fa-times"></i></button>
         </div>
         <?php if (!empty($points)): ?>
         <div class="form-group" style="margin-bottom:16px">
-            <label>📍 Точка питания</label>
+            <label><i class="fas fa-map-marker-alt"></i> Точка питания</label>
             <select id="schedulePoint">
                 <?php foreach ($points as $pt): ?>
                 <option value="<?= $pt['id'] ?>"><?= htmlspecialchars($pt['point_name']) ?></option>
@@ -554,14 +554,14 @@ $allEmployeesJson = array_map(function($e) {
                 <tbody id="scheduleRows"></tbody>
             </table>
         </div>
-        <button class="btn btn-secondary" id="addScheduleRow" style="margin-top:10px">➕ Добавить приём пищи</button>
+        <button class="btn btn-secondary" id="addScheduleRow" style="margin-top:10px"><i class="fas fa-plus"></i> Добавить приём пищи</button>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeModal('scheduleModal')">Отмена</button>
-            <button class="btn btn-primary" id="saveSchedule">💾 Сохранить</button>
+            <button class="btn btn-primary" id="saveSchedule"><i class="fas fa-save"></i> Сохранить</button>
         </div>
         <div id="scheduleMsg"></div>
         <?php else: ?>
-        <div class="empty"><div class="empty-icon">📍</div>Нет доступных точек питания</div>
+        <div class="empty"><div class="empty-icon"><i class="fas fa-map-marker-alt"></i></div>Нет доступных точек питания</div>
         <?php endif; ?>
     </div>
 </div>
@@ -570,8 +570,8 @@ $allEmployeesJson = array_map(function($e) {
 <div class="modal-overlay" id="empModal">
     <div class="modal-box" style="max-width:680px">
         <div class="modal-header">
-            <div class="modal-title" id="empModalTitle">➕ Добавление сотрудника</div>
-            <button class="modal-close" onclick="closeModal('empModal')">✕</button>
+            <div class="modal-title" id="empModalTitle"><i class="fas fa-plus"></i> Добавление сотрудника</div>
+            <button class="modal-close" onclick="closeModal('empModal')"><i class="fas fa-times"></i></button>
         </div>
         <form id="empForm">
             <input type="hidden" id="editId">
@@ -621,9 +621,9 @@ $allEmployeesJson = array_map(function($e) {
                 <div class="form-group">
                     <label>Статус QR</label>
                     <select id="empQrStatus">
-                        <option value="active">✅ Активен</option>
-                        <option value="expired">⏰ Просрочен</option>
-                        <option value="blocked">🔒 Заблокирован</option>
+                        <option value="active"><i class="fas fa-check-circle"></i> Активен</option>
+                        <option value="expired"><i class="fas fa-clock"></i> Просрочен</option>
+                        <option value="blocked"><i class="fas fa-lock"></i> Заблокирован</option>
                     </select>
                 </div>
                 <?php if ($is_admin): ?>
@@ -631,10 +631,10 @@ $allEmployeesJson = array_map(function($e) {
                     <label>Роль (для входа)</label>
                     <select id="empRole">
                         <option value="">— Не назначена —</option>
-                        <option value="operator">👤 Оператор</option>
+                        <option value="operator"><i class="fas fa-user"></i> Оператор</option>
                         <?php if ($is_super_admin): ?>
-                        <option value="admin">👑 Администратор</option>
-                        <option value="super_admin">⭐ Супер-администратор</option>
+                        <option value="admin"><i class="fas fa-crown"></i> Администратор</option>
+                        <option value="super_admin"><i class="fas fa-star"></i> Супер-администратор</option>
                         <?php endif; ?>
                     </select>
                 </div>
@@ -645,12 +645,12 @@ $allEmployeesJson = array_map(function($e) {
                 </div>
                 <div class="checkbox-row" id="regenerateQrRow" style="display:none">
                     <input type="checkbox" id="regenerateQr">
-                    <label for="regenerateQr">🔄 Перегенерировать QR-код</label>
+                    <label for="regenerateQr"><i class="fas fa-sync-alt"></i> Перегенерировать QR-код</label>
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('empModal')">Отмена</button>
-                <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Сохранить</button>
             </div>
             <div id="empMsg"></div>
         </form>
@@ -661,8 +661,8 @@ $allEmployeesJson = array_map(function($e) {
 <div class="modal-overlay" id="deleteModal">
     <div class="modal-box" style="max-width:420px">
         <div class="modal-header">
-            <div class="modal-title">🗑️ Удаление сотрудника</div>
-            <button class="modal-close" onclick="closeModal('deleteModal')">✕</button>
+            <div class="modal-title"><i class="fas fa-trash"></i> Удаление сотрудника</div>
+            <button class="modal-close" onclick="closeModal('deleteModal')"><i class="fas fa-times"></i></button>
         </div>
         <p style="font-size:14px;color:var(--text-2);line-height:1.6">
             Вы действительно хотите удалить сотрудника
@@ -680,8 +680,8 @@ $allEmployeesJson = array_map(function($e) {
 <div class="modal-overlay" id="manualModal">
     <div class="modal-box" style="max-width:440px">
         <div class="modal-header">
-            <div class="modal-title">🚪 Ручной пропуск</div>
-            <button class="modal-close" onclick="closeModal('manualModal')">✕</button>
+            <div class="modal-title"><i class="fas fa-sign-out-alt"></i> Ручной пропуск</div>
+            <button class="modal-close" onclick="closeModal('manualModal')"><i class="fas fa-times"></i></button>
         </div>
         <p style="font-size:14px;color:var(--text-2);margin-bottom:16px">
             Пропустить сотрудника <strong id="manualEmpName"></strong> без сканирования QR-кода
@@ -690,10 +690,10 @@ $allEmployeesJson = array_map(function($e) {
             <div class="form-group">
                 <label>Тип питания</label>
                 <select id="manualMealType">
-                    <option value="breakfast">🌅 Завтрак</option>
-                    <option value="lunch" selected>☀️ Обед</option>
-                    <option value="dinner">🌙 Ужин</option>
-                    <option value="night">⭐ Ночное</option>
+                    <option value="breakfast"><i class="fas fa-cloud-sun"></i> Завтрак</option>
+                    <option value="lunch" selected><i class="fas fa-sun"></i> Обед</option>
+                    <option value="dinner"><i class="fas fa-moon"></i> Ужин</option>
+                    <option value="night"><i class="fas fa-star"></i> Ночное</option>
                 </select>
             </div>
             <div class="form-group">
@@ -703,7 +703,7 @@ $allEmployeesJson = array_map(function($e) {
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeModal('manualModal')">Отмена</button>
-            <button class="btn btn-success" id="confirmManualBtn">✅ Пропустить</button>
+            <button class="btn btn-success" id="confirmManualBtn"><i class="fas fa-check-circle"></i> Пропустить</button>
         </div>
     </div>
 </div>
@@ -712,23 +712,23 @@ $allEmployeesJson = array_map(function($e) {
 <div class="modal-overlay" id="orgModal">
     <div class="modal-box" style="max-width:680px">
         <div class="modal-header">
-            <div class="modal-title" id="orgModalTitle">👥 Сотрудники</div>
-            <button class="modal-close" onclick="closeModal('orgModal')">✕</button>
+            <div class="modal-title" id="orgModalTitle"><i class="fas fa-users"></i> Сотрудники</div>
+            <button class="modal-close" onclick="closeModal('orgModal')"><i class="fas fa-times"></i></button>
         </div>
         <div id="orgModalBody" style="overflow-y:auto;max-height:60vh">
-            <div class="empty"><div class="empty-icon">⏳</div>Загрузка…</div>
+            <div class="empty"><div class="empty-icon"><i class="fas fa-hourglass-half"></i></div>Загрузка…</div>
         </div>
     </div>
 </div>
 
 <!-- Camera Overlay -->
 <div class="camera-overlay" id="cameraOverlay">
-    <div style="color:white;font-size:18px;font-weight:700;margin-bottom:12px">📷 Сканирование QR-кода</div>
+    <div style="color:white;font-size:18px;font-weight:700;margin-bottom:12px"><i class="fas fa-camera"></i> Сканирование QR-кода</div>
     <div class="camera-frame">
         <video id="cameraVideo" playsinline autoplay muted style="display:block;width:min(90vw,420px)"></video>
     </div>
     <div class="camera-hint">Наведите камеру на QR-код</div>
-    <button class="camera-close" onclick="closeCamera()">✕ Закрыть камеру</button>
+    <button class="camera-close" onclick="closeCamera()"><i class="fas fa-times"></i> Закрыть камеру</button>
 </div>
 
 <!-- JS Data -->

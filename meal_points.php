@@ -60,6 +60,7 @@ $points = getMealPoints($pdo, false); // все, включая неактивн
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Управление точками — <?= htmlspecialchars(APP_NAME) ?></title>
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="stylesheet" href="assets/css/style.css">
 <style>
 .page-header {
@@ -91,17 +92,17 @@ $points = getMealPoints($pdo, false); // все, включая неактивн
 </head>
 <body>
 <div class="page-header">
-    <a href="index.php" style="color:rgba(255,255,255,.6);text-decoration:none;font-size:20px">←</a>
-    <h1>📍 Управление точками питания</h1>
+    <a href="index.php" style="color:rgba(255,255,255,.6);text-decoration:none;font-size:20px"><i class="fas fa-arrow-left"></i></a>
+    <h1><i class="fas fa-map-marker-alt"></i> Управление точками питания</h1>
 </div>
 <div style="max-width:1200px;margin:0 auto;padding:24px 16px">
 
-<?php if ($msg):  ?><div class="notif success" style="margin-bottom:16px"><div class="notif-inner"><div class="notif-icon">✅</div><div class="notif-body"><div class="notif-title"><?= htmlspecialchars($msg) ?></div></div></div></div><?php endif; ?>
-<?php if ($error): ?><div class="notif error"   style="margin-bottom:16px"><div class="notif-inner"><div class="notif-icon">❌</div><div class="notif-body"><div class="notif-title"><?= htmlspecialchars($error) ?></div></div></div></div><?php endif; ?>
+<?php if ($msg):  ?><div class="notif success" style="margin-bottom:16px"><div class="notif-inner"><div class="notif-icon"><i class="fas fa-check-circle"></i></div><div class="notif-body"><div class="notif-title"><?= htmlspecialchars($msg) ?></div></div></div></div><?php endif; ?>
+<?php if ($error): ?><div class="notif error"   style="margin-bottom:16px"><div class="notif-inner"><div class="notif-icon"><i class="fas fa-times-circle"></i></div><div class="notif-body"><div class="notif-title"><?= htmlspecialchars($error) ?></div></div></div></div><?php endif; ?>
 
 <!-- Add form -->
 <div class="card" style="margin-bottom:20px">
-    <div class="card-header"><div class="card-title">➕ Добавить точку питания</div></div>
+    <div class="card-header"><div class="card-title"><i class="fas fa-plus"></i> Добавить точку питания</div></div>
     <form method="POST">
         <?= Csrf::field() ?>
         <input type="hidden" name="action" value="add">
@@ -128,7 +129,7 @@ $points = getMealPoints($pdo, false); // все, включая неактивн
             </div>
         </div>
         <div style="margin-top:16px">
-            <button type="submit" class="btn btn-primary">➕ Добавить точку</button>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Добавить точку</button>
         </div>
     </form>
 </div>
@@ -136,10 +137,10 @@ $points = getMealPoints($pdo, false); // все, включая неактивн
 <!-- Points list -->
 <div class="card">
     <div class="card-header">
-        <div class="card-title">📋 Все точки питания (<?= count($points) ?>)</div>
+        <div class="card-title"><i class="fas fa-clipboard-list"></i> Все точки питания (<?= count($points) ?>)</div>
     </div>
     <?php if (empty($points)): ?>
-    <div class="empty"><div class="empty-icon">📍</div>Точки питания не добавлены</div>
+    <div class="empty"><div class="empty-icon"><i class="fas fa-map-marker-alt"></i></div>Точки питания не добавлены</div>
     <?php else: ?>
     <div class="points-table-wrap">
         <table class="points-table">
@@ -174,7 +175,7 @@ $points = getMealPoints($pdo, false); // все, включая неактивн
                                 <input type="hidden" name="id"     value="<?= $pt['id'] ?>">
                                 <input type="hidden" name="state"  value="<?= $pt['is_active']?0:1 ?>">
                                 <button type="submit" class="btn-sm" title="<?= $pt['is_active']?'Отключить':'Включить' ?>">
-                                    <?= $pt['is_active']?'⏸️':'▶️' ?>
+                                    <?= $pt['is_active']?'<i class="fas fa-pause-circle"></i>':'<i class="fas fa-play"></i>' ?>
                                 </button>
                             </form>
                             <form method="POST" style="display:inline"
@@ -182,7 +183,7 @@ $points = getMealPoints($pdo, false); // все, включая неактивн
                                 <?= Csrf::field() ?>
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="id"     value="<?= $pt['id'] ?>">
-                                <button type="submit" class="btn-sm danger" title="Удалить">🗑️</button>
+                                <button type="submit" class="btn-sm danger" title="Удалить"><i class="fas fa-trash"></i></button>
                             </form>
                         </div>
                     </td>

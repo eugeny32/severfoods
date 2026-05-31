@@ -530,6 +530,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
 .mob-back-btn{display:none;align-items:center;justify-content:center;
   width:36px;height:36px;border:none;background:none;color:var(--t2);font-size:22px;cursor:pointer}
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
 <div class="app">
@@ -539,10 +540,10 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
   <div class="sidebar-hdr">
     <a href="index.php" class="hdr-back" title="На главную">←</a>
     <div class="search-wrap">
-      <span class="search-icon">🔍</span>
+      <span class="search-icon"><i class="fas fa-search"></i></span>
       <input id="searchInput" type="text" placeholder="Поиск…">
     </div>
-    <button class="new-btn" id="newChatBtn" title="Новый чат / группа / канал">✏️</button>
+    <button class="new-btn" id="newChatBtn" title="Новый чат / группа / канал"><i class="fas fa-pencil-alt"></i></button>
   </div>
   <div class="room-list" id="roomList">
     <div style="padding:20px;text-align:center;color:var(--t3)">Загрузка…</div>
@@ -555,7 +556,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
   <!-- No room placeholder -->
   <div class="no-room" id="noRoom">
     <div class="no-room-inner">
-      <span class="icon">💬</span>
+      <span class="icon"><i class="fas fa-comments"></i></span>
       <h3>Выберите чат</h3>
       <p style="color:var(--t3);font-size:14px">Откройте существующую беседу или создайте новую</p>
     </div>
@@ -573,16 +574,16 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
         <div class="topbar-sub"  id="tbSub"></div>
       </div>
       <div class="topbar-actions">
-        <button class="topbar-btn" id="btnAudioCall" title="Аудиозвонок" onclick="initiateCall(false)">🎙️</button>
-        <button class="topbar-btn" id="btnVideoCall" title="Видеозвонок" onclick="initiateCall(true)">📹</button>
-        <button class="topbar-btn" title="Участники" onclick="toggleMembersPanel()">👥</button>
-        <button class="topbar-btn" id="btnLeave" title="Покинуть" onclick="leaveRoom()" style="display:none">🚪</button>
+        <button class="topbar-btn" id="btnAudioCall" title="Аудиозвонок" onclick="initiateCall(false)"><i class="fas fa-microphone"></i></button>
+        <button class="topbar-btn" id="btnVideoCall" title="Видеозвонок" onclick="initiateCall(true)"><i class="fas fa-video"></i></button>
+        <button class="topbar-btn" title="Участники" onclick="toggleMembersPanel()"><i class="fas fa-users"></i></button>
+        <button class="topbar-btn" id="btnLeave" title="Покинуть" onclick="leaveRoom()" style="display:none"><i class="fas fa-sign-out-alt"></i></button>
       </div>
     </div>
 
     <!-- Empty state (снаружи messagesArea, чтобы innerHTML='' не уничтожал его) -->
     <div id="msgEmpty" class="chat-empty" style="display:flex">
-      <div class="chat-empty-icon">🗨️</div>
+      <div class="chat-empty-icon"><i class="fas fa-comment"></i></div>
       <h3>Сообщений нет</h3>
       <p>Напишите первое сообщение!</p>
     </div>
@@ -594,22 +595,22 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
     <div class="members-panel" id="membersPanel">
       <div class="members-panel-hdr">
         <h3>Участники</h3>
-        <button class="modal-close" onclick="toggleMembersPanel()">✕</button>
+        <button class="modal-close" onclick="toggleMembersPanel()"><i class="fas fa-times"></i></button>
       </div>
       <div style="padding:10px 12px;border-bottom:1px solid var(--border)">
-        <button class="btn btn-ghost" style="width:100%;font-size:13px" onclick="openAddMemberModal()">➕ Добавить участника</button>
+        <button class="btn btn-ghost" style="width:100%;font-size:13px" onclick="openAddMemberModal()"><i class="fas fa-plus"></i> Добавить участника</button>
       </div>
       <div class="members-list" id="membersList"></div>
     </div>
 
     <!-- Reply bar -->
     <div class="reply-bar" id="replyBar">
-      <span style="color:var(--blue);font-size:18px">↩️</span>
+      <span style="color:var(--blue);font-size:18px"><i class="fas fa-reply"></i></span>
       <div class="reply-bar-content">
         <div class="reply-bar-sender" id="replyBarSender"></div>
         <div class="reply-bar-text"   id="replyBarText"></div>
       </div>
-      <button class="reply-close" onclick="cancelReply()">✕</button>
+      <button class="reply-close" onclick="cancelReply()"><i class="fas fa-times"></i></button>
     </div>
 
     <!-- Upload preview -->
@@ -619,9 +620,9 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
     <div class="input-area">
       <input type="file" id="fileInput" multiple style="display:none"
              accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.txt,.csv">
-      <button class="attach-btn" onclick="document.getElementById('fileInput').click()" title="Прикрепить файл">📎</button>
+      <button class="attach-btn" onclick="document.getElementById('fileInput').click()" title="Прикрепить файл"><i class="fas fa-paperclip"></i></button>
       <div class="input-box" id="msgInput" contenteditable="true" data-placeholder="Написать сообщение…"></div>
-      <button class="send-btn-main" id="sendBtn" onclick="sendMessage()" title="Отправить (Enter)">➤</button>
+      <button class="send-btn-main" id="sendBtn" onclick="sendMessage()" title="Отправить (Enter)"><i class="fas fa-paper-plane"></i></button>
     </div>
   </div><!-- #chatView -->
 
@@ -635,14 +636,14 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
   <div class="modal" style="max-width:360px">
     <div class="modal-hdr">
       <div class="modal-title">Новый чат</div>
-      <button class="modal-close" onclick="closeOverlay('newChatOverlay')">✕</button>
+      <button class="modal-close" onclick="closeOverlay('newChatOverlay')"><i class="fas fa-times"></i></button>
     </div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
-      <button class="btn btn-ghost" style="justify-content:flex-start;gap:12px;padding:14px 16px;font-size:15px" onclick="closeOverlay('newChatOverlay');openNewGroupModal('group')">
-        👥 Создать группу
+      <button class="btn btn-ghost" style="justify-content:flex-start;gap:12px;padding:14px 16px;font-size:15px" onclick="closeOverlay('newChatOverlay');openNewGroupModal('group')"><i class="fas fa-users"></i>
+        Создать группу
       </button>
-      <button class="btn btn-ghost" style="justify-content:flex-start;gap:12px;padding:14px 16px;font-size:15px" onclick="closeOverlay('newChatOverlay');openNewGroupModal('channel')">
-        📢 Создать канал
+      <button class="btn btn-ghost" style="justify-content:flex-start;gap:12px;padding:14px 16px;font-size:15px" onclick="closeOverlay('newChatOverlay');openNewGroupModal('channel')"><i class="fas fa-bullhorn"></i>
+        Создать канал
       </button>
       <div style="border-top:1px solid var(--border);padding-top:10px;color:var(--t3);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Личное сообщение</div>
       <div id="directUserList" style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r)"></div>
@@ -655,7 +656,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
   <div class="modal">
     <div class="modal-hdr">
       <div class="modal-title" id="createRoomTitle">Создать группу</div>
-      <button class="modal-close" onclick="closeOverlay('createRoomOverlay')">✕</button>
+      <button class="modal-close" onclick="closeOverlay('createRoomOverlay')"><i class="fas fa-times"></i></button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="createRoomType" value="group">
@@ -688,7 +689,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
   <div class="modal" style="max-width:380px">
     <div class="modal-hdr">
       <div class="modal-title">Добавить участника</div>
-      <button class="modal-close" onclick="closeOverlay('addMemberOverlay')">✕</button>
+      <button class="modal-close" onclick="closeOverlay('addMemberOverlay')"><i class="fas fa-times"></i></button>
     </div>
     <div class="modal-body">
       <div class="member-select-list" id="addMemberList"></div>
@@ -702,7 +703,7 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
 
 <!-- Image viewer -->
 <div class="img-viewer" id="imgViewer" onclick="closeImgViewer()">
-  <button class="img-viewer-close" onclick="closeImgViewer()">✕</button>
+  <button class="img-viewer-close" onclick="closeImgViewer()"><i class="fas fa-times"></i></button>
   <img id="imgViewerSrc" src="" alt="">
   <div class="img-viewer-name" id="imgViewerName"></div>
 </div>
@@ -714,8 +715,8 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
     <div class="inc-name" id="incName">Звонок</div>
     <div class="inc-type" id="incType">Видеозвонок</div>
     <div class="inc-btns">
-      <button class="inc-accept" onclick="acceptCall()">✅</button>
-      <button class="inc-reject" onclick="rejectCall()">📵</button>
+      <button class="inc-accept" onclick="acceptCall()"><i class="fas fa-check"></i></button>
+      <button class="inc-reject" onclick="rejectCall()"><i class="fas fa-phone-slash"></i></button>
     </div>
   </div>
 </div>
@@ -729,17 +730,17 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
       <div class="call-no-av" id="callPeerAv"></div>
       <span>Видео отключено</span>
     </div>
-    <div class="screen-badge" id="screenBadge">🖥️ Демонстрация</div>
+    <div class="screen-badge" id="screenBadge"><i class="fas fa-desktop"></i> Демонстрация</div>
   </div>
   <div class="call-info">
     <span class="call-peer-nm" id="callPeerNm"></span>
     <span class="call-tmr" id="callTmr">0:00</span>
   </div>
   <div class="call-ctrls">
-    <button class="ccbtn" id="ccMute"   onclick="toggleMute()"   title="Микрофон">🎙️</button>
-    <button class="ccbtn" id="ccCam"    onclick="toggleCam()"    title="Камера">📹</button>
-    <button class="ccbtn" id="ccScreen" onclick="toggleScreen()" title="Экран">🖥️</button>
-    <button class="ccbtn end"           onclick="hangUp()"        title="Завершить">📵</button>
+    <button class="ccbtn" id="ccMute"   onclick="toggleMute()"   title="Микрофон"><i class="fas fa-microphone"></i></button>
+    <button class="ccbtn" id="ccCam"    onclick="toggleCam()"    title="Камера"><i class="fas fa-video"></i></button>
+    <button class="ccbtn" id="ccScreen" onclick="toggleScreen()" title="Экран"><i class="fas fa-desktop"></i></button>
+    <button class="ccbtn end"           onclick="hangUp()"        title="Завершить"><i class="fas fa-phone-slash"></i></button>
   </div>
 </div>
 
@@ -791,7 +792,7 @@ function apiPost(action, body={}){
 }
 
 let _toast=null;
-function showToast(msg,ico='ℹ️',dur=3500){
+function showToast(msg,ico='<i class="fas fa-info-circle"></i>',dur=3500){
   $id('toastIco').textContent=ico; $id('toastMsg').textContent=msg;
   const el=$id('toast'); el.classList.add('show');
   clearTimeout(_toast); _toast=setTimeout(()=>el.classList.remove('show'),dur);
@@ -821,7 +822,7 @@ let loadingMore  = false;
 /* ════════════════════════════════════════════════════
    ROOM LIST
 ════════════════════════════════════════════════════ */
-function typeIcon(type){ return type==='channel'?'📢':type==='direct'?'💬':'👥'; }
+function typeIcon(type){ return type==='channel'?'<i class="fas fa-bullhorn"></i>':type==='direct'?'<i class="fas fa-comments"></i>':'<i class="fas fa-users"></i>'; }
 
 function renderRoomList(filter=''){
   const lf = filter.toLowerCase();
@@ -833,7 +834,7 @@ function renderRoomList(filter=''){
   $id('roomList').innerHTML = list.map(r=>{
     const name = r.name || 'Личный чат';
     const col  = r.avatar_color || avatarColor(name);
-    const init = r.type==='channel'?'📢':r.type==='group'?'👥':avatarInitial(name);
+    const init = r.type==='channel'?'<i class="fas fa-bullhorn"></i>':r.type==='group'?'<i class="fas fa-users"></i>':avatarInitial(name);
     const isOnline = r.type==='direct' && onlineSet.has(r._peer_id);
     const unread = r.unread > 0 ? `<span class="unread-badge">${r.unread>99?'99+':r.unread}</span>` : '';
     const prev = r.last_msg_prev ? `<span class="sender">${esc(r.last_sender||'')}:</span>${esc(r.last_msg_prev)}` : '<em style="color:var(--t3)">Нет сообщений</em>';
@@ -887,7 +888,7 @@ async function openRoom(id){
   const name = room.name || 'Личный чат';
   const col  = room.avatar_color || avatarColor(name);
   const init = room.type === 'direct' ? avatarInitial(name) :
-               room.type === 'channel' ? '📢' : '👥';
+               room.type === 'channel' ? '<i class="fas fa-bullhorn"></i>' : '<i class="fas fa-users"></i>';
 
   const tbAvEl   = $id('tbAvatar');
   const tbNmEl   = $id('tbName');
@@ -895,8 +896,8 @@ async function openRoom(id){
   const leaveBtn = $id('btnLeave');
   if (tbAvEl)  { tbAvEl.style.background = col; tbAvEl.textContent = init; }
   if (tbNmEl)  tbNmEl.textContent  = name;
-  if (tbSubEl) tbSubEl.textContent = room.type === 'direct'  ? '💬 Личный чат' :
-                                      room.type === 'channel' ? '📢 Канал'       : '👥 Группа';
+  if (tbSubEl) tbSubEl.innerHTML = room.type === 'direct'  ? '<i class="fas fa-comments"></i> Личный чат' :
+                                      room.type === 'channel' ? '<i class="fas fa-bullhorn"></i> Канал'       : '<i class="fas fa-users"></i> Группа';
   if (leaveBtn) leaveBtn.style.display = room.type !== 'direct' ? '' : 'none';
 
   // ── Сбрасываем состояние ─────────────────────────────
@@ -967,7 +968,7 @@ function renderMsg(m, showSender){
 
   html += `<div class="msg-bub">`;
   if(m.is_deleted){
-    html += `<span class="msg-deleted">🚫 Сообщение удалено</span>`;
+    html += `<span class="msg-deleted"><i class="fas fa-ban"></i> Сообщение удалено</span>`;
   } else if(m.msg_type==='image' && m.file_id){
     html += `<img class="msg-img" src="${FILE_API}${m.file_id}" alt="${esc(m.orig_name||'фото')}"
               onclick="openImgViewer(${m.file_id},'${esc(m.orig_name||'')}')" loading="lazy">`;
@@ -999,15 +1000,15 @@ function renderMsg(m, showSender){
 }
 
 function fileIcon(mime){
-  if(mime.startsWith('image/')) return '🖼️';
-  if(mime.startsWith('video/')) return '🎬';
-  if(mime.startsWith('audio/')) return '🎵';
-  if(mime.includes('pdf')) return '📄';
-  if(mime.includes('word')||mime.includes('document')) return '📝';
-  if(mime.includes('excel')||mime.includes('sheet')) return '📊';
-  if(mime.includes('powerpoint')||mime.includes('presentation')) return '📊';
-  if(mime.includes('zip')||mime.includes('rar')||mime.includes('7z')) return '🗜️';
-  return '📁';
+  if(mime.startsWith('image/')) return '<i class="fas fa-image"></i>';
+  if(mime.startsWith('video/')) return '<i class="fas fa-film"></i>';
+  if(mime.startsWith('audio/')) return '<i class="fas fa-music"></i>';
+  if(mime.includes('pdf')) return '<i class="fas fa-file-pdf"></i>';
+  if(mime.includes('word')||mime.includes('document')) return '<i class="fas fa-file-word"></i>';
+  if(mime.includes('excel')||mime.includes('sheet')) return '<i class="fas fa-file-excel"></i>';
+  if(mime.includes('powerpoint')||mime.includes('presentation')) return '<i class="fas fa-file-powerpoint"></i>';
+  if(mime.includes('zip')||mime.includes('rar')||mime.includes('7z')) return '<i class="fas fa-file-archive"></i>';
+  return '<i class="fas fa-folder"></i>';
 }
 
 /** Показать/скрыть пустое состояние и ленту сообщений */
@@ -1181,7 +1182,7 @@ async function doUpload(qid, file){
     item.fileSize  = d.file_size;
   } else {
     uploadQueue = uploadQueue.filter(u=>u.id!==qid);
-    showToast('Ошибка загрузки: '+(d.error||'неизвестная'), '❌');
+    showToast('Ошибка загрузки: '+(d.error||'неизвестная'), '<i class="fas fa-times-circle"></i>');
   }
   renderUploadQueue();
 }
@@ -1198,10 +1199,10 @@ function renderUploadQueue(){
       ${thumb}
       <div>
         <div class="preview-name">${esc(u.file?.name||u.origName||'Файл')}</div>
-        <div class="preview-size">${u.uploading?'⏳ Загрузка…':fmtSize(u.fileSize||u.file?.size||0)}</div>
+        <div class="preview-size">${u.uploading?'<i class="fas fa-hourglass-half"></i> Загрузка…':fmtSize(u.fileSize||u.file?.size||0)}</div>
         ${u.uploading?'<div class="progress-bar" style="width:60%"></div>':''}
       </div>
-      <button class="preview-remove" onclick="removeFromQueue('${u.id}')">✕</button>
+      <button class="preview-remove" onclick="removeFromQueue('${u.id}')"><i class='fas fa-times'></i></button>
     </div>`;
   }).join('');
 }
@@ -1241,9 +1242,9 @@ function ctxMenu(e, msgId, isOwn){
   menu.className = 'ctx-menu';
   menu.style.cssText = `top:${e.clientY}px;left:${e.clientX}px`;
   menu.innerHTML = `
-    <div class="ctx-item" onclick="startReply(${msgId},'${esc(sender)}','${esc(body.slice(0,80))}');closeCtx()">↩️ Ответить</div>
-    <div class="ctx-item" onclick="navigator.clipboard.writeText(${JSON.stringify(body)});closeCtx();showToast('Скопировано','✅')">📋 Копировать</div>
-    ${isOwn?`<div class="ctx-item danger" onclick="deleteMsg(${msgId});closeCtx()">🗑️ Удалить</div>`:''}
+    <div class="ctx-item" onclick="startReply(${msgId},'${esc(sender)}','${esc(body.slice(0,80))}');closeCtx()"><i class="fas fa-reply"></i> Ответить</div>
+    <div class="ctx-item" onclick="navigator.clipboard.writeText(${JSON.stringify(body)});closeCtx();showToast('Скопировано','<i class="fas fa-check-circle"></i>')"><i class="fas fa-copy"></i> Копировать</div>
+    ${isOwn?`<div class="ctx-item danger" onclick="deleteMsg(${msgId});closeCtx()"><i class="fas fa-trash"></i> Удалить</div>`:''}
   `;
   document.body.appendChild(menu);
   _ctx = menu;
@@ -1259,10 +1260,10 @@ async function deleteMsg(id){
     const msgEl = $id('messagesArea')?.querySelector(`[data-mid="${id}"]`);
     if(msgEl){
       const bub = msgEl.querySelector('.msg-bub');
-      if(bub) bub.innerHTML = '<span class="msg-deleted">🚫 Сообщение удалено</span>';
+      if(bub) bub.innerHTML = '<span class="msg-deleted"><i class="fas fa-ban"></i> Сообщение удалено</span>';
     }
   } else {
-    showToast(d.error || 'Ошибка удаления', '❌');
+    showToast(d.error || 'Ошибка удаления', '<i class="fas fa-times-circle"></i>');
   }
 }
 
@@ -1276,7 +1277,7 @@ async function loadMembers(){
   $id('membersList').innerHTML = members.map(m=>{
     const col  = avatarColor(m.user_name);
     const init = avatarInitial(m.user_name);
-    const rl   = m.room_role==='owner'?'👑 Владелец':m.room_role==='admin'?'⭐ Админ':'Участник';
+    const rl   = m.room_role==='owner'?'<i class="fas fa-crown"></i> Владелец':m.room_role==='admin'?'<i class="fas fa-star"></i> Админ':'Участник';
     return `<div class="member-row">
       <div class="member-av" style="width:36px;height:36px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0">${esc(init)}</div>
       <div class="member-info">
@@ -1304,7 +1305,7 @@ function openAddMemberModal(){
       <input type="checkbox" id="am_${a.id}" value="${a.id}" data-name="${esc(a.name)}" data-role="${esc(a.role)}">
       <div class="member-avatar-sm" style="background:${avatarColor(a.name)}">${esc(avatarInitial(a.name))}</div>
       <div class="member-name-txt">${esc(a.name)}</div>
-      <div class="member-role-txt">${a.role==='super_admin'?'⭐ Супер-admin':'👑 Admin'}</div>
+      <div class="member-role-txt">${a.role==='super_admin'?'<i class="fas fa-star"></i> Супер-admin':'<i class="fas fa-crown"></i> Admin'}</div>
     </div>`).join('');
   openOverlay('addMemberOverlay');
 }
@@ -1312,7 +1313,7 @@ function openAddMemberModal(){
 async function addSelectedMembers(){
   if(!currentRoom) return;
   const checks = [...$id('addMemberList').querySelectorAll('input:checked')];
-  if(!checks.length){ showToast('Выберите участников','⚠️'); return; }
+  if(!checks.length){ showToast('Выберите участников','<i class="fas fa-exclamation-triangle"></i>'); return; }
   for(const c of checks){
     await apiPost('add_member',{room_id:currentRoom.id, user_id:parseInt(c.value), user_name:c.dataset.name, user_role:c.dataset.role});
   }
@@ -1340,7 +1341,7 @@ function buildMemberSelectList(){
       <input type="checkbox" id="ms_${a.id}" value="${a.id}" data-name="${esc(a.name)}" data-role="${esc(a.role)}">
       <div class="member-avatar-sm" style="background:${avatarColor(a.name)}">${esc(avatarInitial(a.name))}</div>
       <div class="member-name-txt">${esc(a.name)}</div>
-      <div class="member-role-txt">${a.role==='super_admin'?'⭐':'👑'}</div>
+      <div class="member-role-txt">${a.role==='super_admin'?'<i class="fas fa-star"></i>':'<i class="fas fa-crown"></i>'}</div>
     </div>`
   ).join('');
 }
@@ -1359,7 +1360,7 @@ function openNewGroupModal(type){
 async function createRoom(){
   const type = $id('createRoomType').value;
   const name = $id('crName').value.trim();
-  if(!name){ showToast('Введите название','⚠️'); return; }
+  if(!name){ showToast('Введите название','<i class="fas fa-exclamation-triangle"></i>'); return; }
 
   const checks  = [...$id('memberSelectList').querySelectorAll('input:checked')];
   const members = checks.map(c=>({id:parseInt(c.value),name:c.dataset.name,role:c.dataset.role}));
@@ -1369,7 +1370,7 @@ async function createRoom(){
   if(d.ok||d.room_id){
     await loadRooms();
     await openRoom(d.room_id);
-  } else showToast(d.error||'Ошибка','❌');
+  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
 }
 
 async function leaveRoom(){
@@ -1395,7 +1396,7 @@ function buildDirectUserList(){
         ${isOn?'<span style="position:absolute;bottom:0;right:0;width:8px;height:8px;border-radius:50%;background:var(--green);border:2px solid var(--s2)"></span>':''}
       </div>
       <div class="member-name-txt">${esc(a.name)}</div>
-      <div class="member-role-txt">${isOn?'🟢 онлайн':'⚫ офлайн'}</div>
+      <div class="member-role-txt">${isOn?'<i class="fas fa-circle" style="color:#4dcd5e"></i> онлайн':'<i class="fas fa-circle" style="color:#666"></i> офлайн'}</div>
     </div>`;
   }).join('') || '<div style="padding:16px;color:var(--t3);text-align:center">Нет доступных пользователей</div>';
 }
@@ -1411,7 +1412,7 @@ async function openDirectWith(toId, toName){
   if(d.ok||d.room_id){
     await loadRooms();
     openRoom(d.room_id);
-  } else showToast(d.error||'Ошибка','❌');
+  } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
 }
 
 /* ════════════════════════════════════════════════════
@@ -1516,13 +1517,13 @@ function callPeerInRoom(){
 
 async function initiateCall(video=true){
   const peer = callPeerInRoom();
-  if(!peer){ showToast('Выберите личный чат для звонка','ℹ️'); return; }
-  if(pc){ showToast('Вы уже в звонке','⚠️'); return; }
+  if(!peer){ showToast('Выберите личный чат для звонка','<i class="fas fa-info-circle"></i>'); return; }
+  if(pc){ showToast('Вы уже в звонке','<i class="fas fa-exclamation-triangle"></i>'); return; }
   await startCallTo(peer.id, peer.name, video);
 }
 
 async function startCallTo(toId, toName, video=true){
-  if(pc){ showToast('Вы уже в звонке','⚠️'); return; }
+  if(pc){ showToast('Вы уже в звонке','<i class="fas fa-exclamation-triangle"></i>'); return; }
   callId=genCallId(); callPeerId=toId; callPeerName=toName; callIsVideo=video; isCaller=true;
   try{
     localStream = await getStream(video);
@@ -1532,13 +1533,13 @@ async function startCallTo(toId, toName, video=true){
     await pc.setLocalDescription(offer);
     await apiPost('signal',{call_id:callId,to_id:toId,sig_type:'invite',payload:{offer,callerName:ME.name,isVideo:video}});
     showCallWindow(toName,video);
-    showToast('Вызов '+toName+'…','📞',20000);
-  } catch(e){ showToast('Ошибка: '+e.message,'❌'); cleanup(); }
+    showToast('Вызов '+toName+'…','<i class="fas fa-phone"></i>',20000);
+  } catch(e){ showToast('Ошибка: '+e.message,'<i class="fas fa-times-circle"></i>'); cleanup(); }
 }
 
 async function getStream(video){
   try{ return await navigator.mediaDevices.getUserMedia({audio:true,video:video?{width:1280,height:720}:false}); }
-  catch(e){ if(video){ showToast('Камера недоступна, аудио','⚠️'); return await navigator.mediaDevices.getUserMedia({audio:true,video:false}); } throw e; }
+  catch(e){ if(video){ showToast('Камера недоступна, аудио','<i class="fas fa-exclamation-triangle"></i>'); return await navigator.mediaDevices.getUserMedia({audio:true,video:false}); } throw e; }
 }
 
 function setupPC(){
@@ -1571,9 +1572,9 @@ function showCallWindow(name,video){
 }
 
 function updateCCUI(){
-  $id('ccMute').textContent  = isMuted  ?'🔇':'🎙️';
+  $id('ccMute').innerHTML  = isMuted  ?'<i class="fas fa-microphone-slash"></i>':'<i class="fas fa-microphone"></i>';
   $id('ccMute').classList.toggle('muted',isMuted);
-  $id('ccCam').textContent   = isCamOff ?'📷':'📹';
+  $id('ccCam').innerHTML   = isCamOff ?'<i class="fas fa-video-slash"></i>':'<i class="fas fa-video"></i>';
   $id('ccCam').classList.toggle('muted',isCamOff);
   $id('ccScreen').classList.toggle('muted',isScreen);
   $id('screenBadge').classList.toggle('on',isScreen);
@@ -1586,7 +1587,7 @@ function showIncoming(sig){
   const nm=pl.callerName||sig.from_name;
   $id('incAv').textContent=avatarInitial(nm); $id('incAv').style.background=avatarColor(nm);
   $id('incName').textContent=nm;
-  $id('incType').textContent=(pl.isVideo!==false)?'📹 Видеозвонок':'🎙️ Аудиозвонок';
+  $id('incType').textContent=(pl.isVideo!==false)?'Видеозвонок':'Аудиозвонок';
   $id('incomingOverlay').classList.add('open');
   startRing();
 }
@@ -1605,7 +1606,7 @@ async function acceptCall(){
     const ans=await pc.createAnswer(); await pc.setLocalDescription(ans);
     await apiPost('signal',{call_id:callId,to_id:callPeerId,sig_type:'answer',payload:ans});
     showCallWindow(callPeerName,callIsVideo);
-  } catch(e){ showToast('Ошибка: '+e.message,'❌'); cleanup(); }
+  } catch(e){ showToast('Ошибка: '+e.message,'<i class="fas fa-times-circle"></i>'); cleanup(); }
 }
 
 function rejectCall(){
@@ -1626,7 +1627,7 @@ async function toggleScreen(){
       $id('vidLocal').srcObject=screenStream;
       st.onended=()=>{ isScreen=false; stopScreen(); };
       isScreen=true; updateCCUI();
-    } catch(e){ showToast('Экран недоступен','⚠️'); }
+    } catch(e){ showToast('Экран недоступен','<i class="fas fa-exclamation-triangle"></i>'); }
   } else stopScreen();
 }
 async function stopScreen(){
@@ -1638,7 +1639,7 @@ async function stopScreen(){
 async function hangUp(send=true){
   if(send&&callPeerId) await apiPost('signal',{call_id:callId,to_id:callPeerId,sig_type:'hangup'}).catch(()=>{});
   cleanup(); $id('callWin').classList.remove('open'); clearInterval(callTmrInt); $id('callTmr').textContent='0:00';
-  showToast('Звонок завершён','📵');
+  showToast('Звонок завершён','<i class="fas fa-phone-slash"></i>');
 }
 
 function cleanup(){
@@ -1662,9 +1663,9 @@ async function handleSignal(sig){
     case 'ice':
       if(pc&&sig.payload) try{await pc.addIceCandidate(new RTCIceCandidate(sig.payload));}catch(_){}
       break;
-    case 'reject': hangUp(false); showToast(sig.from_name+' отклонил(а) звонок','📵'); break;
+    case 'reject': hangUp(false); showToast(sig.from_name+' отклонил(а) звонок','<i class="fas fa-phone-slash"></i>'); break;
     case 'hangup': hangUp(false); break;
-    case 'busy':   hangUp(false); showToast(sig.from_name+' занят(а)','🔴'); break;
+    case 'busy':   hangUp(false); showToast(sig.from_name+' занят(а)','<i class="fas fa-circle" style="color:#e53935"></i>'); break;
   }
 }
 

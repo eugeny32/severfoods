@@ -21,12 +21,12 @@ function getMealTypeName(string $type): string
 function getMealTypeIcon(string $type): string
 {
     return [
-        'breakfast' => '🌅',
-        'lunch'     => '☀️',
-        'dinner'    => '🌙',
-        'night'     => '⭐',
-        'none'      => '⏸️',
-    ][$type] ?? '🍽️';
+        'breakfast' => '<i class="fas fa-cloud-sun"></i>',
+        'lunch'     => '<i class="fas fa-sun"></i>',
+        'dinner'    => '<i class="fas fa-moon"></i>',
+        'night'     => '<i class="fas fa-star"></i>',
+        'none'      => '<i class="fas fa-pause-circle"></i>',
+    ][$type] ?? '<i class="fas fa-utensils"></i>';
 }
 
 // ─── Расписание и текущий приём пищи ─────────────────

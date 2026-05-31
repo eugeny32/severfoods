@@ -76,6 +76,7 @@ arsort($by_point); arsort($by_org);
 <title>Отчёты — <?= htmlspecialchars(APP_NAME) ?></title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="stylesheet" href="assets/css/style.css">
 <style>
 .report-header {
@@ -119,8 +120,8 @@ arsort($by_point); arsort($by_org);
 <body style="background:var(--bg)">
 
 <div class="report-header">
-    <a href="index.php" style="color:rgba(255,255,255,.6);text-decoration:none;font-size:20px">←</a>
-    <h1>📊 Отчёты по питанию</h1>
+    <a href="index.php" style="color:rgba(255,255,255,.6);text-decoration:none;font-size:20px"><i class="fas fa-arrow-left"></i></a>
+    <h1><i class="fas fa-chart-bar"></i> Отчёты по питанию</h1>
     <span style="font-size:13px;opacity:.6;margin-left:auto"><?= htmlspecialchars($user_name) ?></span>
 </div>
 
@@ -129,15 +130,15 @@ arsort($by_point); arsort($by_org);
 <!-- Filter -->
 <form method="GET" class="filter-bar">
     <div class="form-group">
-        <label>📅 Дата от</label>
+        <label><i class="fas fa-calendar-alt"></i> Дата от</label>
         <input type="date" name="start_date" value="<?= $start_date ?>">
     </div>
     <div class="form-group">
-        <label>📅 Дата до</label>
+        <label><i class="fas fa-calendar-alt"></i> Дата до</label>
         <input type="date" name="end_date" value="<?= $end_date ?>">
     </div>
     <div class="form-group">
-        <label>🍽️ Тип питания</label>
+        <label><i class="fas fa-utensils"></i> Тип питания</label>
         <select name="meal_type">
             <option value="all" <?= $meal_type==='all'?'selected':'' ?>>Все</option>
             <option value="breakfast" <?= $meal_type==='breakfast'?'selected':'' ?>>Завтрак</option>
@@ -148,7 +149,7 @@ arsort($by_point); arsort($by_org);
     </div>
     <?php if ($is_super_admin && !empty($points)): ?>
     <div class="form-group">
-        <label>📍 Точка</label>
+        <label><i class="fas fa-map-marker-alt"></i> Точка</label>
         <select name="point_id">
             <option value="">Все точки</option>
             <?php foreach ($points as $pt): ?>
@@ -164,9 +165,9 @@ arsort($by_point); arsort($by_org);
     <div class="form-group" style="min-width:auto">
         <label>&nbsp;</label>
         <div style="display:flex;gap:8px">
-            <button type="submit" class="btn btn-primary">🔍 Применить</button>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Применить</button>
             <a href="export_excel.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
-               class="btn btn-success" style="background:#1d6f42">📊 Excel</a>
+               class="btn btn-success" style="background:#1d6f42"><i class="fas fa-table"></i> Excel</a>
         </div>
     </div>
 </form>
@@ -179,19 +180,19 @@ arsort($by_point); arsort($by_org);
     </div>
     <div class="summary-card">
         <div class="num" style="color:#d97706"><?= $by_type['breakfast'] ?></div>
-        <div class="lbl">🌅 Завтрак</div>
+        <div class="lbl"><i class="fas fa-cloud-sun"></i> Завтрак</div>
     </div>
     <div class="summary-card">
         <div class="num" style="color:#059669"><?= $by_type['lunch'] ?></div>
-        <div class="lbl">☀️ Обед</div>
+        <div class="lbl"><i class="fas fa-sun"></i> Обед</div>
     </div>
     <div class="summary-card">
         <div class="num" style="color:#6d28d9"><?= $by_type['dinner'] ?></div>
-        <div class="lbl">🌙 Ужин</div>
+        <div class="lbl"><i class="fas fa-moon"></i> Ужин</div>
     </div>
     <div class="summary-card">
         <div class="num" style="color:#1e3a8a"><?= $by_type['night'] ?></div>
-        <div class="lbl">⭐ Ночное</div>
+        <div class="lbl"><i class="fas fa-star"></i> Ночное</div>
     </div>
 </div>
 
@@ -199,7 +200,7 @@ arsort($by_point); arsort($by_org);
 <div class="split2">
     <?php if (!empty($by_point)): ?>
     <div class="card">
-        <div class="card-header"><div class="card-title">📍 По точкам</div></div>
+        <div class="card-header"><div class="card-title"><i class="fas fa-map-marker-alt"></i> По точкам</div></div>
         <?php $maxP = max(array_values($by_point)); ?>
         <div class="by-list">
             <?php foreach ($by_point as $name => $cnt): ?>
@@ -215,7 +216,7 @@ arsort($by_point); arsort($by_org);
 
     <?php if (!empty($by_org)): ?>
     <div class="card">
-        <div class="card-header"><div class="card-title">🏢 По организациям</div></div>
+        <div class="card-header"><div class="card-title"><i class="fas fa-building"></i> По организациям</div></div>
         <?php $maxO = max(array_values($by_org)); ?>
         <div class="by-list">
             <?php foreach (array_slice($by_org, 0, 10, true) as $org => $cnt): ?>
@@ -233,14 +234,14 @@ arsort($by_point); arsort($by_org);
 <!-- Table -->
 <div class="card">
     <div class="card-header">
-        <div class="card-title">📋 Детализация (<?= count($logs) ?> записей)</div>
+        <div class="card-title"><i class="fas fa-clipboard-list"></i> Детализация (<?= count($logs) ?> записей)</div>
         <?php if (count($logs) > 100): ?>
         <span style="font-size:12px;color:var(--text-3)">Показаны все <?= count($logs) ?> записей</span>
         <?php endif; ?>
     </div>
 
     <?php if (empty($logs)): ?>
-    <div class="empty"><div class="empty-icon">📋</div>Нет данных за выбранный период</div>
+    <div class="empty"><div class="empty-icon"><i class="fas fa-clipboard-list"></i></div>Нет данных за выбранный период</div>
     <?php else: ?>
     <div class="report-table-wrap">
         <table class="report-table">
