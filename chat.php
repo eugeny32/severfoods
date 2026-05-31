@@ -2688,18 +2688,25 @@ async function init(){
     try { await pingPresence(); await loadRooms(); } catch(_) {}
   }, 10000);
 
-  // iOS/Android: keyboard pushes content up — track visual viewport height
-  // so the input area stays glued to the top of the keyboard
+  // iOS/Android: keyboard pushes content up — track visual viewport height so
+  // the input area stays glued to the top of the keyboard. Only apply the
+  // offset while the message input is actually focused, otherwise standalone
+  // PWA mode (where visualViewport.height differs from innerHeight even with
+  // no keyboard) would falsely push the bottom bar up.
   if (window.visualViewport && isMobile()) {
     const mainEl = $id('main');
-    const onVpResize = () => {
+    const inputBox = $id('msgInput');
+    let _kbActive = false;
+    const applyOffset = () => {
       if (!mainEl) return;
-      // keyboardH > 0 when virtual keyboard is open
+      if (!_kbActive) { mainEl.style.bottom = ''; return; }
       const keyboardH = Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
-      mainEl.style.bottom = keyboardH > 20 ? keyboardH + 'px' : '';
+      mainEl.style.bottom = keyboardH > 80 ? keyboardH + 'px' : '';
     };
-    window.visualViewport.addEventListener('resize', onVpResize);
-    window.visualViewport.addEventListener('scroll', onVpResize);
+    inputBox?.addEventListener('focus', () => { _kbActive = true; setTimeout(applyOffset, 100); });
+    inputBox?.addEventListener('blur',  () => { _kbActive = false; mainEl && (mainEl.style.bottom = ''); });
+    window.visualViewport.addEventListener('resize', applyOffset);
+    window.visualViewport.addEventListener('scroll', applyOffset);
   }
 }
 
