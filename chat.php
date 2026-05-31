@@ -1198,6 +1198,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySele
 let rooms        = [];
 let currentRoom  = null;
 let lastMsgId    = 0;
+let _pollMsgLock = false;  // prevents concurrent pollMessages() calls
 let currentMembers = [];
 let _othersReadId = 0;
 let replyToId    = null;
@@ -1583,8 +1584,9 @@ async function sendMessage(){
   $id('sendBtn').disabled = false;
   inp.focus();
 
-  await pollAll();
-  await loadRooms();
+  // Poll immediately after send — but only if no concurrent poll is running
+  if(!_pollMsgLock) pollMessages().catch(()=>{});
+  loadRooms().catch(()=>{});
 }
 
 // Enter to send
@@ -2314,38 +2316,45 @@ async function pingPresence(){
 }
 
 async function pollMessages(){
-  if(!currentRoom || _initialLoading) return;
-  const d = await api('messages', {room_id: currentRoom.id, after: lastMsgId});
-  const msgs = d.messages || [];
-  if (d.others_read_id !== undefined && d.others_read_id > _othersReadId) {
-    _othersReadId = d.others_read_id;
+  if(!currentRoom || _initialLoading || _pollMsgLock) return;
+  _pollMsgLock = true;
+  try {
+    const d = await api('messages', {room_id: currentRoom.id, after: lastMsgId});
+    const msgs = d.messages || [];
+    if (d.others_read_id !== undefined && d.others_read_id > _othersReadId) {
+      _othersReadId = d.others_read_id;
+      updateMsgStatuses();
+    }
+    if(!msgs.length) return;
+
+    setEmpty(false);
+
+    const area = $id('messagesArea');
+    let html = '';
+    msgs.forEach(m => {
+      // skip if already in DOM (race condition guard)
+      if(area?.querySelector(`[data-mid="${m.id}"]`)) { lastMsgId = Math.max(lastMsgId, m.id); return; }
+      const showSender = m.sender_id !== _prevSender || m.msg_type === 'system';
+      html += renderMsg(m, showSender);
+      _prevSender = m.sender_id;
+      lastMsgId   = Math.max(lastMsgId, m.id);
+    });
+
+    if(area && html) {
+      area.insertAdjacentHTML('beforeend', html);
+      scrollBottom('smooth');
+    }
+
+    markRead(lastMsgId);
     updateMsgStatuses();
+
+    // Тихое обновление unread в сайдбаре
+    const r = rooms.find(x => x.id === currentRoom.id);
+    if(r) r.unread = 0;
+    loadRooms().catch(()=>{});
+  } finally {
+    _pollMsgLock = false;
   }
-  if(!msgs.length) return;
-
-  setEmpty(false);   // есть новые сообщения — убираем заглушку
-
-  let html = '';
-  msgs.forEach(m => {
-    const showSender = m.sender_id !== _prevSender || m.msg_type === 'system';
-    html += renderMsg(m, showSender);
-    _prevSender = m.sender_id;
-    lastMsgId   = Math.max(lastMsgId, m.id);
-  });
-
-  const area = $id('messagesArea');
-  if(area) {
-    area.insertAdjacentHTML('beforeend', html);
-    scrollBottom('smooth');
-  }
-
-  markRead(lastMsgId);
-  updateMsgStatuses();
-
-  // Тихое обновление unread в сайдбаре
-  const r = rooms.find(x => x.id === currentRoom.id);
-  if(r) r.unread = 0;
-  loadRooms().catch(()=>{});
 }
 
 async function pollSignals(){
