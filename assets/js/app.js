@@ -535,6 +535,9 @@ function openEditModal(id) {
         $('empQrStatus').value  = emp.qr_status || 'active';
         $('empIsActive').checked = emp.is_active == 1;
         if ($('empRole')) $('empRole').value = emp.role || '';
+        if ($('empPointId')) $('empPointId').value = emp.assigned_point_id || '';
+        const pg = $('pointSelectGroup');
+        if (pg) pg.style.display = ['admin','operator','super_admin'].includes(emp.role || '') ? '' : 'none';
         $('regenerateQrRow')?.removeAttribute('style');
         openModal('empModal');
     })
@@ -542,6 +545,15 @@ function openEditModal(id) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const roleEl = document.getElementById('empRole');
+    if (roleEl) {
+        roleEl.addEventListener('change', function(){
+            const role = this.value;
+            const pg = document.getElementById('pointSelectGroup');
+            if (pg) pg.style.display = ['admin','operator','super_admin'].includes(role) ? '' : 'none';
+        });
+    }
+
     const form = $('empForm');
     if (!form) return;
     form.addEventListener('submit', e => {
@@ -562,6 +574,7 @@ document.addEventListener('DOMContentLoaded', () => {
             is_active:       $('empIsActive').checked ? 1 : 0,
             role:            $('empRole')?.value || null,
             regenerate_qr:   $('regenerateQr')?.checked || false,
+            assigned_point_id: $('empPointId')?.value || null,
         };
         if (isEdit) data.id = parseInt(id);
 

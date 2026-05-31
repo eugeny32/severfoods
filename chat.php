@@ -785,7 +785,46 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
         Создать канал
       </button>
       <div style="border-top:1px solid var(--border);padding-top:10px;color:var(--t3);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Личное сообщение</div>
-      <div id="directUserList" style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r)"></div>
+      <button class="btn btn-ghost" style="justify-content:flex-start;gap:12px;padding:14px 16px;font-size:15px" onclick="openUserSearch()"><i class="fas fa-search"></i>
+        Найти пользователя
+      </button>
+      <div id="directUserList" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r)"></div>
+      <div style="border-top:1px solid var(--border);padding-top:10px;color:var(--t3);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Группы и каналы</div>
+      <button class="btn btn-ghost" style="justify-content:flex-start;gap:12px;padding:14px 16px;font-size:15px" onclick="openPublicRooms()"><i class="fas fa-globe"></i>
+        Публичные группы/каналы
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Public rooms overlay -->
+<div class="overlay" id="publicRoomsOverlay">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-hdr">
+      <div class="modal-title"><i class="fas fa-globe"></i> Публичные комнаты</div>
+      <button class="modal-close" onclick="closeOverlay('publicRoomsOverlay')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
+      <input type="text" placeholder="Поиск по названию…" style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);font-size:14px;outline:none"
+        oninput="loadPublicRooms(this.value)">
+      <div id="publicRoomList" style="max-height:400px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<!-- User search overlay -->
+<div class="overlay" id="userSearchOverlay">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-hdr">
+      <div class="modal-title"><i class="fas fa-search"></i> Найти пользователя</div>
+      <button class="modal-close" onclick="closeOverlay('userSearchOverlay')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
+      <input type="text" id="userSearchInput" placeholder="Введите имя или логин…" style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--r);font-size:14px;outline:none"
+        oninput="searchUsers()">
+      <div id="userSearchResults" style="max-height:380px;overflow-y:auto">
+        <div style="padding:12px;color:var(--t3);font-size:13px">Введите минимум 2 символа</div>
+      </div>
     </div>
   </div>
 </div>
@@ -2219,6 +2258,64 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
   init();
+}
+
+// Public rooms browser
+async function openPublicRooms(){
+  closeOverlay('newChatOverlay');
+  openOverlay('publicRoomsOverlay');
+  await loadPublicRooms();
+}
+async function loadPublicRooms(filter=''){
+  const d = await api('public_rooms');
+  const list = (d.rooms||[]).filter(r=> !filter || r.name?.toLowerCase().includes(filter.toLowerCase()));
+  const el = $id('publicRoomList');
+  if (!list.length){ el.innerHTML='<div style="padding:16px;text-align:center;color:var(--t3)">Нет публичных комнат</div>'; return; }
+  el.innerHTML = list.map(r=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px;border-bottom:1px solid var(--border)">
+      <div style="width:40px;height:40px;border-radius:50%;background:${r.avatar_color||'#003366'};
+        color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">
+        ${r.type==='channel'?'<i class="fas fa-bullhorn"></i>':'<i class="fas fa-users"></i>'}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600">${esc(r.name||'')}</div>
+        <div style="font-size:12px;color:var(--t3)">${r.member_count} участников${r.description?` · ${esc(r.description.slice(0,40))}`:''}
+        </div>
+      </div>
+      <button class="btn ${r.is_member?'btn-ghost':'btn-primary'}" style="font-size:12px;padding:6px 10px"
+        onclick="${r.is_member?`openRoom(${r.id});closeOverlay('publicRoomsOverlay')`:`joinPublicRoom(${r.id})`}">
+        ${r.is_member?'Открыть':'Вступить'}
+      </button>
+    </div>`).join('');
+}
+async function joinPublicRoom(roomId){
+  await apiPost('join_room',{room_id:roomId});
+  await loadRooms();
+  showToast('Вы вступили в комнату','<i class="fas fa-check"></i>');
+  await loadPublicRooms();
+}
+
+// User search for DM
+let _searchTimer;
+function openUserSearch(){
+  closeOverlay('newChatOverlay');
+  openOverlay('userSearchOverlay');
+  setTimeout(()=>$id('userSearchInput')?.focus(),100);
+}
+async function searchUsers(){
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(async()=>{
+    const q = $id('userSearchInput')?.value||'';
+    if (q.length < 2){ $id('userSearchResults').innerHTML='<div style="padding:12px;color:var(--t3);font-size:13px">Введите минимум 2 символа</div>'; return; }
+    const d = await api('search_users&q='+encodeURIComponent(q));
+    const list = d.users||[];
+    if (!list.length){ $id('userSearchResults').innerHTML='<div style="padding:12px;color:var(--t3);font-size:13px">Никого не найдено</div>'; return; }
+    $id('userSearchResults').innerHTML = list.map(u=>`
+      <div class="member-select-item" onclick="openDirectWith(${u.id},'${esc(u.full_name)}');closeOverlay('userSearchOverlay')">
+        <div class="member-avatar-sm" style="background:${avatarColor(u.full_name)}">${esc(avatarInitial(u.full_name))}</div>
+        <div class="member-name-txt">${esc(u.full_name)}${u.chat_username?` <span style="color:var(--t3);font-size:11px">@${esc(u.chat_username)}</span>`:''}</div>
+      </div>`).join('');
+  }, 300);
 }
 </script>
 </body>

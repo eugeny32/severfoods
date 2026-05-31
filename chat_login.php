@@ -67,6 +67,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $error = 'Заполните все поля';
         }
+    } elseif ($type === 'register') {
+        $name    = trim($_POST['reg_name'] ?? '');
+        $user    = trim($_POST['reg_user'] ?? '');
+        $pass    = $_POST['reg_pass']  ?? '';
+        $pass2   = $_POST['reg_pass2'] ?? '';
+        if (!$name || !$user || !$pass) {
+            $error = 'Заполните все поля';
+        } elseif ($pass !== $pass2) {
+            $error = 'Пароли не совпадают';
+        } elseif (strlen($pass) < 4) {
+            $error = 'Пароль минимум 4 символа';
+        } else {
+            // Check username unique
+            $chk = $pdo->prepare("SELECT id FROM employees WHERE chat_username=?");
+            $chk->execute([$user]);
+            if ($chk->fetch()) {
+                $error = 'Логин уже занят';
+            } else {
+                // Add DB columns if missing
+                try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_access TINYINT(1) NOT NULL DEFAULT 0"); } catch(PDOException $e){}
+                try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_username VARCHAR(100) DEFAULT NULL"); } catch(PDOException $e){}
+                try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_password VARCHAR(255) DEFAULT NULL"); } catch(PDOException $e){}
+                $hash = password_hash($pass, PASSWORD_DEFAULT);
+                // Generate unique QR
+                $qr = 'CHAT_' . strtoupper(bin2hex(random_bytes(8)));
+                $pdo->prepare(
+                    "INSERT INTO employees (full_name, organization, is_active, chat_access, chat_username, chat_password, qr_code, role)
+                     VALUES (?, 'Чат-пользователь', 1, 1, ?, ?, ?, NULL)"
+                )->execute([$name, $user, $hash, $qr]);
+                $newId = (int)$pdo->lastInsertId();
+                $_SESSION['chat_uid']      = $newId;
+                $_SESSION['chat_uname']    = $name;
+                $_SESSION['chat_urole']    = 'user';
+                $_SESSION['chat_is_admin'] = false;
+                header('Location: chat.php'); exit;
+            }
+        }
     }
 }
 ?>
@@ -153,6 +190,9 @@ body::after{content:'';position:fixed;inset:0;
         <button class="tab-btn" id="tabPass" onclick="switchTab('pass')">
             <i class="fas fa-key"></i> Логин / Пароль
         </button>
+        <button class="tab-btn" id="tabReg" onclick="switchTab('reg')">
+            <i class="fas fa-user-plus"></i> Регистрация
+        </button>
     </div>
 
     <div class="card">
@@ -174,6 +214,30 @@ body::after{content:'';position:fixed;inset:0;
             </div>
             <button type="submit" class="btn-submit">
                 <i class="fas fa-sign-in-alt"></i> Войти по QR
+            </button>
+        </form>
+
+        <!-- Registration form -->
+        <form method="POST" class="form" id="formReg">
+            <input type="hidden" name="login_type" value="register">
+            <div class="field">
+                <label><i class="fas fa-id-card"></i> Полное имя</label>
+                <input type="text" id="regName" name="reg_name" placeholder="Иванов Иван Иванович" autocomplete="name">
+            </div>
+            <div class="field">
+                <label><i class="fas fa-user"></i> Логин</label>
+                <input type="text" id="regUser" name="reg_user" placeholder="username" autocomplete="username">
+            </div>
+            <div class="field">
+                <label><i class="fas fa-lock"></i> Пароль</label>
+                <input type="password" id="regPass" name="reg_pass" placeholder="Минимум 4 символа" autocomplete="new-password">
+            </div>
+            <div class="field">
+                <label><i class="fas fa-lock"></i> Подтвердите пароль</label>
+                <input type="password" id="regPass2" name="reg_pass2" placeholder="Повторите пароль" autocomplete="new-password">
+            </div>
+            <button type="submit" class="btn-submit">
+                <i class="fas fa-user-plus"></i> Зарегистрироваться
             </button>
         </form>
 
@@ -201,14 +265,12 @@ body::after{content:'';position:fixed;inset:0;
 <script src="assets/js/qr-input.js"></script>
 <script>
 function switchTab(tab){
-    const isQr = tab==='qr';
-    document.getElementById('formQr').classList.toggle('active',isQr);
-    document.getElementById('formPass').classList.toggle('active',!isQr);
-    document.getElementById('tabQr').classList.toggle('active',isQr);
-    document.getElementById('tabPass').classList.toggle('active',!isQr);
-    const inp = isQr
-        ? document.querySelector('#formQr input[name=qr_code]')
-        : document.querySelector('#formPass input[name=login]');
+    ['qr','pass','reg'].forEach(t=>{
+        document.getElementById('form'+t.charAt(0).toUpperCase()+t.slice(1))?.classList.toggle('active', t===tab);
+        document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1))?.classList.toggle('active', t===tab);
+    });
+    const selMap = {qr:'#formQr input[name=qr_code]', pass:'#formPass input[name=login]', reg:'#regName'};
+    const inp = document.querySelector(selMap[tab]);
     setTimeout(()=>inp&&inp.focus(),50);
 }
 </script>

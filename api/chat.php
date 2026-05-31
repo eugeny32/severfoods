@@ -94,6 +94,9 @@ switch ($action) {
     case 'chat_users':      doChatUsers();      break;
     case 'save_chat_user':  doSaveChatUser();   break;
     case 'remove_chat_user': doRemoveChatUser(); break;
+    case 'public_rooms':   doPublicRooms();   break;
+    case 'join_room':      doJoinRoom();      break;
+    case 'search_users':   doSearchUsers();   break;
     default:
         echo json_encode(['error' => 'Unknown action']);
 }
@@ -305,6 +308,7 @@ function initTables(): void
     // Add new columns if not exist
     try { $pdo->exec("ALTER TABLE chat_messages ADD COLUMN is_edited TINYINT(1) NOT NULL DEFAULT 0"); } catch(PDOException $e){}
     try { $pdo->exec("ALTER TABLE chat_rooms ADD COLUMN pinned_msg_id INT DEFAULT NULL"); } catch(PDOException $e){}
+    try { $pdo->exec("ALTER TABLE chat_rooms ADD COLUMN is_public TINYINT(1) NOT NULL DEFAULT 0"); } catch(PDOException $e){}
     try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_access TINYINT(1) NOT NULL DEFAULT 0"); } catch(PDOException $e){}
     try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_username VARCHAR(100) DEFAULT NULL"); } catch(PDOException $e){}
     try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_password VARCHAR(255) DEFAULT NULL"); } catch(PDOException $e){}
@@ -1012,4 +1016,50 @@ function doRemoveChatUser(): void {
     $pdo->prepare("UPDATE employees SET chat_access=0, chat_username=NULL, chat_password=NULL WHERE id=?")
         ->execute([$empId]);
     echo json_encode(['ok' => true]);
+}
+
+function doPublicRooms(): void {
+    global $pdo, $uid;
+    $rows = $pdo->prepare(
+        "SELECT r.id, r.type, r.name, r.description, r.avatar_color,
+                (SELECT COUNT(*) FROM chat_room_members WHERE room_id=r.id) AS member_count,
+                (SELECT 1 FROM chat_room_members WHERE room_id=r.id AND user_id=?) AS is_member
+         FROM chat_rooms r WHERE r.is_public=1 AND r.type IN ('group','channel')
+         ORDER BY r.last_msg_at DESC"
+    );
+    $rows->execute([$uid]);
+    $list = $rows->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($list as &$r) { $r['id']=(int)$r['id']; $r['member_count']=(int)$r['member_count']; $r['is_member']=(int)$r['is_member']; }
+    echo json_encode(['rooms' => $list]);
+}
+
+function doJoinRoom(): void {
+    global $pdo, $uid, $uname, $urole;
+    $roomId = (int)(json_decode(file_get_contents('php://input'),true)['room_id'] ?? 0);
+    if (!$roomId) err('Bad request');
+    $r = $pdo->prepare("SELECT is_public,type FROM chat_rooms WHERE id=?");
+    $r->execute([$roomId]);
+    $room = $r->fetch(PDO::FETCH_ASSOC);
+    if (!$room || !$room['is_public']) err('Комната закрыта', 403);
+    // Add if not already member
+    $pdo->prepare("INSERT IGNORE INTO chat_room_members (room_id,user_id,user_name,user_role,room_role)
+                   VALUES (?,?,?,?,'member')")->execute([$roomId,$uid,$uname,$urole]);
+    echo json_encode(['ok'=>true]);
+}
+
+function doSearchUsers(): void {
+    global $pdo, $uid;
+    $q = trim($_GET['q'] ?? '');
+    if (strlen($q) < 2) { echo json_encode(['users'=>[]]); return; }
+    $stmt = $pdo->prepare(
+        "SELECT id, full_name, role, chat_username
+         FROM employees WHERE is_active=1 AND (chat_access=1 OR role IN ('admin','super_admin'))
+           AND (full_name LIKE ? OR chat_username LIKE ?) AND id!=?
+         LIMIT 20"
+    );
+    $like = "%{$q}%";
+    $stmt->execute([$like,$like,$uid]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$r) $r['id']=(int)$r['id'];
+    echo json_encode(['users'=>$rows]);
 }
