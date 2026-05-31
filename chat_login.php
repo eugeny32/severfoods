@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $error = 'Введите QR-код';
         }
-    } else {
+    } elseif ($type === 'password') {
         $login    = trim($_POST['login']    ?? '');
         $password = $_POST['password'] ?? '';
         if ($login && $password) {
@@ -68,10 +68,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Заполните все поля';
         }
     } elseif ($type === 'register') {
-        $name    = trim($_POST['reg_name'] ?? '');
-        $user    = trim($_POST['reg_user'] ?? '');
-        $pass    = $_POST['reg_pass']  ?? '';
-        $pass2   = $_POST['reg_pass2'] ?? '';
+        $name  = trim($_POST['reg_name'] ?? '');
+        $user  = trim($_POST['reg_user'] ?? '');
+        $pass  = $_POST['reg_pass']  ?? '';
+        $pass2 = $_POST['reg_pass2'] ?? '';
         if (!$name || !$user || !$pass) {
             $error = 'Заполните все поля';
         } elseif ($pass !== $pass2) {
@@ -79,19 +79,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (strlen($pass) < 4) {
             $error = 'Пароль минимум 4 символа';
         } else {
-            // Check username unique
+            try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_access TINYINT(1) NOT NULL DEFAULT 0"); } catch(PDOException $e){}
+            try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_username VARCHAR(100) DEFAULT NULL"); } catch(PDOException $e){}
+            try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_password VARCHAR(255) DEFAULT NULL"); } catch(PDOException $e){}
             $chk = $pdo->prepare("SELECT id FROM employees WHERE chat_username=?");
             $chk->execute([$user]);
             if ($chk->fetch()) {
                 $error = 'Логин уже занят';
             } else {
-                // Add DB columns if missing
-                try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_access TINYINT(1) NOT NULL DEFAULT 0"); } catch(PDOException $e){}
-                try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_username VARCHAR(100) DEFAULT NULL"); } catch(PDOException $e){}
-                try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_password VARCHAR(255) DEFAULT NULL"); } catch(PDOException $e){}
                 $hash = password_hash($pass, PASSWORD_DEFAULT);
-                // Generate unique QR
-                $qr = 'CHAT_' . strtoupper(bin2hex(random_bytes(8)));
+                $qr   = 'CHAT_' . strtoupper(bin2hex(random_bytes(8)));
                 $pdo->prepare(
                     "INSERT INTO employees (full_name, organization, is_active, chat_access, chat_username, chat_password, qr_code, role)
                      VALUES (?, 'Чат-пользователь', 1, 1, ?, ?, ?, NULL)"

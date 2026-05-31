@@ -520,7 +520,7 @@ function doAddMember(): void
     if (!$roomId || !$toId || !$toName) err('Missing fields');
 
     $rr = getRoomRole($roomId);
-    if (!in_array($rr, ['owner','admin'], true)) err('Not enough rights', 403);
+    if (!in_array($rr, ['owner','admin'], true) && !$isAdmin) err('Not enough rights', 403);
 
     $pdo->prepare(
         "INSERT IGNORE INTO chat_room_members (room_id, user_id, user_name, user_role, room_role) VALUES (?,?,?,?,'member')"
