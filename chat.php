@@ -184,7 +184,8 @@ body{
 }
 .topbar-info{flex:1;min-width:0}
 .topbar-name{font-weight:700;color:var(--t1);font-size:15px}
-.topbar-sub{font-size:12px;color:var(--t3);margin-top:1px}
+.topbar-sub{font-size:12px;color:var(--t3);margin-top:1px;transition:color .3s}
+.topbar-sub .online-label{color:var(--green);font-weight:500}
 .topbar-actions{display:flex;gap:2px;align-items:center}
 .topbar-btn{
   width:40px;height:40px;border-radius:50%;background:none;border:none;
@@ -1200,6 +1201,22 @@ let _pinnedMsgId    = null;
 ════════════════════════════════════════════════════ */
 function typeIcon(type){ return type==='channel'?'<i class="fas fa-bullhorn"></i>':type==='direct'?'<i class="fas fa-comments"></i>':'<i class="fas fa-users"></i>'; }
 
+function updateTopbarStatus(){
+  if(!currentRoom) return;
+  const tbSubEl = $id('tbSub');
+  if(!tbSubEl) return;
+  if(currentRoom.type === 'direct'){
+    const isOnline = onlineSet.has(currentRoom._peer_id);
+    tbSubEl.innerHTML = isOnline
+      ? '<span class="online-label"><i class="fas fa-circle" style="font-size:7px;vertical-align:middle;margin-right:4px"></i>В сети</span>'
+      : 'не в сети';
+  } else if(currentRoom.type === 'channel'){
+    tbSubEl.innerHTML = '<i class="fas fa-bullhorn"></i> Канал';
+  } else {
+    tbSubEl.innerHTML = '<i class="fas fa-users"></i> Группа';
+  }
+}
+
 function renderRoomList(filter=''){
   const lf = filter.toLowerCase();
   const list = rooms.filter(r=> !lf || (r.name||'').toLowerCase().includes(lf));
@@ -1283,8 +1300,7 @@ async function openRoom(id){
   const leaveBtn = $id('btnLeave');
   if (tbAvEl)  { tbAvEl.style.background = col; tbAvEl.innerHTML = init; }
   if (tbNmEl)  tbNmEl.textContent  = name;
-  if (tbSubEl) tbSubEl.innerHTML = room.type === 'direct'  ? '<i class="fas fa-comments"></i> Личный чат' :
-                                      room.type === 'channel' ? '<i class="fas fa-bullhorn"></i> Канал'       : '<i class="fas fa-users"></i> Группа';
+  updateTopbarStatus();
   if (leaveBtn) leaveBtn.style.display = room.type !== 'direct' ? '' : 'none';
 
   // ── Сбрасываем состояние ─────────────────────────────
@@ -2196,6 +2212,7 @@ async function pingPresence(){
   const onlineD = await api('online');
   onlineSet = new Set((onlineD.online||[]).map(u=>parseInt(u.user_id)));
   renderRoomList($id('searchInput').value);
+  updateTopbarStatus();
 }
 
 async function pollMessages(){

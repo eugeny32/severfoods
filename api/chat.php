@@ -390,13 +390,15 @@ function doRooms(): void
         $r['unread']  = (int)$r['unread'];
         $r['muted']   = (bool)$r['muted'];
 
-        // Для direct — имя = имя собеседника
+        // Для direct — имя и peer_id = собеседник
         if ($r['type'] === 'direct') {
             $other = $pdo->prepare(
-                "SELECT user_name FROM chat_room_members WHERE room_id=? AND user_id!=? LIMIT 1"
+                "SELECT user_id, user_name FROM chat_room_members WHERE room_id=? AND user_id!=? LIMIT 1"
             );
             $other->execute([$r['id'], $uid]);
-            $r['name'] = $other->fetchColumn() ?: 'Личная беседа';
+            $peer = $other->fetch(PDO::FETCH_ASSOC);
+            $r['name']     = $peer ? $peer['user_name'] : 'Личная беседа';
+            $r['_peer_id'] = $peer ? (int)$peer['user_id'] : 0;
         }
     }
     unset($r);
