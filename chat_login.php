@@ -192,7 +192,7 @@ body::after{content:'';position:fixed;inset:0;
             <i class="fas fa-qrcode"></i> QR-код
         </button>
         <button class="tab-btn" id="tabPass" onclick="switchTab('pass')">
-            <i class="fas fa-key"></i> Логин / Пароль
+            <i class="fas fa-sign-in-alt"></i> Вход
         </button>
         <button class="tab-btn" id="tabReg" onclick="switchTab('reg')">
             <i class="fas fa-user-plus"></i> Регистрация
