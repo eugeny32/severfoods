@@ -58,6 +58,7 @@ if ($is_super_admin) {
 $allEmployees = getEmployees($pdo);
 $expiringEmps = getExpiringEmployees($pdo, 7);
 $vjgList      = getVjgList($pdo);
+$mealPointsList = getMealPoints($pdo, true); // active only
 $orgStats     = $pdo->query(
     "SELECT TRIM(organization) as organization, COUNT(*) as cnt FROM employees WHERE is_active=1 GROUP BY TRIM(organization) ORDER BY TRIM(organization)"
 )->fetchAll();
@@ -247,20 +248,24 @@ $allEmployeesJson = array_map(function($e) {
                 <!-- 4 плитки по типам -->
                 <div class="stats-row">
                     <div class="stat-tile">
+                        <div class="stat-icon-row"><i class="fas fa-cloud-sun"></i></div>
                         <div class="stat-num" id="stat_breakfast"><?= $stats['breakfast'] ?></div>
-                        <div class="stat-lbl"><i class="fas fa-cloud-sun"></i> Завтрак</div>
+                        <div class="stat-lbl">Завтрак</div>
                     </div>
                     <div class="stat-tile">
+                        <div class="stat-icon-row"><i class="fas fa-sun"></i></div>
                         <div class="stat-num" id="stat_lunch"><?= $stats['lunch'] ?></div>
-                        <div class="stat-lbl"><i class="fas fa-sun"></i> Обед</div>
+                        <div class="stat-lbl">Обед</div>
                     </div>
                     <div class="stat-tile">
+                        <div class="stat-icon-row"><i class="fas fa-moon"></i></div>
                         <div class="stat-num" id="stat_dinner"><?= $stats['dinner'] ?></div>
-                        <div class="stat-lbl"><i class="fas fa-moon"></i> Ужин</div>
+                        <div class="stat-lbl">Ужин</div>
                     </div>
                     <div class="stat-tile">
+                        <div class="stat-icon-row"><i class="fas fa-star"></i></div>
                         <div class="stat-num" id="stat_night"><?= $stats['night'] ?></div>
-                        <div class="stat-lbl"><i class="fas fa-star"></i> Ночное</div>
+                        <div class="stat-lbl">Ночное</div>
                     </div>
                 </div>
             </div>
@@ -639,6 +644,26 @@ $allEmployeesJson = array_map(function($e) {
                     </select>
                 </div>
                 <?php endif; ?>
+                <div class="form-group" id="pointSelectGroup" style="display:none">
+                    <label>Точка питания</label>
+                    <select id="empPointId">
+                        <option value="">— Не назначена —</option>
+                        <?php if ($is_super_admin): ?>
+                        <?php foreach ($mealPointsList as $mp): ?>
+                        <option value="<?= $mp['id'] ?>"><?= htmlspecialchars($mp['point_name']) ?> (<?= htmlspecialchars($mp['point_code']) ?>)</option>
+                        <?php endforeach; ?>
+                        <?php else: ?>
+                        <?php
+                        $adminPoint = null;
+                        foreach ($mealPointsList as $mp) {
+                            if ($mp['id'] == ($assigned_point_id ?? 0)) { $adminPoint = $mp; break; }
+                        }
+                        if ($adminPoint): ?>
+                        <option value="<?= $adminPoint['id'] ?>" selected><?= htmlspecialchars($adminPoint['point_name']) ?></option>
+                        <?php endif; ?>
+                        <?php endif; ?>
+                    </select>
+                </div>
                 <div class="checkbox-row">
                     <input type="checkbox" id="empIsActive" checked>
                     <label for="empIsActive">Сотрудник активен (имеет доступ)</label>
