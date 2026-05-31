@@ -127,8 +127,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     --accent:#f59e0b;--surface:#fff;--gray-50:#f8fafc;--gray-100:#f1f5f9;
     --gray-200:#e2e8f0;--gray-500:#64748b;--danger:#ef4444;--radius:16px;
 }
-body{font-family:'Onest',sans-serif;background:var(--blue-900);min-height:100vh;
-    display:flex;align-items:center;justify-content:center;padding:20px;overflow-x:hidden}
+html{background:var(--blue-900);min-height:100%;min-height:-webkit-fill-available}
+body{font-family:'Onest',sans-serif;background:var(--blue-900);min-height:100vh;min-height:-webkit-fill-available;
+    display:flex;align-items:center;justify-content:center;padding:20px;overflow-x:hidden;
+    padding-bottom:calc(20px + env(safe-area-inset-bottom))}
 body::before{content:'';position:fixed;inset:0;
     background:radial-gradient(ellipse 80% 60% at 20% 20%,rgba(0,68,138,.6) 0%,transparent 60%),
                radial-gradient(ellipse 60% 80% at 80% 80%,rgba(0,51,102,.8) 0%,transparent 60%);
