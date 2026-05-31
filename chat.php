@@ -126,7 +126,7 @@ body{
   width:40px;height:40px;border-radius:50%;background:var(--blue);
   border:none;color:#fff;font-size:18px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;
-  transition:background .2s;flex-shrink:0;
+  transition:background .2s;
   touch-action:manipulation;-webkit-tap-highlight-color:transparent;
 }
 .new-btn:hover,.new-btn:active{background:var(--blue2)}
@@ -287,7 +287,6 @@ body{
 }
 .msg-time-txt{font-size:11px;color:var(--t3)}
 .msg-wrap.own .msg-time-txt{color:rgba(255,255,255,.45)}
-.msg-edited{font-size:11px;color:var(--t3);font-style:italic}
 
 /* Context menu */
 .ctx-menu{
@@ -1833,13 +1832,28 @@ async function createRoom(){
   } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
 }
 
+/* Единая точка возврата к «нет выбранной беседы».
+   Использует display='' чтобы media-query сам решал:
+   flex на десктопе, none на мобильном (где показывается список). */
+function showNoRoom(){
+  currentRoom = null;
+  const cv=$id('chatView'); if(cv) cv.style.display='none';
+  const nr=$id('noRoom');   if(nr) nr.style.display='';
+  // сбрасываем переходные состояния беседы
+  $id('pinnedBar')?.classList.remove('show');
+  $id('replyBar')?.classList.remove('show');
+  $id('membersPanel')?.classList.remove('open');
+  membersPanel = false;
+  const ar=$id('messagesArea'); if(ar) ar.innerHTML='';
+  // на мобильном возвращаемся к списку бесед
+  if(isMobile()) $id('sidebar')?.classList.add('mob-open');
+}
+
 async function leaveRoom(){
   if(!currentRoom) return;
   if(!confirm('Покинуть этот чат?')) return;
   await apiPost('leave_room',{room_id:currentRoom.id});
-  currentRoom = null;
-  const cv=$id('chatView'); if(cv) cv.style.display='none';
-  const nr=$id('noRoom');   if(nr) nr.style.display='flex';
+  showNoRoom();
   await loadRooms();
 }
 
@@ -1891,9 +1905,7 @@ async function deleteRoom(){
   const d = await apiPost('delete_room',{room_id:currentRoom.id});
   if(d.ok){
     closeOverlay('roomSettingsOverlay');
-    currentRoom=null;
-    const cv=$id('chatView'); if(cv) cv.style.display='none';
-    const nr=$id('noRoom');   if(nr) nr.style.display='flex';
+    showNoRoom();
     await loadRooms();
     showToast('Комната удалена','<i class="fas fa-trash"></i>');
   } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
@@ -2056,7 +2068,7 @@ async function confirmLeaveRoom(roomId){
   const room = rooms.find(r=>r.id===roomId);
   if (!room) return;
   if (!confirm(`Покинуть «${room.name || 'чат'}»?`)) return;
-  if (currentRoom?.id === roomId) { currentRoom=null; $id('noRoom').style.display=''; $id('chatView').style.display='none'; }
+  if (currentRoom?.id === roomId) showNoRoom();
   await apiPost('leave_room',{room_id:roomId});
   await loadRooms();
 }
@@ -2064,7 +2076,7 @@ async function confirmDeleteRoom(roomId){
   const room = rooms.find(r=>r.id===roomId);
   if (!room) return;
   if (!confirm(`Удалить комнату «${room.name}» навсегда?`)) return;
-  if (currentRoom?.id === roomId) { currentRoom=null; $id('noRoom').style.display=''; $id('chatView').style.display='none'; }
+  if (currentRoom?.id === roomId) showNoRoom();
   await apiPost('delete_room',{room_id:roomId});
   showToast('<i class="fas fa-trash"></i>','Комната удалена','');
   await loadRooms();
@@ -2584,12 +2596,9 @@ function stopRing(){ clearInterval(_ri); try{_ac?.close();}catch(_){} _ac=null; 
    MOBILE
 ════════════════════════════════════════════════════ */
 function closeMobileChat(){
+  // Просто возвращаем список бесед поверх (сайдбар занимает весь экран),
+  // не трогаем noRoom='flex', иначе заглушка вылезает из-под выреза экрана.
   $id('sidebar')?.classList.add('mob-open');
-  // On mobile, hide chatView and show sidebar
-  if(window.innerWidth <= 680){
-    const cv=$id('chatView'); if(cv) cv.style.display='none';
-    const nr=$id('noRoom');   if(nr) nr.style.display='flex';
-  }
 }
 
 function isMobile(){ return window.innerWidth <= 680; }
