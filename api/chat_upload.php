@@ -17,16 +17,20 @@ require_once dirname(__DIR__) . '/config.php';
 header('Content-Type: application/json; charset=utf-8');
 
 // ─── Auth ─────────────────────────────────────────────
-if (!isset($_SESSION['user_id']) || empty($_SESSION['is_admin'])) {
+// Accept both main admin session and chat-specific session
+if (!empty($_SESSION['chat_uid'])) {
+    $uid   = (int)$_SESSION['chat_uid'];
+    $uname = $_SESSION['chat_uname'] ?? 'User';
+} elseif (!empty($_SESSION['user_id']) && !empty($_SESSION['is_admin'])) {
+    $uid   = (int)$_SESSION['user_id'];
+    $uname = $_SESSION['user_name'] ?? 'Admin';
+} else {
     http_response_code(403);
     echo json_encode(['error' => 'Forbidden']);
     exit;
 }
 
 Csrf::guard();
-
-$uid    = (int)$_SESSION['user_id'];
-$uname  = $_SESSION['user_name'] ?? 'Admin';
 $roomId = (int)($_POST['room_id'] ?? 0);
 
 if (!$roomId) {

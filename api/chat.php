@@ -98,6 +98,8 @@ switch ($action) {
     case 'public_rooms':   doPublicRooms();   break;
     case 'join_room':      doJoinRoom();      break;
     case 'search_users':   doSearchUsers();   break;
+    case 'admin_rooms':    doAdminRooms();    break;
+    case 'admin_stats':    doAdminStats();    break;
     default:
         echo json_encode(['error' => 'Unknown action']);
 }
@@ -1089,4 +1091,30 @@ function doSearchUsers(): void {
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as &$r) $r['id']=(int)$r['id'];
     echo json_encode(['users'=>$rows]);
+}
+
+function doAdminRooms(): void {
+    global $pdo, $isAdmin;
+    if (!$isAdmin) err('Forbidden', 403);
+    $rows = $pdo->query("
+        SELECT r.id, r.type, r.name, r.avatar_color, r.last_msg_at,
+               COUNT(m.user_id) as member_count
+        FROM chat_rooms r
+        LEFT JOIN chat_room_members m ON m.room_id = r.id
+        GROUP BY r.id ORDER BY r.last_msg_at DESC
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$r) { $r['id'] = (int)$r['id']; $r['member_count'] = (int)$r['member_count']; }
+    echo json_encode(['rooms' => $rows]);
+}
+
+function doAdminStats(): void {
+    global $pdo, $isAdmin;
+    if (!$isAdmin) err('Forbidden', 403);
+    $stats = [];
+    $stats['messages'] = (int)$pdo->query("SELECT COUNT(*) FROM chat_messages WHERE is_deleted=0")->fetchColumn();
+    $stats['rooms']    = (int)$pdo->query("SELECT COUNT(*) FROM chat_rooms")->fetchColumn();
+    $stats['users']    = (int)$pdo->query("SELECT COUNT(DISTINCT user_id) FROM chat_room_members")->fetchColumn();
+    try { $stats['files'] = (int)$pdo->query("SELECT COUNT(*) FROM chat_files")->fetchColumn(); } catch(\PDOException $e){ $stats['files']=0; }
+    $stats['online']   = (int)$pdo->query("SELECT COUNT(*) FROM chat_presence")->fetchColumn();
+    echo json_encode(['stats' => $stats]);
 }

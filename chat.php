@@ -787,6 +787,9 @@ body{
 .cu-toggle.on::after{left:19px}.cu-toggle.off::after{left:3px}
 .cu-edit-form{background:var(--bg);border-radius:8px;padding:12px;margin-top:8px;display:none}
 .cu-edit-form.open{display:block}
+.ap-tab-btn{background:none;border:none;color:var(--t2);padding:10px 14px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.ap-tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.ap-tab-btn:hover{color:var(--t1)}
 .cu-field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
 .cu-field label{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase}
 .cu-field input{padding:8px 10px;border:1px solid var(--border);border-radius:6px;
@@ -807,7 +810,7 @@ body{
     </div>
     <button class="new-btn" id="newChatBtn" title="Новый чат / группа / канал"><i class="fas fa-pencil-alt"></i></button>
     <?php if ($isAdminSession): ?>
-    <button class="new-btn" onclick="openChatUsersMgr()" title="Управление пользователями чата" style="margin-left:4px"><i class="fas fa-user-cog"></i></button>
+    <button class="new-btn" onclick="openAdminPanel()" title="Панель администратора" style="margin-left:4px"><i class="fas fa-shield-alt"></i></button>
     <?php endif; ?>
   </div>
   <div class="room-list" id="roomList">
@@ -1096,19 +1099,34 @@ body{
   <span id="toastIco"></span><span id="toastMsg"></span>
 </div>
 
-<!-- Chat Users Manager (admin only) -->
-<div class="overlay" id="chatUsersMgrOverlay">
-  <div class="modal" style="max-width:520px">
+<!-- Admin Panel (admin only) -->
+<div class="overlay" id="adminPanelOverlay">
+  <div class="modal" style="max-width:560px">
     <div class="modal-hdr">
-      <div class="modal-title"><i class="fas fa-user-cog"></i> Пользователи чата</div>
-      <button class="modal-close" onclick="closeOverlay('chatUsersMgrOverlay')"><i class="fas fa-times"></i></button>
+      <div class="modal-title"><i class="fas fa-shield-alt"></i> Панель администратора</div>
+      <button class="modal-close" onclick="closeOverlay('adminPanelOverlay')"><i class="fas fa-times"></i></button>
     </div>
-    <div class="modal-body" style="padding:0">
+    <!-- Tab nav -->
+    <div style="display:flex;border-bottom:1px solid var(--border);padding:0 16px;gap:4px">
+      <button class="ap-tab-btn active" data-tab="apUsers" onclick="switchApTab('apUsers',this)"><i class="fas fa-users"></i> Пользователи</button>
+      <button class="ap-tab-btn" data-tab="apRooms" onclick="switchApTab('apRooms',this)"><i class="fas fa-comments"></i> Комнаты</button>
+      <button class="ap-tab-btn" data-tab="apStats" onclick="switchApTab('apStats',this)"><i class="fas fa-chart-bar"></i> Статистика</button>
+    </div>
+    <!-- Tab: Users -->
+    <div id="apUsers" class="ap-tab-pane" style="display:flex;flex-direction:column">
       <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px">
         <input type="text" id="cuSearch" placeholder="Поиск сотрудника…" oninput="renderCuList()"
-          style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+          style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--t1)">
       </div>
       <div id="cuList" style="max-height:420px;overflow-y:auto;padding:0 16px"></div>
+    </div>
+    <!-- Tab: Rooms -->
+    <div id="apRooms" class="ap-tab-pane" style="display:none;flex-direction:column">
+      <div id="apRoomList" style="max-height:450px;overflow-y:auto;padding:0 16px"></div>
+    </div>
+    <!-- Tab: Stats -->
+    <div id="apStats" class="ap-tab-pane" style="display:none;flex-direction:column">
+      <div id="apStatsContent" style="padding:20px 16px"></div>
     </div>
   </div>
 </div>
@@ -2084,16 +2102,83 @@ async function confirmDeleteRoom(roomId){
 }
 
 /* ════════════════════════════════════════════════════
-   CHAT USERS MANAGER
+   ADMIN PANEL
 ════════════════════════════════════════════════════ */
 let _cuUsers = [];
-async function openChatUsersMgr(){
+async function openAdminPanel(){
   if (!ME.isAdmin) return;
-  openOverlay('chatUsersMgrOverlay');
-  $id('cuList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--t3)">Загрузка…</div>';
+  openOverlay('adminPanelOverlay');
+  // load users tab by default
+  $id('cuList').innerHTML='<div style="padding:20px;text-align:center;color:var(--t3)">Загрузка…</div>';
   const d = await api('chat_users');
   _cuUsers = d.users || [];
   renderCuList();
+}
+
+function switchApTab(tabId, btn){
+  document.querySelectorAll('.ap-tab-pane').forEach(p=>p.style.display='none');
+  document.querySelectorAll('.ap-tab-btn').forEach(b=>b.classList.remove('active'));
+  $id(tabId).style.display='flex';
+  btn.classList.add('active');
+  if(tabId==='apRooms') loadApRooms();
+  if(tabId==='apStats') loadApStats();
+}
+
+async function loadApRooms(){
+  $id('apRoomList').innerHTML='<div style="padding:20px;text-align:center;color:var(--t3)">Загрузка…</div>';
+  const d = await api('admin_rooms');
+  const list = d.rooms || [];
+  if(!list.length){ $id('apRoomList').innerHTML='<div style="padding:20px;text-align:center;color:var(--t3)">Нет комнат</div>'; return; }
+  $id('apRoomList').innerHTML = list.map(r=>{
+    const typeIcon = r.type==='channel'?'<i class="fas fa-bullhorn"></i>':r.type==='direct'?'<i class="fas fa-comments"></i>':'<i class="fas fa-users"></i>';
+    const name = r.name || (r.type==='direct'?'Личная беседа':'Без названия');
+    const ts = r.last_msg_at ? fmtTime(r.last_msg_at) : '—';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="width:36px;height:36px;border-radius:50%;background:${r.avatar_color||'#003366'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${typeIcon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name)}</div>
+        <div style="font-size:11px;color:var(--t3)">${r.member_count} участников · ${ts}</div>
+      </div>
+      ${r.id!==1?`<button onclick="apDeleteRoom(${r.id},this)" style="border:none;background:rgba(220,38,38,.15);color:#f87171;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px" title="Удалить комнату"><i class="fas fa-trash"></i></button>`:''}
+    </div>`;
+  }).join('');
+}
+
+async function apDeleteRoom(roomId, btn){
+  if(!confirm('Удалить эту комнату и все сообщения в ней?')) return;
+  btn.disabled=true;
+  await apiPost('delete_room',{room_id:roomId});
+  await loadApRooms();
+  await loadRooms();
+}
+
+async function loadApStats(){
+  $id('apStatsContent').innerHTML='<div style="text-align:center;color:var(--t3);padding:20px">Загрузка…</div>';
+  const d = await api('admin_stats');
+  const s = d.stats||{};
+  $id('apStatsContent').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="background:var(--bg);border-radius:10px;padding:16px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:var(--accent)">${s.messages||0}</div>
+        <div style="font-size:12px;color:var(--t3);margin-top:4px"><i class="fas fa-comment"></i> Сообщений</div>
+      </div>
+      <div style="background:var(--bg);border-radius:10px;padding:16px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:var(--accent)">${s.rooms||0}</div>
+        <div style="font-size:12px;color:var(--t3);margin-top:4px"><i class="fas fa-comments"></i> Комнат</div>
+      </div>
+      <div style="background:var(--bg);border-radius:10px;padding:16px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:var(--accent)">${s.users||0}</div>
+        <div style="font-size:12px;color:var(--t3);margin-top:4px"><i class="fas fa-users"></i> Участников</div>
+      </div>
+      <div style="background:var(--bg);border-radius:10px;padding:16px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:var(--accent)">${s.online||0}</div>
+        <div style="font-size:12px;color:var(--t3);margin-top:4px"><i class="fas fa-circle" style="color:var(--green)"></i> Онлайн</div>
+      </div>
+      <div style="background:var(--bg);border-radius:10px;padding:16px;text-align:center;grid-column:span 2">
+        <div style="font-size:28px;font-weight:700;color:var(--accent)">${s.files||0}</div>
+        <div style="font-size:12px;color:var(--t3);margin-top:4px"><i class="fas fa-paperclip"></i> Файлов загружено</div>
+      </div>
+    </div>`;
 }
 function renderCuList(){
   const q = ($id('cuSearch')?.value||'').toLowerCase();
