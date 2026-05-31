@@ -317,11 +317,8 @@ body{
 /* Input area */
 .input-area{
   background:var(--s2);border-top:1px solid var(--border);
-  padding:10px 14px;
-  padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom));
   display:flex;align-items:flex-end;gap:10px;flex-shrink:0;
-  /* Prevent iOS from hiding input behind keyboard */
-  position:sticky;bottom:0;
 }
 .attach-btn,.send-btn-main{
   width:40px;height:40px;border-radius:50%;border:none;
@@ -680,7 +677,6 @@ body{
     position:fixed;
     top:0;left:0;right:0;
     bottom:0;
-    padding-bottom:env(safe-area-inset-bottom);
     display:flex;flex-direction:column;
   }
 
@@ -700,10 +696,12 @@ body{
     min-height:0;
   }
 
-  /* Input area — sticky to bottom */
+  /* Input area — flush to bottom with safe area */
   .input-area{
     flex-shrink:0;
-    padding-bottom:12px;
+    position:static;
+    padding-bottom:calc(10px + env(safe-area-inset-bottom));
+    background:var(--s2);
   }
 
   /* Topbar — safe area at top */
