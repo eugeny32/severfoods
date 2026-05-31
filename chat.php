@@ -2291,18 +2291,26 @@ const ICE = {
     {urls:'stun:stun1.l.google.com:19302'},
     {urls:'stun:stun2.l.google.com:19302'},
     {urls:'stun:stun.cloudflare.com:3478'},
-    // Free public TURN (OpenRelay) — enables NAT traversal on mobile
+    // Free public TURN (Metered OpenRelay) — required for NAT traversal on
+    // mobile / carrier-grade NAT. The old openrelayproject.org domain is dead;
+    // openrelay.metered.ca is the current working endpoint.
     {
-      urls: [
-        'turn:openrelayproject.org:3478',
-        'turn:openrelayproject.org:443',
-        'turn:openrelayproject.org:3478?transport=tcp'
-      ],
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
+      urls:'turn:openrelay.metered.ca:80',
+      username:'openrelayproject',
+      credential:'openrelayproject'
     },
     {
-      urls:'turns:openrelayproject.org:443',
+      urls:'turn:openrelay.metered.ca:443',
+      username:'openrelayproject',
+      credential:'openrelayproject'
+    },
+    {
+      urls:'turn:openrelay.metered.ca:443?transport=tcp',
+      username:'openrelayproject',
+      credential:'openrelayproject'
+    },
+    {
+      urls:'turns:openrelay.metered.ca:443',
       username:'openrelayproject',
       credential:'openrelayproject'
     }
@@ -2410,6 +2418,15 @@ function setupPC(){
     console.log('[webrtc] connectionState:', st);
     if(st === 'connected'){
       clearTimeout(_reconnTimer);
+      // iOS: ontrack fires async (outside the accept-tap gesture) and Safari may
+      // have blocked autoplay. Re-attempt playback now that media is flowing.
+      const rv=$id('vidRemote');
+      if(rv && rv.srcObject){
+        rv.play().catch(()=>{});
+        const hasV = rv.srcObject.getVideoTracks().some(t=>t.enabled && t.readyState==='live');
+        rv.style.display = hasV?'block':'none';
+        $id('callNoVid').style.display = hasV?'none':'flex';
+      }
     } else if(st === 'disconnected'){
       // Give 8s for mobile to recover before hanging up
       _reconnTimer = setTimeout(()=>{

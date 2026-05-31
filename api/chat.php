@@ -796,7 +796,7 @@ function doPoll(): void
 
     $stmt = $pdo->prepare(
         "SELECT id, call_id, from_id, from_name, sig_type, payload
-         FROM chat_signals WHERE to_id=? AND consumed=0 ORDER BY id ASC LIMIT 20"
+         FROM chat_signals WHERE to_id=? AND consumed=0 ORDER BY id ASC LIMIT 50"
     );
     $stmt->execute([$uid]);
     $sigs = $stmt->fetchAll(PDO::FETCH_ASSOC);
