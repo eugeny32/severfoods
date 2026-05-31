@@ -481,6 +481,11 @@ function openManualModal(id, name) {
     manualEmpId = id;
     const nameEl = $('manualEmpName');
     if (nameEl) nameEl.textContent = name;
+    // Pre-select current meal type
+    const sel = $('manualMealType');
+    if (sel && window.CURRENT_MEAL && window.CURRENT_MEAL !== 'none') {
+        sel.value = window.CURRENT_MEAL;
+    }
     openModal('manualModal');
 }
 function closeManualModal() { closeModal('manualModal'); }
@@ -515,7 +520,14 @@ function openAddModal() {
     $('editId').value = '';
     $('regenerateQrRow')?.setAttribute('style','display:none');
     $('empIsActive').checked = true;
+    fillOrgDatalist();
     openModal('empModal');
+}
+
+function fillOrgDatalist() {
+    const dl = document.getElementById('orgDatalist');
+    if (!dl || !window.ORG_LIST) return;
+    dl.innerHTML = window.ORG_LIST.map(o => `<option value="${o.replace(/"/g,'&quot;')}">`).join('');
 }
 
 function openEditModal(id) {

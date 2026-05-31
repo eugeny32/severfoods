@@ -615,7 +615,14 @@ function doMessages(): void
     }
     unset($m);
 
-    echo json_encode(['messages' => $msgs]);
+    // Max last_read_id of OTHER members (for delivery/read status)
+    $rStmt = $pdo->prepare(
+        "SELECT COALESCE(MAX(last_read_id),0) FROM chat_read WHERE room_id=? AND user_id!=?"
+    );
+    $rStmt->execute([$roomId, $uid]);
+    $othersReadId = (int)$rStmt->fetchColumn();
+
+    echo json_encode(['messages' => $msgs, 'others_read_id' => $othersReadId]);
 }
 
 function doSend(): void

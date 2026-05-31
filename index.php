@@ -591,7 +591,8 @@ $allEmployeesJson = array_map(function($e) {
                 </div>
                 <div class="form-group">
                     <label>Организация *</label>
-                    <input type="text" id="empOrg" required placeholder="ООО Компания">
+                    <input type="text" id="empOrg" required placeholder="ООО Компания" list="orgDatalist" autocomplete="off">
+                    <datalist id="orgDatalist"></datalist>
                 </div>
                 <div class="form-group">
                     <label>Отдел</label>
@@ -765,6 +766,8 @@ $allEmployeesJson = array_map(function($e) {
     window.orgStats         = <?= json_encode($orgStats,         JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.points           = <?= json_encode($points,           JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.mealPointId      = <?= json_encode($meal_point_id) ?>;
+    window.CURRENT_MEAL     = <?= json_encode($current_meal) ?>;
+    window.ORG_LIST         = <?= json_encode(array_column($pdo->query("SELECT DISTINCT TRIM(organization) as o FROM employees WHERE organization!='' ORDER BY o")->fetchAll(), 'o'), JSON_UNESCAPED_UNICODE) ?>;
 })();
 </script>
 <script src="assets/js/qr-input.js"></script>

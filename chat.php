@@ -594,13 +594,17 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
 }
 .mob-back-btn{display:none;align-items:center;justify-content:center;
   width:36px;height:36px;border:none;background:none;color:var(--t2);font-size:22px;cursor:pointer}
-/* Room context button — Telegram style: replaces time on hover */
-.room-ctx-btn{width:24px;height:24px;border:none;background:none;color:var(--t3);font-size:12px;
-  border-radius:50%;cursor:pointer;display:none;align-items:center;justify-content:center;
-  transition:background .15s;flex-shrink:0;margin-top:2px}
-.room-item:hover .room-time{display:none}
+/* Room meta — badge under time */
+.room-meta{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;min-width:44px}
+/* Context menu on avatar */
+.room-avatar-wrap{position:relative;flex-shrink:0;cursor:pointer}
+.room-ctx-btn{position:absolute;inset:0;width:100%;height:100%;border:none;background:rgba(0,0,0,.45);
+  color:#fff;font-size:13px;border-radius:50%;cursor:pointer;display:none;align-items:center;
+  justify-content:center;transition:opacity .15s}
 .room-item:hover .room-ctx-btn{display:flex}
-.room-ctx-btn:hover{background:var(--border);color:var(--t1)}
+/* Message status icons */
+.msg-status{font-size:11px;margin-left:4px;opacity:.7}
+.msg-status.read{color:#4fc3f7;opacity:1}
 /* Chat users manager modal */
 .cu-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
 .cu-row:last-child{border-bottom:none}
@@ -1011,6 +1015,7 @@ let rooms        = [];
 let currentRoom  = null;
 let lastMsgId    = 0;
 let currentMembers = [];
+let _othersReadId = 0;
 let replyToId    = null;
 let replyToText  = '';
 let replyToSender= '';
@@ -1047,9 +1052,12 @@ function renderRoomList(filter=''){
     const ts   = r.last_msg_at ? fmtTime(r.last_msg_at) : '';
     const activeClass = currentRoom?.id===r.id ? 'active' : '';
     return `<div class="room-item ${activeClass}" onclick="openRoom(${r.id})">
-      <div class="room-avatar" style="background:${col}">
-        ${r.type==='direct'?`<span style="font-size:16px">${esc(init)}</span>`:init}
-        ${isOnline?'<span class="online-dot"></span>':''}
+      <div class="room-avatar-wrap">
+        <div class="room-avatar" style="background:${col}">
+          ${r.type==='direct'?`<span style="font-size:16px">${esc(init)}</span>`:init}
+          ${isOnline?'<span class="online-dot"></span>':''}
+        </div>
+        <button class="room-ctx-btn" title="Действия" onclick="roomCtxMenu(event,${r.id})"><i class="fas fa-ellipsis-v"></i></button>
       </div>
       <div class="room-body">
         <div class="room-name">${r.type!=='group'?`<span class="room-type-icon">${typeIcon(r.type)}</span>`:''}${esc(name)}</div>
@@ -1057,7 +1065,6 @@ function renderRoomList(filter=''){
       </div>
       <div class="room-meta">
         <span class="room-time">${ts}</span>
-        <button class="room-ctx-btn" title="Действия" onclick="roomCtxMenu(event,${r.id})"><i class="fas fa-ellipsis-v"></i></button>
         ${unread}
       </div>
     </div>`;
@@ -1210,9 +1217,30 @@ function renderMsg(m, showSender){
   }
   html += `</div>`; // msg-bub
 
-  html += `<div class="msg-footer"><span class="msg-time-txt">${fmtTime(m.created_at)}</span></div>`;
+  let statusIcon = '';
+  if (own && !m.is_deleted) {
+    const isRead = m.id <= _othersReadId;
+    statusIcon = isRead
+      ? `<span class="msg-status read" title="Прочитано"><i class="fas fa-check-double"></i></span>`
+      : `<span class="msg-status" title="Доставлено"><i class="fas fa-check"></i></span>`;
+  }
+  html += `<div class="msg-footer"><span class="msg-time-txt">${fmtTime(m.created_at)}</span>${statusIcon}</div>`;
   html += `</div></div>`;
   return html;
+}
+
+function updateMsgStatuses(){
+  document.querySelectorAll('.msg-wrap.own[data-mid]').forEach(el => {
+    const mid = parseInt(el.dataset.mid);
+    const statusEl = el.querySelector('.msg-status');
+    if (!statusEl) return;
+    const isRead = mid <= _othersReadId;
+    statusEl.className = 'msg-status' + (isRead ? ' read' : '');
+    statusEl.title = isRead ? 'Прочитано' : 'Доставлено';
+    statusEl.innerHTML = isRead
+      ? '<i class="fas fa-check-double"></i>'
+      : '<i class="fas fa-check"></i>';
+  });
 }
 
 function fileIcon(mime){
@@ -1248,6 +1276,7 @@ async function loadMessages(initial=false){
 
   const d    = await api('messages', {room_id: currentRoom.id, after: initial ? 0 : lastMsgId, limit: 50});
   const msgs = d.messages || [];
+  if (d.others_read_id !== undefined) _othersReadId = d.others_read_id;
 
   if(!msgs.length){
     if(initial) setEmpty(true);
@@ -1991,6 +2020,10 @@ async function pollMessages(){
   if(!currentRoom || _initialLoading) return;
   const d = await api('messages', {room_id: currentRoom.id, after: lastMsgId});
   const msgs = d.messages || [];
+  if (d.others_read_id !== undefined && d.others_read_id > _othersReadId) {
+    _othersReadId = d.others_read_id;
+    updateMsgStatuses();
+  }
   if(!msgs.length) return;
 
   setEmpty(false);   // есть новые сообщения — убираем заглушку
@@ -2010,6 +2043,7 @@ async function pollMessages(){
   }
 
   markRead(lastMsgId);
+  updateMsgStatuses();
 
   // Тихое обновление unread в сайдбаре
   const r = rooms.find(x => x.id === currentRoom.id);
