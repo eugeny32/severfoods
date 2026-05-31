@@ -292,17 +292,19 @@ body{
 /* Context menu */
 .ctx-menu{
   position:fixed;z-index:2000;background:var(--s2);
-  border:1px solid var(--border);border-radius:var(--r);
-  box-shadow:0 8px 30px rgba(0,0,0,.4);min-width:160px;
-  overflow:hidden;animation:fadeIn .15s ease;
+  border:1px solid var(--border);border-radius:10px;
+  box-shadow:0 8px 30px rgba(0,0,0,.4);min-width:150px;max-width:200px;
+  overflow:hidden;animation:fadeIn .12s ease;
 }
 .ctx-item{
-  padding:10px 16px;cursor:pointer;color:var(--t1);
-  font-size:13px;display:flex;align-items:center;gap:10px;
-  transition:background .12s;
+  padding:11px 16px;cursor:pointer;color:var(--t1);
+  font-size:13.5px;font-weight:500;
+  transition:background .1s;white-space:nowrap;
 }
 .ctx-item:hover{background:var(--hover)}
+.ctx-item + .ctx-item{border-top:1px solid rgba(255,255,255,.05)}
 .ctx-item.danger{color:#ff6b6b}
+.ctx-sep{height:1px;background:var(--border);margin:2px 0}
 
 /* Reply bar */
 .reply-bar{
@@ -1682,32 +1684,95 @@ let _ctx = null;
 function ctxMenu(e, msgId, isOwn){
   e.preventDefault();
   if(_ctx){ _ctx.remove(); _ctx=null; }
-  const area = $id('messagesArea');
-  const msgEl= area.querySelector(`[data-mid="${msgId}"]`);
+  const area  = $id('messagesArea');
+  const msgEl = area.querySelector(`[data-mid="${msgId}"]`);
   if(!msgEl) return;
-  const body   = msgEl.querySelector('.msg-text,.msg-deleted')?.textContent||'';
-  const sender = msgEl.querySelector('.msg-sender')?.textContent || ME.name;
+  const body    = msgEl.querySelector('.msg-text,.msg-deleted')?.textContent || '';
+  const sender  = msgEl.querySelector('.msg-sender')?.textContent || ME.name;
   const isAdmin = ['owner','admin'].includes(_myRoomRole);
   const canDel  = isOwn || isAdmin;
-  const canEdit = isOwn;
+  // Редактировать: только своё И ещё не прочитано адресатом
+  const canEdit = isOwn && msgId > _othersReadId;
   const canPin  = isAdmin && currentRoom?.type !== 'direct';
   const isPinned = _pinnedMsgId === msgId;
 
+  let items = '';
+  items += `<div class="ctx-item" onclick="startReply(${msgId},'${esc(sender)}','${esc(body.slice(0,80))}');closeCtx()">Ответить</div>`;
+  items += `<div class="ctx-item" onclick="navigator.clipboard.writeText(${JSON.stringify(body)});closeCtx();showToast('Скопировано')">Копировать</div>`;
+  if(canEdit) items += `<div class="ctx-item" onclick="startEditMsg(${msgId});closeCtx()">Изменить</div>`;
+  if(canPin)  items += `<div class="ctx-item" onclick="${isPinned?'unpinMsg':'pinMsg'}(${msgId});closeCtx()">${isPinned?'Открепить':'Закрепить'}</div>`;
+  items += `<div class="ctx-item" onclick="forwardMsg(${msgId},'${esc(body.slice(0,80))}');closeCtx()">Переслать</div>`;
+  if(canDel)  items += `<div class="ctx-sep"></div><div class="ctx-item danger" onclick="deleteMsg(${msgId});closeCtx()">Удалить</div>`;
+
   const menu = document.createElement('div');
   menu.className = 'ctx-menu';
-  menu.style.cssText = `top:${e.clientY}px;left:${e.clientX}px`;
-  menu.innerHTML = `
-    <div class="ctx-item" onclick="startReply(${msgId},'${esc(sender)}','${esc(body.slice(0,80))}');closeCtx()"><i class="fas fa-reply"></i> Ответить</div>
-    <div class="ctx-item" onclick="navigator.clipboard.writeText(${JSON.stringify(body)});closeCtx();showToast('Скопировано','<i class="fas fa-check-circle"></i>')"><i class="fas fa-copy"></i> Копировать</div>
-    ${canEdit?`<div class="ctx-item" onclick="startEditMsg(${msgId});closeCtx()"><i class="fas fa-pencil-alt"></i> Редактировать</div>`:''}
-    ${canPin?`<div class="ctx-item" onclick="${isPinned?`unpinMsg`:`pinMsg`}(${msgId});closeCtx()"><i class="fas fa-thumbtack"></i> ${isPinned?'Открепить':'Закрепить'}</div>`:''}
-    ${canDel?`<div class="ctx-item danger" onclick="deleteMsg(${msgId});closeCtx()"><i class="fas fa-trash"></i> Удалить</div>`:''}
-  `;
   document.body.appendChild(menu);
+  menu.innerHTML = items;
   _ctx = menu;
-  setTimeout(()=>document.addEventListener('click',closeCtx,{once:true}),10);
+
+  // Position: avoid going off screen edges
+  const mw = menu.offsetWidth || 160;
+  const mh = menu.offsetHeight || 200;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let x = e.clientX;
+  let y = e.clientY;
+  if(x + mw > vw - 8) x = vw - mw - 8;
+  if(x < 8) x = 8;
+  if(y + mh > vh - 8) y = vh - mh - 8;
+  if(y < 8) y = 8;
+  menu.style.cssText = `top:${y}px;left:${x}px`;
+
+  setTimeout(()=>document.addEventListener('click', closeCtx, {once:true}), 10);
 }
 function closeCtx(){ if(_ctx){_ctx.remove();_ctx=null;} }
+
+async function forwardMsg(msgId, previewText){
+  // Show room picker overlay
+  const rooms2 = rooms.filter(r => r.id !== currentRoom?.id);
+  if(!rooms2.length){ showToast('Нет доступных бесед для пересылки'); return; }
+
+  let overlay = $id('forwardOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'forwardOverlay';
+    overlay.className = 'overlay';
+    overlay.innerHTML = `<div class="modal" style="max-width:380px">
+      <div class="modal-hdr">
+        <div class="modal-title">Переслать сообщение</div>
+        <button class="modal-close" onclick="closeOverlay('forwardOverlay')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body" style="padding:0">
+        <div id="forwardList" style="max-height:360px;overflow-y:auto"></div>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+  }
+
+  overlay.dataset.srcMsg = msgId;
+  $id('forwardList').innerHTML = rooms2.map(r => {
+    const name = r.name || 'Личный чат';
+    const col  = r.avatar_color || avatarColor(name);
+    const init = r.type==='channel'?'<i class="fas fa-bullhorn"></i>':r.type==='group'?'<i class="fas fa-users"></i>':avatarInitial(name);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s"
+        onmouseover="this.style.background='var(--hover)'" onmouseout="this.style.background=''"
+        onclick="doForward(${r.id},${msgId})">
+      <div style="width:36px;height:36px;border-radius:50%;background:${col};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">${init}</div>
+      <div style="font-size:13px;font-weight:600">${esc(name)}</div>
+    </div>`;
+  }).join('');
+  openOverlay('forwardOverlay');
+}
+
+async function doForward(toRoomId, msgId){
+  closeOverlay('forwardOverlay');
+  const msgEl = $id('messagesArea')?.querySelector(`[data-mid="${msgId}"]`);
+  const body  = msgEl?.querySelector('.msg-text')?.textContent || '';
+  if(!body.trim()){ showToast('Нельзя переслать это сообщение'); return; }
+  const d = await apiPost('send', {room_id: toRoomId, text: body});
+  if(d.ok || d.id) showToast('Сообщение переслано');
+  else showToast(d.error || 'Ошибка пересылки');
+}
 
 async function deleteMsg(id){
   if(!confirm('Удалить сообщение?')) return;
