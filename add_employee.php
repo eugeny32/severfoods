@@ -1,0 +1,62 @@
+<?php
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/functions.php';
+
+header('Content-Type: application/json');
+
+if (!isAjax()) {
+    http_response_code(400); echo json_encode(['success' => false, 'message' => 'Только AJAX']); exit;
+}
+if (!isset($_SESSION['user_id']) || empty($_SESSION['is_admin'])) {
+    http_response_code(403); echo json_encode(['success' => false, 'message' => 'Доступ запрещён']); exit;
+}
+
+Csrf::guard();
+
+$data = json_decode(file_get_contents('php://input'), true);
+if (!$data) { echo json_encode(['success' => false, 'message' => 'Нет данных']); exit; }
+
+$full_name    = trim($data['full_name']    ?? '');
+$birth_date   = $data['birth_date']        ?? null;
+$organization = trim($data['organization'] ?? '');
+$department   = trim($data['department']   ?? '');
+$position     = trim($data['position']     ?? '');
+$vjg_type     = trim($data['vjg_type']     ?? '');
+$price        = floatval($data['price']    ?? 0);
+$qr_expires   = !empty($data['qr_expires_at']) ? $data['qr_expires_at'] : null;
+$qr_status    = in_array($data['qr_status'] ?? '', ['active','expired','blocked'])
+                ? $data['qr_status'] : 'active';
+$is_active    = isset($data['is_active']) ? (int)(bool)$data['is_active'] : 1;
+$role         = !empty($data['role']) ? $data['role'] : null;
+
+$errors = [];
+if (empty($full_name))    $errors[] = 'ФИО обязательно';
+if (empty($birth_date))   $errors[] = 'Дата рождения обязательна';
+if (empty($organization)) $errors[] = 'Организация обязательна';
+
+if (!empty($errors)) {
+    echo json_encode(['success' => false, 'message' => implode('; ', $errors)]); exit;
+}
+
+// Только super_admin может назначать привилегированные роли
+$current_role = $_SESSION['role'] ?? 'admin';
+if ($current_role !== 'super_admin' && in_array($role, ['admin','super_admin'], true)) {
+    $role = null;
+}
+
+$qr_code = generateUniqueQrCode();
+
+try {
+    $pdo->prepare(
+        "INSERT INTO employees
+             (full_name, birth_date, organization, department, position,
+              vjg_type, price, qr_code, qr_expires_at, qr_status, is_active, role)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    )->execute([$full_name, $birth_date, $organization, $department, $position,
+                $vjg_type, $price, $qr_code, $qr_expires, $qr_status, $is_active, $role]);
+    $new_id = (int)$pdo->lastInsertId();
+    logAction('add_employee', "Добавлен: {$full_name} (ID:{$new_id})");
+    echo json_encode(['success' => true, 'message' => "Сотрудник «{$full_name}» добавлен", 'id' => $new_id]);
+} catch (PDOException $e) {
+    echo json_encode(['success' => false, 'message' => 'Ошибка базы данных']);
+}
