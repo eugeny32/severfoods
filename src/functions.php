@@ -31,7 +31,7 @@ function getMealTypeIcon(string $type): string
 
 // ─── Расписание и текущий приём пищи ─────────────────
 
-function getCurrentMealType(PDO $pdo = null, $meal_point_id = null): string
+function getCurrentMealType(?PDO $pdo = null, $meal_point_id = null): string
 {
     $current_time = date('H:i:s');
     $current_day  = date('N'); // 1=Пн … 7=Вс

@@ -793,7 +793,7 @@ function apiPost(action, body={}){
 
 let _toast=null;
 function showToast(msg,ico='<i class="fas fa-info-circle"></i>',dur=3500){
-  $id('toastIco').textContent=ico; $id('toastMsg').textContent=msg;
+  $id('toastIco').innerHTML=ico; $id('toastMsg').textContent=msg;
   const el=$id('toast'); el.classList.add('show');
   clearTimeout(_toast); _toast=setTimeout(()=>el.classList.remove('show'),dur);
 }
