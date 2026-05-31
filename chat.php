@@ -2374,84 +2374,119 @@ async function getStream(video){
 
 let _reconnTimer = null;
 let _iceRestartCount = 0;
+// Call keepalive — send ping every 5s, watchdog fires if no pong for 18s
+let _kaSendInt = null;
+let _kaWatchdog = null;
+
+function startKeepalive(){
+  stopKeepalive();
+  _kaSendInt = setInterval(()=>{
+    if(callId && callPeerId)
+      apiPost('signal',{call_id:callId,to_id:callPeerId,sig_type:'keepalive'}).catch(()=>{});
+  }, 5000);
+  resetKaWatchdog();
+}
+
+function resetKaWatchdog(){
+  clearTimeout(_kaWatchdog);
+  _kaWatchdog = setTimeout(()=>{
+    // Remote side stopped sending keepalives — network drop or app killed
+    showToast('Соединение прервано','<i class="fas fa-phone-slash"></i>');
+    hangUp(false);
+  }, 18000);
+}
+
+function stopKeepalive(){
+  clearInterval(_kaSendInt); _kaSendInt = null;
+  clearTimeout(_kaWatchdog);  _kaWatchdog = null;
+}
 
 function setupPC(){
   _iceBuffer = [];
   _remoteDescSet = false;
   _iceRestartCount = 0;
   pc = new RTCPeerConnection(ICE);
+  pc.onicecandidate          = _onIceCandidate;
+  pc.ontrack                 = _onTrack;
+  pc.onconnectionstatechange = _onConnState;
+  pc.oniceconnectionstatechange = _onIceState;
+}
 
-  pc.onicecandidate = e=>{
-    if(e.candidate) apiPost('signal',{call_id:callId,to_id:callPeerId,sig_type:'ice',payload:e.candidate});
-  };
+// Named handlers — referenced both in setupPC and relay-only PC recreation
+function _onIceCandidate(e){
+  if(e.candidate) apiPost('signal',{call_id:callId,to_id:callPeerId,sig_type:'ice',payload:e.candidate});
+}
 
-  pc.ontrack = e=>{
-    const stream = e.streams[0];
-    const vidEl = $id('vidRemote');
-    vidEl.srcObject = stream;
-    // iOS Safari: must call play() explicitly
-    vidEl.play().catch(()=>{});
+function _onTrack(e){
+  const stream = e.streams[0];
+  const vidEl = $id('vidRemote');
+  vidEl.srcObject = stream;
+  vidEl.play().catch(()=>{});
+  const check = ()=>{
     const hasV = stream.getVideoTracks().some(t=>t.enabled && t.readyState==='live');
     $id('callNoVid').style.display = hasV?'none':'flex';
     vidEl.style.display = hasV?'block':'none';
-    // Re-check video after small delay (track may not be live yet)
-    setTimeout(()=>{
-      const v2 = stream.getVideoTracks().some(t=>t.enabled && t.readyState==='live');
-      $id('callNoVid').style.display = v2?'none':'flex';
-      vidEl.style.display = v2?'block':'none';
-    }, 1000);
   };
+  check(); setTimeout(check, 1200);
+}
 
-  pc.onconnectionstatechange = ()=>{
-    const st = pc?.connectionState;
-    console.log('[webrtc] connectionState:', st);
-    if(st === 'connected'){
-      clearTimeout(_reconnTimer);
-      // iOS: ontrack fires async (outside the accept-tap gesture) and Safari may
-      // have blocked autoplay. Re-attempt playback now that media is flowing.
-      const rv=$id('vidRemote');
-      if(rv && rv.srcObject){
-        rv.play().catch(()=>{});
-        const hasV = rv.srcObject.getVideoTracks().some(t=>t.enabled && t.readyState==='live');
-        rv.style.display = hasV?'block':'none';
-        $id('callNoVid').style.display = hasV?'none':'flex';
-      }
-    } else if(st === 'disconnected'){
-      // Give 8s for mobile to recover before hanging up
-      _reconnTimer = setTimeout(()=>{
-        if(pc?.connectionState !== 'connected') hangUp(false);
-      }, 8000);
-    } else if(st === 'failed'){
-      clearTimeout(_reconnTimer);
-      hangUp(false);
-    }
-  };
+function _onConnState(){
+  const st = pc?.connectionState;
+  console.log('[webrtc] connectionState:', st);
+  if(st === 'connected'){
+    clearTimeout(_reconnTimer);
+    // iOS: re-attempt play() once media flows (ontrack can fire outside gesture)
+    const rv=$id('vidRemote');
+    if(rv && rv.srcObject){ rv.play().catch(()=>{}); }
+    _onTrack({streams:[rv?.srcObject]});
+  } else if(st === 'disconnected'){
+    _reconnTimer = setTimeout(()=>{
+      if(pc?.connectionState !== 'connected') hangUp(false);
+    }, 8000);
+  } else if(st === 'failed'){
+    clearTimeout(_reconnTimer);
+    hangUp(false);
+  }
+}
 
-  pc.oniceconnectionstatechange = async ()=>{
-    const ist = pc?.iceConnectionState;
-    console.log('[webrtc] iceConnectionState:', ist);
-    if(ist === 'failed'){
+async function _onIceState(){
+  const ist = pc?.iceConnectionState;
+  console.log('[webrtc] iceConnectionState:', ist);
+  if(ist === 'failed'){
       // Try ICE restart once before giving up — critical for mobile-to-mobile
       // (carrier-grade NAT, first TURN allocation may fail or time out)
       if(_iceRestartCount < 2 && pc){
         _iceRestartCount++;
-        console.log('[webrtc] ICE failed, restarting (attempt', _iceRestartCount, ')');
-        pc.restartIce();
-        // Caller must renegotiate with a new offer containing iceRestart:true
+        console.log('[webrtc] ICE failed, restart attempt', _iceRestartCount);
+        // Attempt 1: normal restart. Attempt 2: force relay-only (TURN)
+        // so carrier-grade NAT can't block the path
+        const forceRelay = _iceRestartCount >= 2;
+        if(forceRelay){
+          // Replace PC with relay-only config and re-add tracks
+          pc.close(); pc = null;
+          _remoteDescSet = false; _iceBuffer = [];
+          const relayCfg = Object.assign({}, ICE, {iceTransportPolicy:'relay'});
+          pc = new RTCPeerConnection(relayCfg);
+          pc.onicecandidate = _onIceCandidate;
+          pc.ontrack = _onTrack;
+          pc.onconnectionstatechange = _onConnState;
+          pc.oniceconnectionstatechange = _onIceState;
+          if(localStream) localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+          console.log('[webrtc] switched to relay-only ICE');
+        } else {
+          pc.restartIce();
+        }
         if(isCaller){
           try{
-            const offer = await pc.createOffer({iceRestart:true});
+            const offer = await pc.createOffer({iceRestart:true, offerToReceiveAudio:true, offerToReceiveVideo:callIsVideo});
             await pc.setLocalDescription(offer);
-            await apiPost('signal',{call_id:callId,to_id:callPeerId,sig_type:'restart',payload:offer});
+            await apiPost('signal',{call_id:callId,to_id:callPeerId,sig_type:'restart',payload:{offer,forceRelay}});
           } catch(e){ console.warn('[webrtc] restart offer failed', e); }
         }
       } else {
-        // Give up after 2 retries
         clearTimeout(_reconnTimer);
         hangUp(false);
       }
-    }
-  };
 }
 
 function showCallWindow(name,video){
@@ -2467,6 +2502,7 @@ function showCallWindow(name,video){
   $id('callNoVid').style.display = 'flex'; // show placeholder until remote track arrives
   $id('vidRemote').style.display = 'none';
   $id('callWin').classList.add('open');
+  startKeepalive();
   callStart=Date.now();
   clearInterval(callTmrInt);
   callTmrInt=setInterval(()=>{
@@ -2562,6 +2598,7 @@ async function hangUp(send=true){
 
 function cleanup(){
   clearTimeout(_reconnTimer);
+  stopKeepalive();
   stopRing();
   if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null;}
   if(localStream) {localStream.getTracks().forEach(t=>t.stop()); localStream=null;}
@@ -2599,16 +2636,36 @@ async function handleSignal(sig){
       }
       break;
     case 'restart':
-      // Caller restarted ICE — callee applies new offer and re-answers
-      if(pc && !isCaller && sig.payload){
+      // Caller restarted ICE — callee recreates PC if relay-only requested, then re-answers
+      if(!isCaller && sig.payload){
         try{
-          await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+          const pl = sig.payload;
+          const offer = pl.offer || pl;
+          if(pl.forceRelay && pc){
+            pc.close(); pc = null;
+            _remoteDescSet = false; _iceBuffer = [];
+            const relayCfg = Object.assign({}, ICE, {iceTransportPolicy:'relay'});
+            pc = new RTCPeerConnection(relayCfg);
+            pc.onicecandidate = _onIceCandidate;
+            pc.ontrack = _onTrack;
+            pc.onconnectionstatechange = _onConnState;
+            pc.oniceconnectionstatechange = _onIceState;
+            if(localStream) localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+          }
+          if(!pc) break;
+          await pc.setRemoteDescription(new RTCSessionDescription(offer));
           _remoteDescSet = true;
+          for(const c of _iceBuffer){ try{ await pc.addIceCandidate(new RTCIceCandidate(c)); }catch(_){} }
+          _iceBuffer = [];
           const ans = await pc.createAnswer();
           await pc.setLocalDescription(ans);
           await apiPost('signal',{call_id:callId,to_id:callPeerId,sig_type:'answer',payload:ans});
         } catch(e){ console.warn('[webrtc] restart answer failed', e); }
       }
+      break;
+    case 'keepalive':
+      // Remote side is alive — reset watchdog timer
+      if(callId && sig.call_id === callId) resetKaWatchdog();
       break;
     case 'reject':
       hangUp(false);
