@@ -7,18 +7,29 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/functions.php';
 
-checkAdmin();
+// Accept both main admin session and chat-specific session
+if (!empty($_SESSION['chat_uid'])) {
+    $uid    = (int)$_SESSION['chat_uid'];
+    $uname  = $_SESSION['chat_uname']    ?? 'User';
+    $urole  = $_SESSION['chat_urole']    ?? 'member';
+    $isSA   = $urole === 'super_admin';
+    $isAdminSession = !empty($_SESSION['chat_is_admin']);
+} elseif (!empty($_SESSION['user_id']) && !empty($_SESSION['is_admin'])) {
+    $uid    = (int)$_SESSION['user_id'];
+    $uname  = $_SESSION['user_name']  ?? 'Admin';
+    $urole  = $_SESSION['role']       ?? 'admin';
+    $isSA   = $urole === 'super_admin';
+    $isAdminSession = true;
+} else {
+    header('Location: chat_login.php'); exit;
+}
 
-$uid    = (int)$_SESSION['user_id'];
-$uname  = $_SESSION['user_name']  ?? 'Admin';
-$urole  = $_SESSION['role']       ?? 'admin';
-$isSA   = $urole === 'super_admin';
-$csrf   = Csrf::getToken();
+$csrf = Csrf::getToken();
 
-// Список всех admin-пользователей для «Добавить участника»
+// Все пользователи с доступом в чат (для «Добавить участника»)
 $allAdmins = $pdo->query(
     "SELECT id, full_name, role FROM employees
-     WHERE is_active=1 AND role IN ('admin','super_admin')
+     WHERE is_active=1 AND (role IN ('admin','super_admin') OR chat_access=1)
      ORDER BY full_name"
 )->fetchAll();
 ?>
@@ -570,6 +581,34 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
 }
 .mob-back-btn{display:none;align-items:center;justify-content:center;
   width:36px;height:36px;border:none;background:none;color:var(--t2);font-size:22px;cursor:pointer}
+/* Room context button */
+.room-item{position:relative}
+.room-ctx-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  width:26px;height:26px;border:none;background:none;color:var(--t3);font-size:13px;
+  border-radius:50%;cursor:pointer;display:none;align-items:center;justify-content:center;transition:background .15s}
+.room-item:hover .room-ctx-btn{display:flex}
+.room-ctx-btn:hover{background:var(--border);color:var(--t1)}
+/* Chat users manager modal */
+.cu-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.cu-row:last-child{border-bottom:none}
+.cu-avatar{width:36px;height:36px;border-radius:50%;background:var(--blue-700,#003366);
+  color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.cu-info{flex:1;min-width:0}
+.cu-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cu-meta{font-size:11px;color:var(--t3)}
+.cu-actions{display:flex;gap:6px;flex-shrink:0}
+.cu-toggle{width:36px;height:20px;border-radius:10px;border:none;cursor:pointer;
+  position:relative;transition:background .2s;flex-shrink:0}
+.cu-toggle.on{background:#22c55e}.cu-toggle.off{background:var(--border)}
+.cu-toggle::after{content:'';position:absolute;top:3px;width:14px;height:14px;
+  border-radius:50%;background:#fff;transition:left .2s}
+.cu-toggle.on::after{left:19px}.cu-toggle.off::after{left:3px}
+.cu-edit-form{background:var(--bg);border-radius:8px;padding:12px;margin-top:8px;display:none}
+.cu-edit-form.open{display:block}
+.cu-field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.cu-field label{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase}
+.cu-field input{padding:8px 10px;border:1px solid var(--border);border-radius:6px;
+  font-size:13px;background:var(--surface)}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
@@ -585,6 +624,9 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
       <input id="searchInput" type="text" placeholder="Поиск…">
     </div>
     <button class="new-btn" id="newChatBtn" title="Новый чат / группа / канал"><i class="fas fa-pencil-alt"></i></button>
+    <?php if ($isAdminSession): ?>
+    <button class="new-btn" onclick="openChatUsersMgr()" title="Управление пользователями чата" style="margin-left:4px"><i class="fas fa-user-cog"></i></button>
+    <?php endif; ?>
   </div>
   <div class="room-list" id="roomList">
     <div style="padding:20px;text-align:center;color:var(--t3)">Загрузка…</div>
@@ -833,6 +875,29 @@ html,body{height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,-apple-sy
   <span id="toastIco"></span><span id="toastMsg"></span>
 </div>
 
+<!-- Chat Users Manager (admin only) -->
+<div class="overlay" id="chatUsersMgrOverlay">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-hdr">
+      <div class="modal-title"><i class="fas fa-user-cog"></i> Пользователи чата</div>
+      <button class="modal-close" onclick="closeOverlay('chatUsersMgrOverlay')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" style="padding:0">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px">
+        <input type="text" id="cuSearch" placeholder="Поиск сотрудника…" oninput="renderCuList()"
+          style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px">
+      </div>
+      <div id="cuList" style="max-height:420px;overflow-y:auto;padding:0 16px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Room context dropdown -->
+<div id="roomCtxDropdown" style="display:none;position:fixed;z-index:9999;
+  background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  box-shadow:0 4px 20px rgba(0,0,0,.15);min-width:180px;overflow:hidden">
+</div>
+
 <!-- ═══ JS DATA ═══ -->
 <script>
 const ME = {
@@ -840,6 +905,7 @@ const ME = {
   name: <?= json_encode($uname) ?>,
   role: <?= json_encode($urole) ?>,
   csrf: <?= json_encode($csrf) ?>,
+  isAdmin: <?= json_encode($isAdminSession) ?>,
 };
 const ALL_ADMINS = <?= json_encode(array_map(fn($a) => [
   'id'   => (int)$a['id'],
@@ -937,6 +1003,7 @@ function renderRoomList(filter=''){
         <div class="room-preview">${prev}</div>
       </div>
       <div class="room-meta"><span class="room-time">${ts}</span>${unread}</div>
+      <button class="room-ctx-btn" title="Действия" onclick="roomCtxMenu(event,${r.id})"><i class="fas fa-ellipsis-v"></i></button>
     </div>`;
   }).join('');
 }
@@ -1654,6 +1721,155 @@ async function saveEditMsg(msgId){
     const bub=$id('messagesArea')?.querySelector(`[data-mid="${msgId}"]`)?.querySelector('.msg-bub');
     if(bub) bub.innerHTML=`<div class="msg-text">${esc(text)}</div><span class="msg-edited">(ред.)</span>`;
   } else showToast(d.error||'Ошибка','<i class="fas fa-times-circle"></i>');
+}
+
+/* ════════════════════════════════════════════════════
+   ROOM CONTEXT MENU (sidebar)
+════════════════════════════════════════════════════ */
+function roomCtxMenu(e, roomId){
+  e.stopPropagation();
+  const room = rooms.find(r=>r.id===roomId||r.id===+roomId);
+  if (!room) return;
+  const dd = $id('roomCtxDropdown');
+  const items = [];
+  if (room.id !== (currentRoom?.id)) {
+    items.push({icon:'fa-comments',label:'Открыть',fn:`openRoom(${room.id})`});
+  }
+  if (room.type !== 'direct') {
+    items.push({icon:'fa-user-plus',label:'Добавить участника',fn:`openRoom(${room.id});setTimeout(openAddMemberModal,300)`});
+  }
+  items.push({icon:'fa-sign-out-alt',label:'Покинуть',fn:`confirmLeaveRoom(${room.id})`});
+  if (ME.isAdmin && room.type !== 'direct') {
+    items.push({icon:'fa-cog',label:'Настройки',fn:`openRoom(${room.id});openRoomSettings()`});
+    items.push({icon:'fa-trash',label:'Удалить',fn:`confirmDeleteRoom(${room.id})`,cls:'danger'});
+  }
+  dd.innerHTML = items.map(it=>`
+    <button onclick="${it.fn};hideRoomCtx()" style="display:flex;align-items:center;gap:10px;
+      width:100%;padding:10px 14px;border:none;background:none;text-align:left;cursor:pointer;
+      font-size:13px;${it.cls==='danger'?'color:#ef4444':'color:var(--t1)'}">
+      <i class="fas ${it.icon}" style="width:14px;text-align:center"></i>${it.label}
+    </button>`).join('');
+  const rect = e.currentTarget.getBoundingClientRect();
+  dd.style.display = 'block';
+  dd.style.left = (rect.left - dd.offsetWidth + rect.width) + 'px';
+  dd.style.top  = rect.bottom + 'px';
+  // Keep within viewport
+  requestAnimationFrame(()=>{
+    const ddR = dd.getBoundingClientRect();
+    if (ddR.right > window.innerWidth) dd.style.left = (window.innerWidth - ddR.width - 8) + 'px';
+    if (ddR.bottom > window.innerHeight) dd.style.top = (rect.top - ddR.height) + 'px';
+  });
+}
+function hideRoomCtx(){ $id('roomCtxDropdown').style.display='none'; }
+document.addEventListener('click', ()=> hideRoomCtx());
+
+async function confirmLeaveRoom(roomId){
+  const room = rooms.find(r=>r.id===roomId);
+  if (!room) return;
+  if (!confirm(`Покинуть «${room.name || 'чат'}»?`)) return;
+  if (currentRoom?.id === roomId) { currentRoom=null; $id('noRoom').style.display=''; $id('chatView').style.display='none'; }
+  await apiPost('leave_room',{room_id:roomId});
+  await loadRooms();
+}
+async function confirmDeleteRoom(roomId){
+  const room = rooms.find(r=>r.id===roomId);
+  if (!room) return;
+  if (!confirm(`Удалить комнату «${room.name}» навсегда?`)) return;
+  if (currentRoom?.id === roomId) { currentRoom=null; $id('noRoom').style.display=''; $id('chatView').style.display='none'; }
+  await apiPost('delete_room',{room_id:roomId});
+  showToast('<i class="fas fa-trash"></i>','Комната удалена','');
+  await loadRooms();
+}
+
+/* ════════════════════════════════════════════════════
+   CHAT USERS MANAGER
+════════════════════════════════════════════════════ */
+let _cuUsers = [];
+async function openChatUsersMgr(){
+  if (!ME.isAdmin) return;
+  openOverlay('chatUsersMgrOverlay');
+  $id('cuList').innerHTML = '<div style="padding:20px;text-align:center;color:var(--t3)">Загрузка…</div>';
+  const d = await api('chat_users');
+  _cuUsers = d.users || [];
+  renderCuList();
+}
+function renderCuList(){
+  const q = ($id('cuSearch')?.value||'').toLowerCase();
+  const list = _cuUsers.filter(u=> !q || u.full_name.toLowerCase().includes(q));
+  if (!list.length){ $id('cuList').innerHTML='<div style="padding:20px;text-align:center;color:var(--t3)">Нет сотрудников</div>'; return; }
+  $id('cuList').innerHTML = list.map(u=>{
+    const init = (u.full_name||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+    const roleLabel = {super_admin:'Супер-адм',admin:'Админ',manager:'Менеджер',employee:'Сотрудник'}[u.role]||u.role;
+    return `<div class="cu-row" id="cu-row-${u.id}">
+      <div class="cu-avatar" style="background:${avatarColor(u.full_name)}">${init}</div>
+      <div class="cu-info">
+        <div class="cu-name">${esc(u.full_name)}</div>
+        <div class="cu-meta">${roleLabel}${u.chat_username?` · @${esc(u.chat_username)}`:''}${u.has_qr?' · QR':''}</div>
+      </div>
+      <div class="cu-actions">
+        <button class="cu-toggle ${u.chat_access?'on':'off'}" title="${u.chat_access?'Отключить доступ':'Включить доступ'}"
+          onclick="toggleCuAccess(${u.id},this)"></button>
+        <button style="width:28px;height:28px;border:none;background:var(--bg);border-radius:6px;cursor:pointer;font-size:12px"
+          title="Редактировать" onclick="toggleCuEdit(${u.id})"><i class="fas fa-pencil-alt"></i></button>
+      </div>
+    </div>
+    <div class="cu-edit-form" id="cu-edit-${u.id}">
+      <div class="cu-field"><label>Логин для чата</label>
+        <input type="text" id="cu-username-${u.id}" value="${esc(u.chat_username||'')}" placeholder="chat_login">
+      </div>
+      <div class="cu-field"><label>Пароль (оставьте пустым — без изменений)</label>
+        <input type="password" id="cu-password-${u.id}" placeholder="Новый пароль…">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" style="font-size:12px;padding:6px 12px" onclick="saveCuUser(${u.id})">
+          <i class="fas fa-save"></i> Сохранить
+        </button>
+        <button class="btn btn-ghost" style="font-size:12px;padding:6px 12px" onclick="toggleCuEdit(${u.id})">
+          Отмена
+        </button>
+        <button class="btn btn-danger" style="font-size:12px;padding:6px 12px;margin-left:auto" onclick="removeCuUser(${u.id})">
+          <i class="fas fa-user-minus"></i> Убрать доступ
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function toggleCuEdit(id){
+  const el = $id(`cu-edit-${id}`);
+  el.classList.toggle('open');
+}
+async function toggleCuAccess(id, btn){
+  const isOn = btn.classList.contains('on');
+  const newAccess = isOn ? 0 : 1;
+  await apiPost('save_chat_user',{id, chat_access: newAccess});
+  btn.classList.toggle('on', !isOn);
+  btn.classList.toggle('off', isOn);
+  const u = _cuUsers.find(u=>u.id===id);
+  if (u) u.chat_access = newAccess;
+  showToast('<i class="fas fa-user-check"></i>', isOn?'Доступ отключён':'Доступ включён', '');
+}
+async function saveCuUser(id){
+  const username = $id(`cu-username-${id}`).value.trim();
+  const password = $id(`cu-password-${id}`).value;
+  const payload = {id, chat_username: username};
+  if (password) payload.chat_password = password;
+  const d = await apiPost('save_chat_user', payload);
+  if (d.error){ alert(d.error); return; }
+  const u = _cuUsers.find(u=>u.id===id);
+  if (u){ u.chat_username = username; if(password) u.has_password=1; }
+  $id(`cu-password-${id}`).value = '';
+  toggleCuEdit(id);
+  renderCuList();
+  showToast('<i class="fas fa-check"></i>','Сохранено','');
+}
+async function removeCuUser(id){
+  if (!confirm('Убрать доступ к чату для этого сотрудника?')) return;
+  await apiPost('remove_chat_user',{id});
+  const u = _cuUsers.find(u=>u.id===id);
+  if (u){ u.chat_access=0; u.chat_username=null; u.has_password=0; }
+  toggleCuEdit(id);
+  renderCuList();
+  showToast('<i class="fas fa-user-minus"></i>','Доступ убран','');
 }
 
 /* ════════════════════════════════════════════════════

@@ -48,15 +48,22 @@ set_error_handler(function (int $no, string $msg, string $file, int $line): bool
     exit;
 });
 
-if (!isset($_SESSION['user_id']) || empty($_SESSION['is_admin'])) {
+// Accept both main admin session and chat-specific session
+if (!empty($_SESSION['chat_uid'])) {
+    $uid   = (int)$_SESSION['chat_uid'];
+    $uname = $_SESSION['chat_uname']    ?? 'User';
+    $urole = $_SESSION['chat_urole']    ?? 'member';
+    $isAdmin = !empty($_SESSION['chat_is_admin']);
+} elseif (!empty($_SESSION['user_id']) && !empty($_SESSION['is_admin'])) {
+    $uid   = (int)$_SESSION['user_id'];
+    $uname = $_SESSION['user_name'] ?? 'Admin';
+    $urole = $_SESSION['role']      ?? 'admin';
+    $isAdmin = true;
+} else {
     http_response_code(403);
     echo json_encode(['error' => 'Forbidden']);
     exit;
 }
-
-$uid   = (int)$_SESSION['user_id'];
-$uname = $_SESSION['user_name'] ?? 'Admin';
-$urole = $_SESSION['role']      ?? 'admin';
 $action = $_GET['action'] ?? '';
 
 initTables();
@@ -84,6 +91,9 @@ switch ($action) {
     case 'edit_msg':        doEditMsg();        break;
     case 'pin_msg':         doPinMsg();         break;
     case 'pinned':          doPinned();         break;
+    case 'chat_users':      doChatUsers();      break;
+    case 'save_chat_user':  doSaveChatUser();   break;
+    case 'remove_chat_user': doRemoveChatUser(); break;
     default:
         echo json_encode(['error' => 'Unknown action']);
 }
@@ -295,6 +305,9 @@ function initTables(): void
     // Add new columns if not exist
     try { $pdo->exec("ALTER TABLE chat_messages ADD COLUMN is_edited TINYINT(1) NOT NULL DEFAULT 0"); } catch(PDOException $e){}
     try { $pdo->exec("ALTER TABLE chat_rooms ADD COLUMN pinned_msg_id INT DEFAULT NULL"); } catch(PDOException $e){}
+    try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_access TINYINT(1) NOT NULL DEFAULT 0"); } catch(PDOException $e){}
+    try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_username VARCHAR(100) DEFAULT NULL"); } catch(PDOException $e){}
+    try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_password VARCHAR(255) DEFAULT NULL"); } catch(PDOException $e){}
 
     // Общий канал по умолчанию
     try {
@@ -930,4 +943,73 @@ function doPinned(): void {
     $msg = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     if ($msg) $msg['id'] = (int)$msg['id'];
     echo json_encode(['pinned' => $msg]);
+}
+
+// ═════════════════════════════════════════════════════
+//  CHAT USER MANAGEMENT (admin only)
+// ═════════════════════════════════════════════════════
+
+function doChatUsers(): void {
+    global $pdo, $isAdmin;
+    if (!$isAdmin) err('Forbidden', 403);
+    $rows = $pdo->query(
+        "SELECT id, full_name, role, chat_access,
+                chat_username, chat_password IS NOT NULL AS has_password,
+                qr_code IS NOT NULL AS has_qr
+         FROM employees WHERE is_active=1 ORDER BY full_name"
+    )->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$r) {
+        $r['id'] = (int)$r['id'];
+        $r['chat_access'] = (int)$r['chat_access'];
+        $r['has_password'] = (int)$r['has_password'];
+        $r['has_qr'] = (int)$r['has_qr'];
+    }
+    echo json_encode(['users' => $rows]);
+}
+
+function doSaveChatUser(): void {
+    global $pdo, $isAdmin;
+    if (!$isAdmin) err('Forbidden', 403);
+
+    $data = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+    $empId   = (int)($data['id'] ?? 0);
+    $access  = isset($data['chat_access']) ? (int)(bool)$data['chat_access'] : null;
+    $chatUser = isset($data['chat_username']) ? trim($data['chat_username']) : null;
+    $chatPass = isset($data['chat_password']) ? $data['chat_password'] : null;
+
+    if (!$empId) err('Bad request');
+
+    if ($access !== null) {
+        $pdo->prepare("UPDATE employees SET chat_access=? WHERE id=?")->execute([$access, $empId]);
+    }
+    if ($chatUser !== null) {
+        // Check uniqueness
+        if ($chatUser !== '') {
+            $exists = $pdo->prepare("SELECT id FROM employees WHERE chat_username=? AND id!=?");
+            $exists->execute([$chatUser, $empId]);
+            if ($exists->fetch()) err('Логин уже занят');
+        }
+        $pdo->prepare("UPDATE employees SET chat_username=? WHERE id=?")
+            ->execute([$chatUser ?: null, $empId]);
+    }
+    if ($chatPass !== null) {
+        if ($chatPass === '') {
+            $pdo->prepare("UPDATE employees SET chat_password=NULL WHERE id=?")->execute([$empId]);
+        } else {
+            $hash = password_hash($chatPass, PASSWORD_DEFAULT);
+            $pdo->prepare("UPDATE employees SET chat_password=? WHERE id=?")->execute([$hash, $empId]);
+        }
+    }
+    echo json_encode(['ok' => true]);
+}
+
+function doRemoveChatUser(): void {
+    global $pdo, $isAdmin;
+    if (!$isAdmin) err('Forbidden', 403);
+    $data = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+    $empId = (int)($data['id'] ?? 0);
+    if (!$empId) err('Bad request');
+    $pdo->prepare("UPDATE employees SET chat_access=0, chat_username=NULL, chat_password=NULL WHERE id=?")
+        ->execute([$empId]);
+    echo json_encode(['ok' => true]);
 }
