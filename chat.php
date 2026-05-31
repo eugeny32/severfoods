@@ -27,11 +27,24 @@ if (!empty($_SESSION['chat_uid'])) {
 $csrf = Csrf::getToken();
 
 // Все пользователи с доступом в чат (для «Добавить участника»)
-$allAdmins = $pdo->query(
-    "SELECT id, full_name, role FROM employees
-     WHERE is_active=1 AND (role IN ('admin','super_admin') OR chat_access=1)
-     ORDER BY full_name"
-)->fetchAll();
+// chat_access column may not exist yet — fall back to role-based query
+try {
+    $allAdmins = $pdo->query(
+        "SELECT id, full_name, role FROM employees
+         WHERE is_active=1 AND (role IN ('admin','super_admin') OR chat_access=1)
+         ORDER BY full_name"
+    )->fetchAll();
+} catch (PDOException $e) {
+    $allAdmins = $pdo->query(
+        "SELECT id, full_name, role FROM employees
+         WHERE is_active=1 AND role IN ('admin','super_admin')
+         ORDER BY full_name"
+    )->fetchAll();
+}
+// Run DB migrations (adds chat_access, chat_username, chat_password columns if missing)
+try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_access TINYINT(1) NOT NULL DEFAULT 0"); } catch(PDOException $e){}
+try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_username VARCHAR(100) DEFAULT NULL"); } catch(PDOException $e){}
+try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_password VARCHAR(255) DEFAULT NULL"); } catch(PDOException $e){}
 ?>
 <!DOCTYPE html>
 <html lang="ru">
