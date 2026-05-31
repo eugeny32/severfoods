@@ -344,6 +344,8 @@ function doPing(): void
     // Чистка старых записей
     $pdo->exec("DELETE FROM chat_presence WHERE last_ping < DATE_SUB(NOW(), INTERVAL 25 SECOND)");
     $pdo->exec("DELETE FROM chat_signals WHERE consumed=1 AND created_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
+    // Also clean very old uncollected signals (e.g. user offline >2min)
+    $pdo->exec("DELETE FROM chat_signals WHERE consumed=0 AND created_at < DATE_SUB(NOW(), INTERVAL 2 MINUTE)");
 
     ok(['ts' => time()]);
 }

@@ -2235,12 +2235,16 @@ async function pollMessages(){
 }
 
 async function pollSignals(){
-  const d = await api('poll');
-  for(const s of (d.signals||[])) handleSignal(s);
+  // Signals must always poll — never blocked by _initialLoading
+  try {
+    const d = await api('poll');
+    for(const s of (d.signals||[])) await handleSignal(s);
+  } catch(_) {}
 }
 
 async function pollAll(){
-  await Promise.all([pollMessages(), pollSignals()]).catch(()=>{});
+  // Run signals always; messages only when not loading
+  await Promise.allSettled([pollMessages(), pollSignals()]);
 }
 
 function markRead(lastId){
@@ -2283,21 +2287,17 @@ let callId=null,callPeerId=null,callPeerName='',callIsVideo=true,isCaller=false;
 let isMuted=false,isCamOff=false,isScreen=false;
 let pendingInvite=null;
 let callStart=null,callTmrInt=null;
+let _iceBuffer = []; // buffer ICE candidates before remoteDescription is set
+let _remoteDescSet = false;
 
 function genCallId(){ return 'c_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); }
 
 function callPeerInRoom(){
   if(!currentRoom) return null;
-  // For direct rooms — find the other user from members
   if(currentRoom.type==='direct'){
-    const d=$id('membersList').querySelectorAll('.member-row');
-    for(const row of d){
-      const nm=row.querySelector('.member-nm').textContent.replace(' (Вы)','').trim();
-      if(nm!==ME.name){
-        const av=ALL_ADMINS.find(a=>a.name===nm);
-        return av || null;
-      }
-    }
+    // Use currentMembers (live data) instead of DOM scraping
+    const peer = currentMembers.find(m => m.user_id !== ME.id);
+    if(peer) return {id: peer.user_id, name: peer.user_name};
   }
   return null;
 }
@@ -2316,7 +2316,10 @@ async function startCallTo(toId, toName, video=true){
     localStream = await getStream(video);
     setupPC();
     localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-    const offer = await pc.createOffer();
+    const offer = await pc.createOffer({
+      offerToReceiveAudio:true,
+      offerToReceiveVideo:video
+    });
     await pc.setLocalDescription(offer);
     await apiPost('signal',{call_id:callId,to_id:toId,sig_type:'invite',payload:{offer,callerName:ME.name,isVideo:video}});
     showCallWindow(toName,video);
@@ -2349,6 +2352,8 @@ async function getStream(video){
 let _reconnTimer = null;
 
 function setupPC(){
+  _iceBuffer = [];
+  _remoteDescSet = false;
   pc = new RTCPeerConnection(ICE);
 
   pc.onicecandidate = e=>{
@@ -2447,7 +2452,15 @@ async function acceptCall(){
     localStream=await getStream(callIsVideo); setupPC();
     localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
     await pc.setRemoteDescription(new RTCSessionDescription(pl.offer));
-    const ans=await pc.createAnswer(); await pc.setLocalDescription(ans);
+    _remoteDescSet = true;
+    // Flush buffered ICE candidates
+    for(const c of _iceBuffer){ try{ await pc.addIceCandidate(new RTCIceCandidate(c)); }catch(_){} }
+    _iceBuffer = [];
+    const ans=await pc.createAnswer({
+      offerToReceiveAudio:true,
+      offerToReceiveVideo:callIsVideo
+    });
+    await pc.setLocalDescription(ans);
     await apiPost('signal',{call_id:callId,to_id:callPeerId,sig_type:'answer',payload:ans});
     showCallWindow(callPeerName,callIsVideo);
   } catch(e){ showToast('Ошибка: '+e.message,'<i class="fas fa-times-circle"></i>'); cleanup(); }
@@ -2475,8 +2488,13 @@ async function toggleScreen(){
   } else stopScreen();
 }
 async function stopScreen(){
-  isScreen=false; if(screenStream){ screenStream.getTracks().forEach(t=>t.stop()); screenStream=null; }
-  if(localStream&&pc){ const ct=localStream.getVideoTracks()[0]; if(ct){ const s=pc.getSenders().find(s=>s.track?.kind==='video'); if(s) await s.replaceTrack(ct); } $id('vidLocal').srcObject=localStream; }
+  isScreen=false;
+  if(screenStream){ screenStream.getTracks().forEach(t=>t.stop()); screenStream=null; }
+  if(localStream&&pc){
+    const ct=localStream.getVideoTracks()[0];
+    if(ct){ const s=pc.getSenders().find(s=>s.track?.kind==='video'); if(s) await s.replaceTrack(ct); }
+    const lv=$id('vidLocal'); lv.srcObject=localStream; lv.play().catch(()=>{});
+  }
   updateCCUI();
 }
 
@@ -2497,6 +2515,7 @@ function cleanup(){
   if(lv){lv.srcObject=null;}
   $id('callNoVid').style.display='flex';
   callId=callPeerId=callPeerName=null; isMuted=isCamOff=isScreen=isCaller=false; pendingInvite=null;
+  _iceBuffer=[]; _remoteDescSet=false;
 }
 
 async function handleSignal(sig){
@@ -2506,14 +2525,32 @@ async function handleSignal(sig){
       else showIncoming(sig);
       break;
     case 'answer':
-      if(pc&&isCaller) await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+      if(pc && isCaller && sig.payload){
+        await pc.setRemoteDescription(new RTCSessionDescription(sig.payload));
+        _remoteDescSet = true;
+        // Flush ICE candidates buffered before answer arrived
+        for(const c of _iceBuffer){ try{ await pc.addIceCandidate(new RTCIceCandidate(c)); }catch(_){} }
+        _iceBuffer = [];
+      }
       break;
     case 'ice':
-      if(pc&&sig.payload) try{await pc.addIceCandidate(new RTCIceCandidate(sig.payload));}catch(_){}
+      if(!pc || !sig.payload) break;
+      if(!_remoteDescSet){
+        // Buffer until remoteDescription is set
+        _iceBuffer.push(sig.payload);
+      } else {
+        try{ await pc.addIceCandidate(new RTCIceCandidate(sig.payload)); }catch(_){}
+      }
       break;
-    case 'reject': hangUp(false); showToast(sig.from_name+' отклонил(а) звонок','<i class="fas fa-phone-slash"></i>'); break;
+    case 'reject':
+      hangUp(false);
+      showToast(sig.from_name+' отклонил(а) звонок','<i class="fas fa-phone-slash"></i>');
+      break;
     case 'hangup': hangUp(false); break;
-    case 'busy':   hangUp(false); showToast(sig.from_name+' занят(а)','<i class="fas fa-circle" style="color:#e53935"></i>'); break;
+    case 'busy':
+      hangUp(false);
+      showToast(sig.from_name+' занят(а)','<i class="fas fa-circle" style="color:#e53935"></i>');
+      break;
   }
 }
 
