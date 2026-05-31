@@ -65,16 +65,12 @@ try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_password VARCHAR(255) DE
    BASE
 ════════════════════════════════════════════════════ */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-html{height:100%;height:-webkit-fill-available}
+html{height:100%;height:-webkit-fill-available;background:#17212b}
 body{
   height:100%;height:-webkit-fill-available;
   overflow:hidden;
   font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;
-  /* iOS safe area */
-  padding-top:env(safe-area-inset-top);
-  padding-bottom:env(safe-area-inset-bottom);
-  padding-left:env(safe-area-inset-left);
-  padding-right:env(safe-area-inset-right);
+  background:#17212b;
 }
 :root{
   --s:#17212b;--s2:#232e3c;--s3:#2b5278;--s4:#1c2733;
@@ -93,9 +89,8 @@ body{
 ════════════════════════════════════════════════════ */
 .app{
   display:flex;
-  height:100vh;height:-webkit-fill-available;
+  height:100%;
   background:var(--s);
-  /* Account for safe areas inside the app container */
   min-height:0;
 }
 
@@ -675,8 +670,6 @@ body{
     z-index:300;
     transform:translateX(-100%);
     transition:transform .28s cubic-bezier(.4,0,.2,1);
-    /* Safe area */
-    padding-top:env(safe-area-inset-top);
     padding-bottom:env(safe-area-inset-bottom);
   }
   .sidebar.mob-open{transform:translateX(0)}
@@ -684,7 +677,10 @@ body{
   /* Main fills full screen */
   .main{
     width:100vw;
-    position:fixed;inset:0;
+    position:fixed;
+    top:0;left:0;right:0;
+    bottom:0;
+    padding-bottom:env(safe-area-inset-bottom);
     display:flex;flex-direction:column;
   }
 
@@ -704,10 +700,10 @@ body{
     min-height:0;
   }
 
-  /* Input area — sticky to bottom, above iOS home bar */
+  /* Input area — sticky to bottom */
   .input-area{
     flex-shrink:0;
-    padding-bottom:calc(12px + env(safe-area-inset-bottom));
+    padding-bottom:12px;
   }
 
   /* Topbar — safe area at top */
