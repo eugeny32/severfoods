@@ -886,7 +886,9 @@ function doDeleteRoom(): void {
     $b      = jsonBody();
     $roomId = (int)($b['room_id'] ?? 0);
     if (!$roomId) err('Missing room_id');
-    if (getRoomType($roomId) === 'direct') err('Cannot delete direct chat', 400);
+    // Only super_admin / global admin can delete direct chats; regular owners cannot
+    $isDirect = getRoomType($roomId) === 'direct';
+    if ($isDirect && !$isAdmin && $urole !== 'super_admin') err('Cannot delete direct chat', 400);
     $rr = getRoomRole($roomId);
     if (!$isAdmin && $rr !== 'owner' && $urole !== 'super_admin') err('Forbidden', 403);
 

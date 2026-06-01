@@ -112,21 +112,38 @@ body{
   border-bottom:1px solid var(--border);flex-shrink:0;overflow:visible;
 }
 .hdr-back{
-  color:var(--blue);background:none;border:none;font-size:20px;
-  cursor:pointer;padding:4px;border-radius:6px;flex-shrink:0;
-  text-decoration:none;display:flex;align-items:center;
+  width:30px;height:30px;border-radius:50%;background:var(--s3);
+  border:none;color:var(--t1);font-size:14px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  text-decoration:none;transition:background .2s;
+  touch-action:manipulation;-webkit-tap-highlight-color:transparent;
 }
-.hdr-back:hover{background:var(--hover)}
+.hdr-back:hover{background:var(--blue2)}
+
+/* Search — collapsed icon, expands inline */
 .search-wrap{
-  flex:1;display:flex;align-items:center;gap:8px;
-  background:var(--s);border-radius:20px;padding:7px 12px;
+  display:flex;align-items:center;
+  border-radius:20px;overflow:hidden;
+  width:30px;height:30px;flex-shrink:0;
+  background:var(--s);
+  transition:width .25s ease,background .2s;
+}
+.search-wrap.open{
+  width:140px;background:var(--s);
+}
+.search-icon{
+  width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+  color:var(--t2);font-size:14px;flex-shrink:0;cursor:pointer;
 }
 .search-wrap input{
-  flex:1;background:none;border:none;outline:none;
-  color:var(--t1);font-size:14px;
+  flex:1;width:0;background:none;border:none;outline:none;
+  color:var(--t1);font-size:13px;padding:0;
+  opacity:0;pointer-events:none;transition:opacity .15s;
+}
+.search-wrap.open input{
+  opacity:1;pointer-events:all;padding-right:10px;
 }
 .search-wrap input::placeholder{color:var(--t3)}
-.search-icon{color:var(--t3);font-size:15px}
 
 .new-btn{
   width:30px;height:30px;border-radius:50%;background:var(--blue);
@@ -829,15 +846,16 @@ body{
 <!-- ═══ SIDEBAR ═══ -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-hdr">
-    <div class="search-wrap">
-      <span class="search-icon"><i class="fas fa-search"></i></span>
+    <button class="hdr-back" onclick="window.location='index.php'" title="На главную"><i class="fas fa-arrow-left"></i></button>
+    <div class="search-wrap" id="searchWrap">
+      <span class="search-icon" onclick="toggleSearch()" title="Поиск"><i class="fas fa-search"></i></span>
       <input id="searchInput" type="text" placeholder="Поиск…">
     </div>
     <button class="new-btn" id="newChatBtn" title="Новый чат / группа / канал"><i class="fas fa-pencil-alt"></i></button>
     <?php if ($isAdminSession): ?>
-    <button class="new-btn" onclick="openAdminPanel()" title="Панель администратора" style="margin-left:4px"><i class="fas fa-shield-alt"></i></button>
+    <button class="new-btn" onclick="openAdminPanel()" title="Панель администратора"><i class="fas fa-shield-alt"></i></button>
     <?php endif; ?>
-    <button class="new-btn" onclick="openProfile()" title="Мой профиль" style="margin-left:4px"><i class="fas fa-user-circle"></i></button>
+    <button class="new-btn" onclick="openProfile()" title="Мой профиль"><i class="fas fa-user-circle"></i></button>
   </div>
   <div class="room-list" id="roomList">
     <div style="padding:20px;text-align:center;color:var(--t3)">Загрузка…</div>
@@ -1311,6 +1329,25 @@ async function loadRooms(){
 }
 
 $id('searchInput').addEventListener('input', ()=> renderRoomList($id('searchInput').value));
+
+function toggleSearch(){
+  const wrap = $id('searchWrap');
+  const inp  = $id('searchInput');
+  if(!wrap) return;
+  const opening = !wrap.classList.contains('open');
+  wrap.classList.toggle('open', opening);
+  if(opening){ inp.focus(); }
+  else { inp.value=''; renderRoomList(''); }
+}
+$id('searchInput').addEventListener('blur', ()=>{
+  if(!$id('searchInput').value){
+    $id('searchWrap').classList.remove('open');
+    renderRoomList('');
+  }
+});
+$id('searchInput').addEventListener('keydown', e=>{
+  if(e.key==='Escape'){ $id('searchWrap').classList.remove('open'); $id('searchInput').value=''; renderRoomList(''); }
+});
 
 /* ════════════════════════════════════════════════════
    OPEN ROOM
@@ -2272,7 +2309,7 @@ async function loadApRooms(){
         <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t1)">${esc(name)}</div>
         <div style="font-size:11px;color:var(--t3)">${r.member_count} участников · ${ts}</div>
       </div>
-      ${r.id!==1?`<button onclick="apDeleteRoom(${r.id},this)" style="border:none;background:rgba(220,38,38,.15);color:#f87171;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px" title="Удалить комнату"><i class="fas fa-trash"></i></button>`:''}
+      ${r.id!==1?`<button onclick="apDeleteRoom(${r.id},this)" style="border:none;background:rgba(220,38,38,.15);color:#f87171;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px" title="Удалить комнату${r.type==='direct'?' (личная беседа)':''}"><i class="fas fa-trash"></i></button>`:''}
     </div>`;
   }).join('');
 }
@@ -3084,16 +3121,16 @@ function openProfile(){
         <div id="profileAvatar" style="width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:#fff"></div>
       </div>
       <div>
-        <label style="font-size:12px;font-weight:700;color:var(--text-3);display:block;margin-bottom:5px">Имя</label>
-        <div id="profileName" style="font-size:15px;font-weight:600;padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border)"></div>
+        <label style="font-size:12px;font-weight:700;color:var(--t3);display:block;margin-bottom:5px">Имя</label>
+        <div id="profileName" style="font-size:15px;font-weight:500;padding:8px 12px;background:var(--s);border-radius:8px;border:1px solid var(--border);color:var(--t1)"></div>
       </div>
       <div>
-        <label style="font-size:12px;font-weight:700;color:var(--text-3);display:block;margin-bottom:5px">Организация</label>
-        <div id="profileOrg" style="font-size:13px;color:var(--text-2);padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border)"></div>
+        <label style="font-size:12px;font-weight:700;color:var(--t3);display:block;margin-bottom:5px">Организация</label>
+        <div id="profileOrg" style="font-size:13px;color:var(--t2);padding:8px 12px;background:var(--s);border-radius:8px;border:1px solid var(--border)"></div>
       </div>
       <div>
-        <label style="font-size:12px;font-weight:700;color:var(--text-3);display:block;margin-bottom:5px">Должность</label>
-        <div id="profilePos" style="font-size:13px;color:var(--text-2);padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border)"></div>
+        <label style="font-size:12px;font-weight:700;color:var(--t3);display:block;margin-bottom:5px">Должность</label>
+        <div id="profilePos" style="font-size:13px;color:var(--t2);padding:8px 12px;background:var(--s);border-radius:8px;border:1px solid var(--border)"></div>
       </div>
     </div>
   </div>
