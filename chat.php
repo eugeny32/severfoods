@@ -109,7 +109,7 @@ body{
 }
 .sidebar-hdr{
   padding:10px 12px;display:flex;align-items:center;gap:6px;
-  border-bottom:1px solid var(--border);flex-shrink:0;
+  border-bottom:1px solid var(--border);flex-shrink:0;overflow:visible;
 }
 .hdr-back{
   color:var(--blue);background:none;border:none;font-size:20px;
@@ -139,8 +139,10 @@ body{
 
 /* Room list */
 .room-list{flex:1;overflow-y:auto}
-.room-list::-webkit-scrollbar{width:3px}
-.room-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.room-list::-webkit-scrollbar{width:5px}
+.room-list::-webkit-scrollbar-track{background:transparent}
+.room-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:10px}
+.room-list::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.25)}
 
 .room-item{
   display:flex;align-items:center;gap:12px;
@@ -208,7 +210,23 @@ body{
   display:flex;flex-direction:column;
 }
 .messages-area::-webkit-scrollbar{width:5px}
-.messages-area::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+.messages-area::-webkit-scrollbar-track{background:transparent}
+.messages-area::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:10px}
+.messages-area::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.25)}
+
+/* Typing indicator */
+.typing-indicator{
+  padding:4px 16px 2px;display:flex;align-items:center;gap:7px;
+  font-size:12px;color:var(--t3);flex-shrink:0;
+}
+.typing-dots{display:flex;align-items:center;gap:3px}
+.typing-dots span{
+  width:5px;height:5px;border-radius:50%;background:var(--t3);
+  animation:typingBounce 1.2s infinite;
+}
+.typing-dots span:nth-child(2){animation-delay:.2s}
+.typing-dots span:nth-child(3){animation-delay:.4s}
+@keyframes typingBounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)}}
 
 /* Load more */
 .load-more-btn{
@@ -326,13 +344,13 @@ body{
 /* Input area */
 .input-area{
   background:var(--s2);border-top:1px solid var(--border);
-  padding:10px 14px calc(10px + env(safe-area-inset-bottom));
-  display:flex;align-items:flex-end;gap:10px;flex-shrink:0;
+  padding:8px 12px calc(8px + env(safe-area-inset-bottom));
+  display:flex;align-items:center;gap:8px;flex-shrink:0;
 }
 .attach-btn,.send-btn-main{
-  width:40px;height:40px;border-radius:50%;border:none;
+  width:34px;height:34px;border-radius:50%;border:none;
   display:flex;align-items:center;justify-content:center;
-  font-size:20px;cursor:pointer;flex-shrink:0;transition:all .2s;
+  font-size:15px;cursor:pointer;flex-shrink:0;transition:all .2s;
 }
 .attach-btn{background:var(--s);color:var(--t2)}
 .attach-btn:hover{background:var(--hover);color:var(--t1)}
@@ -340,9 +358,9 @@ body{
 .send-btn-main:hover{background:var(--blue2)}
 .send-btn-main:disabled{opacity:.4;cursor:not-allowed}
 .input-box{
-  flex:1;min-height:40px;max-height:160px;overflow-y:auto;
+  flex:1;min-height:34px;max-height:160px;overflow-y:auto;
   background:var(--s);border:none;border-radius:20px;
-  padding:10px 16px;color:var(--t1);font-size:16px;/* 16px prevents iOS zoom */
+  padding:7px 14px;color:var(--t1);font-size:14px;
   resize:none;outline:none;line-height:1.5;font-family:inherit;
   -webkit-user-select:text;user-select:text;
   touch-action:manipulation;
@@ -888,6 +906,12 @@ body{
         <button class="btn btn-ghost" style="width:100%;font-size:13px" onclick="openAddMemberModal()"><i class="fas fa-plus"></i> Добавить участника</button>
       </div>
       <div class="members-list" id="membersList"></div>
+    </div>
+
+    <!-- Typing indicator -->
+    <div class="typing-indicator" id="typingIndicator" style="display:none">
+      <span class="typing-dots"><span></span><span></span><span></span></span>
+      <span class="typing-text" id="typingText">печатает…</span>
     </div>
 
     <!-- Reply bar -->
@@ -1609,6 +1633,31 @@ async function sendMessage(){
 $id('msgInput').addEventListener('keydown', e=>{
   if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
 });
+$id('msgInput').addEventListener('input', ()=> sendTypingSignal());
+
+/* ════════════════════════════════════════════════════
+   TYPING INDICATOR
+════════════════════════════════════════════════════ */
+let _typingTimer = null;
+let _typingSentAt = 0;
+function sendTypingSignal(){
+  if(!currentRoom) return;
+  const now = Date.now();
+  if(now - _typingSentAt < 3000) return; // throttle: once per 3s
+  _typingSentAt = now;
+  apiPost('signal',{room_id:currentRoom.id, sig_type:'typing', payload:{name:ME.name}}).catch(()=>{});
+}
+
+let _typingHideTimer = null;
+function showTyping(name){
+  const el = $id('typingIndicator');
+  const tx = $id('typingText');
+  if(!el) return;
+  if(tx) tx.textContent = name + ' печатает…';
+  el.style.display = 'flex';
+  clearTimeout(_typingHideTimer);
+  _typingHideTimer = setTimeout(()=>{ if(el) el.style.display='none'; }, 4000);
+}
 
 /* ════════════════════════════════════════════════════
    FILE UPLOAD
@@ -2220,7 +2269,7 @@ async function loadApRooms(){
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
       <div style="width:36px;height:36px;border-radius:50%;background:${r.avatar_color||'#003366'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${typeIcon}</div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(name)}</div>
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t1)">${esc(name)}</div>
         <div style="font-size:11px;color:var(--t3)">${r.member_count} участников · ${ts}</div>
       </div>
       ${r.id!==1?`<button onclick="apDeleteRoom(${r.id},this)" style="border:none;background:rgba(220,38,38,.15);color:#f87171;border-radius:6px;padding:5px 8px;cursor:pointer;font-size:12px" title="Удалить комнату"><i class="fas fa-trash"></i></button>`:''}
@@ -2852,6 +2901,10 @@ async function handleSignal(sig){
     case 'busy':
       hangUp(false);
       showToast(sig.from_name+' занят(а)','<i class="fas fa-circle" style="color:#e53935"></i>');
+      break;
+    case 'typing':
+      if(sig.room_id === currentRoom?.id && sig.from_id !== ME.id)
+        showTyping(sig.payload?.name || sig.from_name || '...');
       break;
   }
 }

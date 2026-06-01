@@ -796,44 +796,67 @@ function doPoll(): void
 {
     global $pdo, $uid;
 
+    // Ensure room_id column exists
+    try { $pdo->exec("ALTER TABLE chat_signals ADD COLUMN room_id BIGINT UNSIGNED DEFAULT NULL"); } catch(\PDOException $e){}
+
+    // Direct signals (calls)
     $stmt = $pdo->prepare(
-        "SELECT id, call_id, from_id, from_name, sig_type, payload
+        "SELECT id, call_id, from_id, from_name, sig_type, payload, room_id
          FROM chat_signals WHERE to_id=? AND consumed=0 ORDER BY id ASC LIMIT 50"
     );
     $stmt->execute([$uid]);
     $sigs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Room-scoped signals (typing) — not consumed, just read; exclude own
+    $stmtR = $pdo->prepare(
+        "SELECT id, call_id, from_id, from_name, sig_type, payload, room_id
+         FROM chat_signals
+         WHERE room_id IS NOT NULL AND from_id != ? AND consumed=0
+           AND created_at > DATE_SUB(NOW(), INTERVAL 5 SECOND)
+         ORDER BY id ASC LIMIT 50"
+    );
+    $stmtR->execute([$uid]);
+    $roomSigs = $stmtR->fetchAll(PDO::FETCH_ASSOC);
+
     if ($sigs) {
         $ids = implode(',', array_map(fn($s) => (int)$s['id'], $sigs));
         $pdo->exec("UPDATE chat_signals SET consumed=1 WHERE id IN ($ids)");
-        foreach ($sigs as &$s) {
-            $s['id']      = (int)$s['id'];
-            $s['from_id'] = (int)$s['from_id'];
-            $s['payload'] = $s['payload'] ? json_decode($s['payload'], true) : null;
-        }
-        unset($s);
     }
 
-    echo json_encode(['signals' => $sigs]);
+    $all = array_merge($sigs, $roomSigs);
+    foreach ($all as &$s) {
+        $s['id']      = (int)$s['id'];
+        $s['from_id'] = (int)$s['from_id'];
+        $s['room_id'] = $s['room_id'] ? (int)$s['room_id'] : null;
+        $s['payload'] = $s['payload'] ? json_decode($s['payload'], true) : null;
+    }
+    unset($s);
+
+    echo json_encode(['signals' => $all]);
 }
 
 function doSignal(): void
 {
     global $pdo, $uid, $uname;
 
+    // Ensure room_id column exists (typing signals use it)
+    try { $pdo->exec("ALTER TABLE chat_signals ADD COLUMN room_id BIGINT UNSIGNED DEFAULT NULL"); } catch(\PDOException $e){}
+
     $b = jsonBody();
     $callId  = preg_replace('/[^a-zA-Z0-9_-]/', '', $b['call_id']  ?? '');
     $toId    = isset($b['to_id']) ? (int)$b['to_id'] : null;
-    $sigType = preg_replace('/[^a-z]/', '', $b['sig_type'] ?? '');
+    $roomId  = isset($b['room_id']) ? (int)$b['room_id'] : null;
+    $sigType = preg_replace('/[^a-z_]/', '', $b['sig_type'] ?? '');
     $payload = isset($b['payload']) ? json_encode($b['payload']) : null;
 
-    $allowed = ['invite','answer','ice','reject','hangup','busy'];
-    if (!$callId || !in_array($sigType, $allowed, true)) err('Invalid signal');
+    $allowed = ['invite','answer','ice','reject','hangup','busy','typing'];
+    if (!in_array($sigType, $allowed, true)) err('Invalid signal');
+    if ($sigType !== 'typing' && !$callId) err('Missing call_id');
 
     $pdo->prepare(
-        "INSERT INTO chat_signals (call_id, from_id, from_name, to_id, sig_type, payload)
-         VALUES (?,?,?,?,?,?)"
-    )->execute([$callId, $uid, $uname, $toId, $sigType, $payload]);
+        "INSERT INTO chat_signals (call_id, from_id, from_name, to_id, room_id, sig_type, payload)
+         VALUES (?,?,?,?,?,?,?)"
+    )->execute([$callId ?: null, $uid, $uname, $toId, $roomId, $sigType, $payload]);
 
     ok();
 }
@@ -858,14 +881,14 @@ function doUpdateRoom(): void {
 }
 
 function doDeleteRoom(): void {
-    global $pdo, $urole;
+    global $pdo, $urole, $isAdmin;
     Csrf::guard();
     $b      = jsonBody();
     $roomId = (int)($b['room_id'] ?? 0);
     if (!$roomId) err('Missing room_id');
     if (getRoomType($roomId) === 'direct') err('Cannot delete direct chat', 400);
     $rr = getRoomRole($roomId);
-    if ($rr !== 'owner' && $urole !== 'super_admin') err('Forbidden', 403);
+    if (!$isAdmin && $rr !== 'owner' && $urole !== 'super_admin') err('Forbidden', 403);
 
     $pdo->prepare("DELETE FROM chat_room_members WHERE room_id=?")->execute([$roomId]);
     $pdo->prepare("DELETE FROM chat_messages WHERE room_id=?")->execute([$roomId]);
