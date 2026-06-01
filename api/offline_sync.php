@@ -13,6 +13,7 @@
  *  GET  ?action=meal_points       — точки питания с расписаниями
  *  GET  ?action=logs&since=ISO    — записи питания с указанной даты
  *  POST ?action=push              — загрузить офлайн-записи на сервер
+ *  POST ?action=auth              — аутентификация пользователя
  * =====================================================
  */
 
@@ -42,6 +43,7 @@ switch ($action) {
     case 'meal_points':doMealPoints(); break;
     case 'logs':       doLogs();       break;
     case 'push':       doPush();       break;
+    case 'auth':       doAuth();       break;
     default:
         http_response_code(400);
         echo json_encode(['error' => 'Unknown action']);
@@ -67,7 +69,7 @@ function doEmployees(): void
     $rows = $pdo->query(
         "SELECT id, full_name, birth_date, organization, department, position,
                 vjg_type, price, qr_code, qr_expires_at, qr_status,
-                is_active, role, assigned_point_id,
+                is_active, role, login, assigned_point_id,
                 UNIX_TIMESTAMP(updated_at) AS updated_ts
          FROM employees
          WHERE is_active = 1
@@ -229,5 +231,62 @@ function doPush(): void
         'errors'   => $errors,
         'results'  => $results,
         'ts'       => time(),
+    ]);
+}
+
+function doAuth(): void
+{
+    global $pdo;
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['error' => 'POST required']);
+        exit;
+    }
+
+    $body     = json_decode(file_get_contents('php://input'), true) ?? [];
+    $login    = trim($body['login'] ?? '');
+    $password = $body['password'] ?? '';
+
+    if ($login === '' || $password === '') {
+        http_response_code(400);
+        echo json_encode(['error' => 'Введите логин и пароль']);
+        exit;
+    }
+
+    $stmt = $pdo->prepare(
+        "SELECT id, full_name, login, password, role, organization, department,
+                position, assigned_point_id, is_active, qr_code
+         FROM employees
+         WHERE login = ? AND is_active = 1 AND role IS NOT NULL
+         LIMIT 1"
+    );
+    $stmt->execute([$login]);
+    $emp = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$emp || !password_verify($password, $emp['password'])) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Неверный логин или пароль']);
+        exit;
+    }
+
+    // Signed token (valid 30 days)
+    $payload = base64_encode(json_encode([
+        'id'   => (int)$emp['id'],
+        'role' => $emp['role'],
+        'exp'  => time() + 30 * 86400,
+    ]));
+    $sig   = hash_hmac('sha256', $payload, env('OFFLINE_SYNC_TOKEN', ''));
+    $token = $payload . '.' . $sig;
+
+    unset($emp['password']);
+    $emp['id']               = (int)$emp['id'];
+    $emp['assigned_point_id'] = $emp['assigned_point_id'] ? (int)$emp['assigned_point_id'] : null;
+
+    echo json_encode([
+        'ok'            => true,
+        'employee'      => $emp,
+        'session_token' => $token,
+        'expires_at'    => date('c', time() + 30 * 86400),
+        'ts'            => time(),
     ]);
 }
