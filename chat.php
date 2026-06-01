@@ -157,7 +157,7 @@ body{
   background:var(--green);border:2px solid var(--s2);
 }
 .room-body{flex:1;min-width:0}
-.room-name{font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.room-name{font-weight:400;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .room-preview{font-size:13px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 .room-preview .sender{color:var(--t3);margin-right:3px}
 .room-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
@@ -184,7 +184,7 @@ body{
   font-size:15px;font-weight:700;color:#fff;
 }
 .topbar-info{flex:1;min-width:0}
-.topbar-name{font-weight:700;color:var(--t1);font-size:15px}
+.topbar-name{font-weight:500;color:var(--t1);font-size:15px}
 .topbar-sub{font-size:12px;color:var(--t3);margin-top:1px;transition:color .3s}
 .topbar-sub .online-label{color:var(--green);font-weight:500}
 .topbar-actions{display:flex;gap:2px;align-items:center}
@@ -234,7 +234,7 @@ body{
 .msg-col{max-width:65%;display:flex;flex-direction:column}
 .msg-wrap.own .msg-col{align-items:flex-end}
 
-.msg-sender{font-size:12px;font-weight:700;color:var(--blue);margin-bottom:3px;padding-left:12px}
+.msg-sender{font-size:12px;font-weight:500;color:var(--blue);margin-bottom:3px;padding-left:12px}
 .msg-wrap.own .msg-sender{display:none}
 
 /* Reply strip */
@@ -397,17 +397,17 @@ body{
 }
 @keyframes popIn{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
 .modal-hdr{
-  padding:18px 20px 14px;border-bottom:1px solid var(--border);
+  padding:12px 16px 10px;border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;
 }
-.modal-title{font-size:17px;font-weight:800;color:var(--t1)}
-.modal-close{background:none;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:0 4px}
+.modal-title{font-size:15px;font-weight:500;color:var(--t1)}
+.modal-close{background:none;border:none;color:var(--t3);font-size:20px;cursor:pointer;padding:0 4px}
 .modal-close:hover{color:var(--t1)}
-.modal-body{padding:20px}
-.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+.modal-body{padding:14px 16px}
+.modal-footer{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
 
 .form-field{margin-bottom:16px}
-.form-field label{display:block;font-size:12px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.form-field label{display:block;font-size:12px;font-weight:400;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
 .form-field input,.form-field textarea,.form-field select{
   width:100%;background:var(--s);border:1px solid var(--border);border-radius:var(--r);
   color:var(--t1);padding:10px 14px;font-family:inherit;font-size:14px;outline:none;
@@ -439,8 +439,8 @@ body{
 .member-role-txt{font-size:11px;color:var(--t3)}
 
 .btn{
-  padding:10px 20px;border-radius:var(--r);border:none;font-family:inherit;
-  font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;
+  padding:8px 16px;border-radius:var(--r);border:none;font-family:inherit;
+  font-size:13px;font-weight:500;cursor:pointer;transition:all .2s;
 }
 .btn-primary{background:var(--blue);color:#fff}
 .btn-primary:hover{background:var(--blue2)}
@@ -806,7 +806,6 @@ body{
 <!-- ═══ SIDEBAR ═══ -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-hdr">
-    <a href="index.php" class="hdr-back" title="На главную">←</a>
     <div class="search-wrap">
       <span class="search-icon"><i class="fas fa-search"></i></span>
       <input id="searchInput" type="text" placeholder="Поиск…">
