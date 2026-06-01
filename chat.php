@@ -75,9 +75,11 @@ body{
 }
 :root{
   --s:#17212b;--s2:#232e3c;--s3:#2b5278;--s4:#1c2733;
+  --bg:#232e3c;--surface:#2b3a4a;--accent:#2b9cf2;
   --blue:#2b9cf2;--blue2:#1a8de0;--green:#4dcd5e;
   --red:#e53935;--yellow:#fdd835;
   --t1:#fff;--t2:rgba(255,255,255,.7);--t3:rgba(255,255,255,.4);--t4:rgba(255,255,255,.2);
+  --text-2:rgba(255,255,255,.6);
   --border:rgba(255,255,255,.06);
   --msg-in:#182533;--msg-in-t:#fff;
   --msg-out:#2b5278;--msg-out-t:#fff;
@@ -103,7 +105,7 @@ body{
   flex-shrink:0;position:relative;
 }
 .sidebar-hdr{
-  padding:14px 14px 10px;display:flex;align-items:center;gap:10px;
+  padding:10px 12px;display:flex;align-items:center;gap:6px;
   border-bottom:1px solid var(--border);flex-shrink:0;
 }
 .hdr-back{
@@ -124,8 +126,8 @@ body{
 .search-icon{color:var(--t3);font-size:15px}
 
 .new-btn{
-  width:40px;height:40px;border-radius:50%;background:var(--blue);
-  border:none;color:#fff;font-size:18px;cursor:pointer;
+  width:30px;height:30px;border-radius:50%;background:var(--blue);
+  border:none;color:#fff;font-size:14px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;
   transition:background .2s;
   touch-action:manipulation;-webkit-tap-highlight-color:transparent;
@@ -779,7 +781,7 @@ body{
 .cu-avatar{width:36px;height:36px;border-radius:50%;background:var(--blue-700,#003366);
   color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
 .cu-info{flex:1;min-width:0}
-.cu-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cu-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t1)}
 .cu-meta{font-size:11px;color:var(--t3)}
 .cu-actions{display:flex;gap:6px;flex-shrink:0}
 .cu-toggle{width:36px;height:20px;border-radius:10px;border:none;cursor:pointer;
@@ -788,7 +790,7 @@ body{
 .cu-toggle::after{content:'';position:absolute;top:3px;width:14px;height:14px;
   border-radius:50%;background:#fff;transition:left .2s}
 .cu-toggle.on::after{left:19px}.cu-toggle.off::after{left:3px}
-.cu-edit-form{background:var(--bg);border-radius:8px;padding:12px;margin-top:8px;display:none}
+.cu-edit-form{background:var(--s);border-radius:8px;padding:12px;margin-top:8px;display:none;color:var(--t1)}
 .cu-edit-form.open{display:block}
 .ap-tab-btn{background:none;border:none;color:var(--t2);padding:10px 14px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .ap-tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
@@ -796,7 +798,7 @@ body{
 .cu-field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
 .cu-field label{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase}
 .cu-field input{padding:8px 10px;border:1px solid var(--border);border-radius:6px;
-  font-size:13px;background:var(--surface)}
+  font-size:13px;background:var(--s2);color:var(--t1)}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>

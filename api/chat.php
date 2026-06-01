@@ -839,7 +839,7 @@ function doSignal(): void
 }
 
 function doUpdateRoom(): void {
-    global $pdo;
+    global $pdo, $isAdmin;
     Csrf::guard();
     $b      = jsonBody();
     $roomId = (int)($b['room_id'] ?? 0);
@@ -850,7 +850,7 @@ function doUpdateRoom(): void {
     if (!$roomId) err('Missing room_id');
     if (getRoomType($roomId) === 'direct') err('Cannot edit direct chat', 400);
     $rr = getRoomRole($roomId);
-    if (!in_array($rr, ['owner','admin'], true)) err('Forbidden', 403);
+    if (!$isAdmin && !in_array($rr, ['owner','admin'], true)) err('Forbidden', 403);
 
     $pdo->prepare("UPDATE chat_rooms SET name=?, description=?, avatar_color=? WHERE id=?")
         ->execute([$name ?: null, $desc ?: null, $color ?: null, $roomId]);
