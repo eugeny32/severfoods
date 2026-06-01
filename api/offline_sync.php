@@ -238,38 +238,50 @@ function doAuth(): void
 {
     global $pdo;
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
-        echo json_encode(['error' => 'POST required']);
-        exit;
+        http_response_code(405); echo json_encode(['error' => 'POST required']); exit;
     }
 
-    $body     = json_decode(file_get_contents('php://input'), true) ?? [];
-    $login    = trim($body['login'] ?? '');
-    $password = $body['password'] ?? '';
+    $body    = json_decode(file_get_contents('php://input'), true) ?? [];
+    $qrCode  = trim($body['qr_code'] ?? '');
+    $role    = $body['role'] ?? 'operator';
+    $pointId = isset($body['meal_point_id']) ? (int)$body['meal_point_id'] : null;
 
-    if ($login === '' || $password === '') {
+    if ($qrCode === '') {
         http_response_code(400);
-        echo json_encode(['error' => 'Введите логин и пароль']);
+        echo json_encode(['error' => 'QR-код обязателен']);
         exit;
     }
 
-    $stmt = $pdo->prepare(
-        "SELECT id, full_name, login, password, role, organization, department,
-                position, assigned_point_id, is_active, qr_code
-         FROM employees
-         WHERE login = ? AND is_active = 1 AND role IS NOT NULL
-         LIMIT 1"
-    );
-    $stmt->execute([$login]);
+    if ($role === 'admin') {
+        $stmt = $pdo->prepare(
+            "SELECT * FROM employees
+             WHERE qr_code = ? AND role IN ('admin','super_admin') AND is_active = 1 LIMIT 1"
+        );
+    } else {
+        $stmt = $pdo->prepare(
+            "SELECT * FROM employees
+             WHERE qr_code = ? AND role IN ('operator','admin','super_admin') AND is_active = 1 LIMIT 1"
+        );
+    }
+    $stmt->execute([$qrCode]);
     $emp = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$emp || !password_verify($password, $emp['password'])) {
+    if (!$emp) {
         http_response_code(401);
-        echo json_encode(['error' => 'Неверный логин или пароль']);
+        echo json_encode(['error' => 'QR-код не найден или недостаточно прав']);
         exit;
     }
 
-    // Signed token (valid 30 days)
+    // If operator chose a specific point — store it
+    $selectedPointId = $pointId ?: ($emp['assigned_point_id'] ?? null);
+    $pointName = null;
+    if ($selectedPointId) {
+        $pt = $pdo->prepare("SELECT point_name FROM meal_points WHERE id = ? LIMIT 1");
+        $pt->execute([$selectedPointId]);
+        $ptRow = $pt->fetch(PDO::FETCH_ASSOC);
+        $pointName = $ptRow ? $ptRow['point_name'] : null;
+    }
+
     $payload = base64_encode(json_encode([
         'id'   => (int)$emp['id'],
         'role' => $emp['role'],
@@ -279,8 +291,10 @@ function doAuth(): void
     $token = $payload . '.' . $sig;
 
     unset($emp['password']);
-    $emp['id']               = (int)$emp['id'];
+    $emp['id']                = (int)$emp['id'];
     $emp['assigned_point_id'] = $emp['assigned_point_id'] ? (int)$emp['assigned_point_id'] : null;
+    $emp['selected_point_id'] = $selectedPointId ? (int)$selectedPointId : null;
+    $emp['selected_point_name'] = $pointName;
 
     echo json_encode([
         'ok'            => true,
