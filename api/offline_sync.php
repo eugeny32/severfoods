@@ -237,11 +237,11 @@ function doPush(): void
 function doAuth(): void
 {
     global $pdo;
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405); echo json_encode(['error' => 'POST required']); exit;
-    }
-
-    $body    = json_decode(file_get_contents('php://input'), true) ?? [];
+    // Body from POST (json) or GET params fallback
+    $body = [];
+    $raw  = file_get_contents('php://input');
+    if ($raw) $body = json_decode($raw, true) ?? [];
+    if (empty($body)) $body = $_GET + $_POST; // fallback for redirect-converted GETs
     $qrCode  = trim($body['qr_code'] ?? '');
     $role    = $body['role'] ?? 'operator';
     $pointId = isset($body['meal_point_id']) ? (int)$body['meal_point_id'] : null;
