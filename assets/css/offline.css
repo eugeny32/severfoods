@@ -1,0 +1,135 @@
+/* ── Offline module styles ──────────────────────────────── */
+
+/* Header chip — connection status */
+.chip.offline-indicator {
+    cursor: default;
+    transition: background .3s, color .3s, border-color .3s;
+}
+.chip.offline-indicator.is-online {
+    background: rgba(16,185,129,.15);
+    border-color: rgba(16,185,129,.3);
+    color: #d1fae5;
+}
+.chip.offline-indicator.is-offline {
+    background: rgba(239,68,68,.2);
+    border-color: rgba(239,68,68,.35);
+    color: #fca5a5;
+    animation: offline-pulse 2s ease-in-out infinite;
+}
+.chip.offline-indicator.is-syncing {
+    background: rgba(59,130,246,.2);
+    border-color: rgba(59,130,246,.35);
+    color: #bfdbfe;
+}
+.chip.offline-indicator.has-queue {
+    background: rgba(245,158,11,.2);
+    border-color: rgba(245,158,11,.35);
+    color: #fde68a;
+}
+@keyframes offline-pulse {
+    0%,100% { opacity: 1; }
+    50%     { opacity: .55; }
+}
+
+/* Offline banner shown in scan panel when connection lost */
+.offline-banner {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 16px;
+    margin-bottom: 14px;
+    border-radius: var(--radius);
+    background: rgba(234,179,8,.1);
+    border: 1px solid rgba(234,179,8,.4);
+    color: #78350f;
+    font-size: 13px;
+    line-height: 1.5;
+}
+.offline-banner.show { display: flex; }
+
+/* Queue badge on Offline tab button */
+.queue-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: #f59e0b;
+    color: white;
+    font-size: 10px;
+    font-weight: 800;
+    margin-left: 5px;
+    vertical-align: middle;
+}
+
+/* Offline tab: stats grid */
+.offline-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.offline-stat-card {
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg);
+    text-align: center;
+}
+.offline-stat-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    margin-bottom: 8px;
+}
+.offline-stat-val {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1.1;
+}
+.offline-stat-val.clr-green { color: var(--success); }
+.offline-stat-val.clr-red   { color: var(--danger); }
+.offline-stat-val.clr-amber { color: var(--warning); }
+.offline-stat-time {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-2);
+}
+
+/* Offline action buttons row */
+.offline-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+/* Offline queue table */
+.queue-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.queue-table th {
+    background: var(--bg);
+    padding: 9px 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    border-bottom: 1px solid var(--border);
+}
+.queue-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--bg-deep);
+    vertical-align: middle;
+}
+.queue-table tr:last-child td { border-bottom: none; }
+.queue-table tr:hover td { background: var(--bg); }
