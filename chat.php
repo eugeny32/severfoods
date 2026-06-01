@@ -263,6 +263,7 @@ body{
 }
 
 .msg-text{white-space:pre-wrap}
+.msg-fwd-label { font-size:11px; color:#64748b; font-style:italic; margin-bottom:3px; padding:2px 6px; background:rgba(0,0,0,.04); border-radius:4px; }
 
 /* File bubbles */
 .msg-img{
@@ -814,6 +815,7 @@ body{
     <?php if ($isAdminSession): ?>
     <button class="new-btn" onclick="openAdminPanel()" title="Панель администратора" style="margin-left:4px"><i class="fas fa-shield-alt"></i></button>
     <?php endif; ?>
+    <button class="new-btn" onclick="openProfile()" title="Мой профиль" style="margin-left:4px"><i class="fas fa-user-circle"></i></button>
   </div>
   <div class="room-list" id="roomList">
     <div style="padding:20px;text-align:center;color:var(--t3)">Загрузка…</div>
@@ -1419,7 +1421,15 @@ function renderMsg(m, showSender){
     </a>`;
     if(m.body) html += `<div class="msg-text" style="margin-top:6px">${esc(m.body).replace(/\n/g,'<br>')}</div>`;
   } else {
-    html += `<div class="msg-text">${esc(m.body||'').replace(/\n/g,'<br>')}</div>`;
+    let displayBody = m.body || '';
+    let fwdHeader = '';
+    if(displayBody.startsWith('⟫ Переслано')){
+      const nl = displayBody.indexOf('\n');
+      fwdHeader = nl > -1 ? displayBody.slice(0, nl) : displayBody;
+      displayBody = nl > -1 ? displayBody.slice(nl+1) : '';
+    }
+    if(fwdHeader) html += `<div class="msg-fwd-label">${esc(fwdHeader)}</div>`;
+    if(displayBody) html += `<div class="msg-text">${esc(displayBody).replace(/\n/g,'<br>')}</div>`;
   }
   html += `</div>`; // msg-bub
 
@@ -1768,8 +1778,11 @@ async function doForward(toRoomId, msgId){
   closeOverlay('forwardOverlay');
   const msgEl = $id('messagesArea')?.querySelector(`[data-mid="${msgId}"]`);
   const body  = msgEl?.querySelector('.msg-text')?.textContent || '';
+  const senderName = msgEl?.querySelector('.msg-sender')?.textContent ||
+                     msgEl?.closest('.msg-wrap')?.querySelector('.msg-av')?.title || '';
   if(!body.trim()){ showToast('Нельзя переслать это сообщение'); return; }
-  const d = await apiPost('send', {room_id: toRoomId, text: body});
+  const fwdBody = (senderName ? `⟫ Переслано от: ${senderName}\n` : '⟫ Переслано\n') + body;
+  const d = await apiPost('send', {room_id: toRoomId, text: fwdBody});
   if(d.ok || d.id) showToast('Сообщение переслано');
   else showToast(d.error || 'Ошибка пересылки');
 }
@@ -2991,6 +3004,42 @@ async function searchUsers(){
       </div>`).join('');
   }, 300);
 }
+function openProfile(){
+  if(!ME) return;
+  const col = avatarColor(ME.name);
+  $id('profileAvatar').style.background = col;
+  $id('profileAvatar').textContent = avatarInitial(ME.name);
+  $id('profileName').textContent = ME.name || '—';
+  $id('profileOrg').textContent = ME.organization || '—';
+  $id('profilePos').textContent = ME.position || '—';
+  openOverlay('profileOverlay');
+}
 </script>
+
+<div class="overlay" id="profileOverlay" style="display:none">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-hdr">
+      <div class="modal-title">Мой профиль</div>
+      <button class="modal-close" onclick="closeOverlay('profileOverlay')"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" style="padding:20px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;justify-content:center">
+        <div id="profileAvatar" style="width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:#fff"></div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--text-3);display:block;margin-bottom:5px">Имя</label>
+        <div id="profileName" style="font-size:15px;font-weight:600;padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border)"></div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--text-3);display:block;margin-bottom:5px">Организация</label>
+        <div id="profileOrg" style="font-size:13px;color:var(--text-2);padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border)"></div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--text-3);display:block;margin-bottom:5px">Должность</label>
+        <div id="profilePos" style="font-size:13px;color:var(--text-2);padding:8px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--border)"></div>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
