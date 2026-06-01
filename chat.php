@@ -51,6 +51,9 @@ try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_password VARCHAR(255) DE
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#002756">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -70,7 +73,7 @@ html{height:100%;height:-webkit-fill-available;background:#17212b}
 body{
   height:100%;height:-webkit-fill-available;
   overflow:hidden;
-  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;
+  font-family:'Onest','Segoe UI',system-ui,-apple-system,sans-serif;font-size:14px;
   background:#17212b;
 }
 :root{
