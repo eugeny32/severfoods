@@ -69,7 +69,7 @@ function doEmployees(): void
     $rows = $pdo->query(
         "SELECT id, full_name, birth_date, organization, department, position,
                 vjg_type, price, qr_code, qr_expires_at, qr_status,
-                is_active, role, login, assigned_point_id,
+                is_active, role, assigned_point_id,
                 UNIX_TIMESTAMP(updated_at) AS updated_ts
          FROM employees
          WHERE is_active = 1
