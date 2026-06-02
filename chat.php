@@ -69,6 +69,15 @@ try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_password VARCHAR(255) DE
    BASE
 ════════════════════════════════════════════════════ */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+/* ── Global thin scrollbars (Claude-style) ── */
+*::-webkit-scrollbar{width:4px;height:4px}
+*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:10px}
+*::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.22)}
+*::-webkit-scrollbar-corner{background:transparent}
+*{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent}
+
 html{height:100%;height:-webkit-fill-available;background:#17212b}
 body{
   height:100%;height:-webkit-fill-available;
@@ -156,10 +165,6 @@ body{
 
 /* Room list */
 .room-list{flex:1;overflow-y:auto}
-.room-list::-webkit-scrollbar{width:5px}
-.room-list::-webkit-scrollbar-track{background:transparent}
-.room-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:10px}
-.room-list::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.25)}
 
 .room-item{
   display:flex;align-items:center;gap:12px;
@@ -226,10 +231,6 @@ body{
   flex:1;overflow-y:auto;padding:12px 16px;
   display:flex;flex-direction:column;
 }
-.messages-area::-webkit-scrollbar{width:5px}
-.messages-area::-webkit-scrollbar-track{background:transparent}
-.messages-area::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:10px}
-.messages-area::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.25)}
 
 /* Typing indicator */
 .typing-indicator{
@@ -846,7 +847,7 @@ body{
 <!-- ═══ SIDEBAR ═══ -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-hdr">
-    <button class="hdr-back" onclick="window.location='index.php'" title="На главную"><i class="fas fa-arrow-left"></i></button>
+    <button class="hdr-back" onclick="goBack()" title="Назад"><i class="fas fa-arrow-left"></i></button>
     <div class="search-wrap" id="searchWrap">
       <span class="search-icon" onclick="toggleSearch()" title="Поиск"><i class="fas fa-search"></i></span>
       <input id="searchInput" type="text" placeholder="Поиск…">
@@ -1197,6 +1198,15 @@ const ME = {
   csrf: <?= json_encode($csrf) ?>,
   isAdmin: <?= json_encode($isAdminSession) ?>,
 };
+
+function goBack(){
+  // In Electron webview — post message to parent app to switch to scanner tab
+  if(window.parent && window.parent !== window){
+    window.parent.postMessage({action:'navigate',page:'scanner'},'*');
+  } else {
+    window.location = 'index.php';
+  }
+}
 const ALL_ADMINS = <?= json_encode(array_map(fn($a) => [
   'id'   => (int)$a['id'],
   'name' => $a['full_name'],
