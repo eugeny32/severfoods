@@ -119,8 +119,10 @@ $allEmployeesJson = array_map(function($e) {
 <meta name="theme-color" content="#003366">
 <title><?= htmlspecialchars(APP_NAME) ?></title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍽️</text></svg>">
+<link rel="manifest" href="manifest.json">
 <?= Csrf::meta() ?>
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/offline.css">
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" defer></script>
 </head>
 <body>
@@ -144,6 +146,7 @@ $allEmployeesJson = array_map(function($e) {
             <?php if ($meal_point_name && $meal_point_name !== 'Не выбрана'): ?>
             <span class="chip point">📍 <?= htmlspecialchars($meal_point_name) ?></span>
             <?php endif; ?>
+            <span class="chip offline-indicator is-online" id="offlineChip" title="Статус соединения с сервером">🟢 Онлайн</span>
         </div>
         <div class="header-actions">
             <?php if ($is_admin): ?>
@@ -179,6 +182,11 @@ $allEmployeesJson = array_map(function($e) {
         </div>
     </div>
     <?php endif; ?>
+
+    <!-- Offline Banner -->
+    <div class="offline-banner" id="offlineBanner">
+        📴 <strong>Режим офлайн</strong> — сканирования сохраняются локально и будут синхронизированы при восстановлении соединения.
+    </div>
 
     <div class="grid-2">
 
@@ -341,6 +349,7 @@ $allEmployeesJson = array_map(function($e) {
             <button class="tab-btn" data-tab="tabSchedule">⏰ Расписание</button>
             <?php endif; ?>
             <button class="tab-btn" data-tab="tabQrPrint">🖨️ Печать QR</button>
+            <button class="tab-btn" data-tab="tabOffline">📴 Офлайн <span class="queue-badge" id="offlineQueueBadge" style="display:none">0</span></button>
         </div>
 
         <!-- REPORTS -->
@@ -514,6 +523,72 @@ $allEmployeesJson = array_map(function($e) {
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap">
                 <a href="print_all_qr.php" target="_blank" class="btn btn-primary">🖨️ Печать всех QR-кодов</a>
+            </div>
+        </div>
+
+        <!-- OFFLINE TAB -->
+        <div id="tabOffline" class="tab-pane">
+            <div class="offline-stats-grid">
+                <div class="offline-stat-card">
+                    <div class="offline-stat-label">Соединение</div>
+                    <div class="offline-stat-val" id="offlineStatOnline">—</div>
+                </div>
+                <div class="offline-stat-card">
+                    <div class="offline-stat-label">В очереди</div>
+                    <div class="offline-stat-val" id="offlineStatQueue">0</div>
+                </div>
+                <div class="offline-stat-card">
+                    <div class="offline-stat-label">Сотрудников в кэше</div>
+                    <div class="offline-stat-val" id="offlineStatEmps">0</div>
+                </div>
+                <div class="offline-stat-card">
+                    <div class="offline-stat-label">Последняя синхронизация</div>
+                    <div class="offline-stat-val offline-stat-time" id="offlineStatLastSync">—</div>
+                </div>
+                <div class="offline-stat-card">
+                    <div class="offline-stat-label">Кэш обновлён</div>
+                    <div class="offline-stat-val offline-stat-time" id="offlineStatEmpCached">—</div>
+                </div>
+            </div>
+
+            <div class="offline-actions">
+                <button class="btn btn-primary" id="offlineSyncBtn" onclick="window.OfflineManager && window.OfflineManager.manualSync()">
+                    🔄 Синхронизировать очередь
+                </button>
+                <button class="btn btn-secondary" id="offlineRefreshBtn" onclick="window.OfflineManager && window.OfflineManager.manualRefreshEmployees()">
+                    📥 Обновить кэш сотрудников
+                </button>
+            </div>
+            <div id="offlineSyncMsg" style="margin-top:8px;font-size:13px;color:var(--text-2)"></div>
+
+            <div style="margin-top:20px">
+                <div style="font-size:13px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+                    📋 Очередь офлайн-сканирований
+                </div>
+                <div class="queue-table-wrap" style="overflow-x:auto">
+                    <table class="queue-table">
+                        <thead>
+                            <tr>
+                                <th>Время</th>
+                                <th>Сотрудник</th>
+                                <th>QR-код</th>
+                                <th>Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="offlineQueueTbody">
+                            <tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:20px">Очередь пуста</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="margin-top:20px;padding:14px 16px;background:var(--bg-2,#f8f9fa);border-radius:8px;border:1px solid var(--border);font-size:13px;color:var(--text-2);line-height:1.7">
+                <strong>ℹ️ Как работает офлайн-режим:</strong><br>
+                • При отсутствии интернета сканирования QR-кодов сохраняются локально в браузере.<br>
+                • Сотрудники кэшируются заранее — нажмите «Обновить кэш» для загрузки актуального списка.<br>
+                • При восстановлении соединения очередь синхронизируется автоматически.<br>
+                • Для принудительной синхронизации нажмите «Синхронизировать очередь».<br>
+                • Кэш и очередь хранятся в IndexedDB браузера и не исчезают при перезагрузке страницы.
             </div>
         </div>
     </div>
@@ -742,6 +817,7 @@ $allEmployeesJson = array_map(function($e) {
     window.mealPointId      = <?= json_encode($meal_point_id) ?>;
 })();
 </script>
+<script src="assets/js/offline.js" defer></script>
 <script src="assets/js/qr-input.js"></script>
 <script src="assets/js/app.js"></script>
 </body>
