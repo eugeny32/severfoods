@@ -13,6 +13,9 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['is_admin'])) {
 
 Csrf::guard();
 
+// Ensure assigned_point_id column exists
+try { $pdo->exec("ALTER TABLE employees ADD COLUMN assigned_point_id INT DEFAULT NULL"); } catch(PDOException $e){}
+
 $data = json_decode(file_get_contents('php://input'), true);
 if (!$data || empty($data['id'])) {
     echo json_encode(['success' => false, 'message' => 'Нет данных']); exit;
@@ -35,6 +38,7 @@ $qr_status    = in_array($data['qr_status'] ?? '', ['active','expired','blocked'
 $is_active    = isset($data['is_active']) ? (int)(bool)$data['is_active'] : 1;
 $role         = !empty($data['role']) ? $data['role'] : null;
 $regen        = !empty($data['regenerate_qr']);
+$assigned_point_id = !empty($data['assigned_point_id']) ? intval($data['assigned_point_id']) : null;
 
 $errors = [];
 if (empty($full_name))    $errors[] = 'ФИО обязательно';
@@ -49,6 +53,14 @@ $current_role = $_SESSION['role'] ?? 'admin';
 if ($current_role !== 'super_admin' && $role !== $emp['role']) {
     $role = $emp['role'];
 }
+// Admin can only assign operator to their own point
+if ($current_role === 'admin' && $role === 'operator') {
+    $assigned_point_id = $_SESSION['assigned_point_id'] ?? null;
+}
+// Only admin/operator/super_admin get a point
+if (!in_array($role, ['admin','operator','super_admin'], true)) {
+    $assigned_point_id = null;
+}
 
 $qr_code = $regen ? generateUniqueQrCode() : $emp['qr_code'];
 if ($regen) logAction('regenerate_qr', "Перегенерирован QR для: {$full_name} (ID:{$id})");
@@ -57,10 +69,10 @@ try {
     $pdo->prepare(
         "UPDATE employees SET
              full_name=?, birth_date=?, organization=?, department=?, position=?,
-             vjg_type=?, price=?, qr_expires_at=?, qr_status=?, is_active=?, qr_code=?, role=?
+             vjg_type=?, price=?, qr_expires_at=?, qr_status=?, is_active=?, qr_code=?, role=?, assigned_point_id=?
          WHERE id=?"
     )->execute([$full_name, $birth_date, $organization, $department, $position,
-                $vjg_type, $price, $qr_expires, $qr_status, $is_active, $qr_code, $role, $id]);
+                $vjg_type, $price, $qr_expires, $qr_status, $is_active, $qr_code, $role, $assigned_point_id, $id]);
     logAction('update_employee', "Обновлён: {$full_name} (ID:{$id})");
     echo json_encode(['success' => true, 'message' => 'Данные сотрудника обновлены']);
 } catch (PDOException $e) {

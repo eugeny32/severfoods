@@ -21,17 +21,17 @@ function getMealTypeName(string $type): string
 function getMealTypeIcon(string $type): string
 {
     return [
-        'breakfast' => '🌅',
-        'lunch'     => '☀️',
-        'dinner'    => '🌙',
-        'night'     => '⭐',
-        'none'      => '⏸️',
-    ][$type] ?? '🍽️';
+        'breakfast' => '<i class="fas fa-cloud-sun"></i>',
+        'lunch'     => '<i class="fas fa-sun"></i>',
+        'dinner'    => '<i class="fas fa-moon"></i>',
+        'night'     => '<i class="fas fa-star"></i>',
+        'none'      => '<i class="fas fa-pause-circle"></i>',
+    ][$type] ?? '<i class="fas fa-utensils"></i>';
 }
 
 // ─── Расписание и текущий приём пищи ─────────────────
 
-function getCurrentMealType(PDO $pdo = null, $meal_point_id = null): string
+function getCurrentMealType(?PDO $pdo = null, $meal_point_id = null): string
 {
     $current_time = date('H:i:s');
     $current_day  = date('N'); // 1=Пн … 7=Вс
@@ -334,7 +334,9 @@ function getEmployees(PDO $pdo, bool $onlyActive = true): array
     $sql = "SELECT id, full_name, birth_date, organization, department, position,
                    vjg_type, price, qr_expires_at, qr_status, is_active, qr_code, role
             FROM employees";
-    $sql .= $onlyActive ? " WHERE is_active = 1" : '';
+    $conditions = ["NOT (COALESCE(chat_access,0) = 1 AND role IS NULL)"];
+    if ($onlyActive) $conditions[] = "is_active = 1";
+    $sql .= " WHERE " . implode(" AND ", $conditions);
     $sql .= " ORDER BY full_name";
     return $pdo->query($sql)->fetchAll();
 }

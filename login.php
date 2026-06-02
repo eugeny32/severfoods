@@ -108,10 +108,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#002756">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Питание">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/img/icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon.ico">
 <title>Вход — <?= htmlspecialchars(APP_NAME) ?></title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
@@ -226,7 +235,7 @@ body::after {
 <div class="login-wrap">
     <div class="brand">
         <div class="brand-logo">
-            <img src="logo.png" alt="Логотип" onerror="this.parentElement.innerHTML='🍽️'">
+            <img src="logo.png" alt="Логотип" onerror="this.parentElement.innerHTML='<i class=&quot;fas fa-utensils&quot;></i>'">
         </div>
         <h1>СЕВЕР</h1>
         <p>Система контроля питания</p>
@@ -234,17 +243,17 @@ body::after {
 
     <div class="role-tabs">
         <button class="role-tab active" id="tabOperator" onclick="switchTab('operator')">
-            👤 Оператор
+            <i class="fas fa-user"></i> Оператор
         </button>
         <button class="role-tab" id="tabAdmin" onclick="switchTab('admin')">
-            👑 Администратор
+            <i class="fas fa-crown"></i> Администратор
         </button>
     </div>
 
     <div class="card">
         <?php if ($error): ?>
         <div class="alert">
-            <span>⚠️</span>
+            <span><i class="fas fa-exclamation-triangle"></i></span>
             <span><?= htmlspecialchars($error) ?></span>
         </div>
         <?php endif; ?>
@@ -254,7 +263,7 @@ body::after {
             <input type="hidden" name="role" value="operator">
 
             <div class="field">
-                <label>📍 Точка питания</label>
+                <label><i class="fas fa-map-marker-alt"></i> Точка питания</label>
                 <select name="meal_point_id" required>
                     <option value="">— Выберите точку —</option>
                     <?php foreach ($points as $pt): ?>
@@ -268,16 +277,16 @@ body::after {
             </div>
 
             <div class="field">
-                <label>📱 QR-код сотрудника</label>
+                <label><i class="fas fa-qrcode"></i> QR-код сотрудника</label>
                 <input type="text" name="login"
                     placeholder="Отсканируйте или введите QR-код"
                     autocomplete="off" autofocus>
                 <div class="qr-hint">
-                    <span>🔍</span> Используйте сканер или введите код вручную
+                    <span><i class="fas fa-search"></i></span> Используйте сканер или введите код вручную
                 </div>
             </div>
 
-            <button type="submit" class="btn-login">🔓 Войти как оператор</button>
+            <button type="submit" class="btn-login"><i class="fas fa-unlock"></i> Войти как оператор</button>
             <div class="hint-row">Оператор авторизуется по QR-коду сотрудника</div>
         </form>
 
@@ -286,15 +295,15 @@ body::after {
             <input type="hidden" name="role" value="admin">
 
             <div class="field">
-                <label>👤 QR-код администратора</label>
+                <label><i class="fas fa-user-shield"></i> QR-код администратора</label>
                 <input type="text" name="login" placeholder="Введите QR-код"
                     autocomplete="off">
                 <div class="qr-hint">
-                    <span>🔑</span> Введите QR-код сотрудника с ролью администратора
+                    <span><i class="fas fa-key"></i></span> Введите QR-код сотрудника с ролью администратора
                 </div>
             </div>
 
-            <button type="submit" class="btn-login">👑 Войти как администратор</button>
+            <button type="submit" class="btn-login"><i class="fas fa-crown"></i> Войти как администратор</button>
             <div class="hint-row">
                 Для первого входа используйте QR-код: <strong>SUPER_ADMIN_QR</strong>
             </div>
@@ -302,7 +311,13 @@ body::after {
     </div>
 
     <div class="version">v<?= APP_VERSION ?> · <?= htmlspecialchars(APP_NAME) ?></div>
-</div>
+    <div style="text-align:center;margin-top:12px">
+        <a href="chat_login.php" style="font-size:12px;color:rgba(255,255,255,.45);text-decoration:none;display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border:1px solid rgba(255,255,255,.12);border-radius:8px;transition:all .2s"
+           onmouseover="this.style.color='rgba(255,255,255,.75)';this.style.borderColor='rgba(255,255,255,.3)'"
+           onmouseout="this.style.color='rgba(255,255,255,.45)';this.style.borderColor='rgba(255,255,255,.12)'">
+            <i class="fas fa-comments"></i> Войти в мессенджер
+        </a>
+    </div>
 
 <script src="assets/js/qr-input.js"></script>
 <script>

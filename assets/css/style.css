@@ -323,19 +323,20 @@ body.flash-error   { animation: flashError   .5s ease; }
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 14px 12px;
+    padding: 10px 8px;
     text-align: center;
     transition: all .2s;
 }
 .stat-tile:hover { border-color: var(--blue-300); background: var(--blue-50); transform: translateY(-1px); }
+.stat-icon-row { font-size: 18px; color: var(--blue-500); margin-bottom: 4px; }
 .stat-num {
-    font-size: 28px; font-weight: 800;
+    font-size: 22px; font-weight: 800;
     color: var(--blue-800);
     line-height: 1;
     font-variant-numeric: tabular-nums;
 }
 .stat-tile.total .stat-num { color: var(--blue-600); }
-.stat-lbl { font-size: 11px; color: var(--text-3); font-weight: 600; margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
+.stat-lbl { font-size: 10px; color: var(--text-3); font-weight: 600; margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
 
 /* ─── Employee Panel ─── */
 .list-panel {}
@@ -901,4 +902,45 @@ body.flash-error   { animation: flashError   .5s ease; }
 /* На мобильных — idle полностью скрыт */
 @media (max-width: 640px) {
     .qsf-idle { display: none !important; }
+}
+
+/* ─── Mobile improvements ─── */
+@media (max-width: 640px) {
+    /* Main layout */
+    .main-grid { grid-template-columns: 1fr !important; gap: 12px; }
+    .scanner-col, .list-panel { width: 100%; }
+
+    /* Header */
+    .header-inner { padding: 0 12px; gap: 8px; }
+    .header-chips { gap: 6px; flex-wrap: nowrap; overflow-x: auto; }
+    .logo-text { font-size: 16px; }
+
+    /* Tables → cards on mobile */
+    .emp-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* Scan card */
+    .scan-card { padding: 12px; }
+    .qr-input-wrap { font-size: 15px; }
+
+    /* Stats */
+    .stats-row { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+
+    /* Buttons */
+    .btn { padding: 10px 14px; font-size: 13px; }
+
+    /* Modals */
+    .modal-overlay { align-items: flex-end; }
+    .modal-box { border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important; max-width: 100% !important; margin: 0; width: 100%; max-height: 90vh; overflow-y: auto; }
+
+    /* Admin tabs */
+    .tab-nav { overflow-x: auto; flex-wrap: nowrap; gap: 4px; }
+    .tab-btn { white-space: nowrap; padding: 8px 12px; font-size: 13px; }
+
+    /* Card headers */
+    .card-header { flex-wrap: wrap; gap: 8px; }
+}
+
+@media (max-width: 380px) {
+    .stat-num { font-size: 18px; }
+    .stat-icon-row { font-size: 15px; }
 }

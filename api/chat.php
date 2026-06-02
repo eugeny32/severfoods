@@ -48,15 +48,22 @@ set_error_handler(function (int $no, string $msg, string $file, int $line): bool
     exit;
 });
 
-if (!isset($_SESSION['user_id']) || empty($_SESSION['is_admin'])) {
+// Accept both main admin session and chat-specific session
+if (!empty($_SESSION['chat_uid'])) {
+    $uid   = (int)$_SESSION['chat_uid'];
+    $uname = $_SESSION['chat_uname']    ?? 'User';
+    $urole = $_SESSION['chat_urole']    ?? 'member';
+    $isAdmin = !empty($_SESSION['chat_is_admin']);
+} elseif (!empty($_SESSION['user_id']) && !empty($_SESSION['is_admin'])) {
+    $uid   = (int)$_SESSION['user_id'];
+    $uname = $_SESSION['user_name'] ?? 'Admin';
+    $urole = $_SESSION['role']      ?? 'admin';
+    $isAdmin = true;
+} else {
     http_response_code(403);
     echo json_encode(['error' => 'Forbidden']);
     exit;
 }
-
-$uid   = (int)$_SESSION['user_id'];
-$uname = $_SESSION['user_name'] ?? 'Admin';
-$urole = $_SESSION['role']      ?? 'admin';
 $action = $_GET['action'] ?? '';
 
 initTables();
@@ -77,6 +84,22 @@ switch ($action) {
     case 'file':         doFile();        break;
     case 'poll':         doPoll();        break;
     case 'signal':       doSignal();      break;
+    case 'update_room':     doUpdateRoom();     break;
+    case 'delete_room':     doDeleteRoom();     break;
+    case 'kick_member':     doKickMember();     break;
+    case 'set_member_role': doSetMemberRole();  break;
+    case 'edit_msg':        doEditMsg();        break;
+    case 'pin_msg':         doPinMsg();         break;
+    case 'pinned':          doPinned();         break;
+    case 'chat_users':      doChatUsers();      break;
+    case 'room_candidates': doRoomCandidates(); break;
+    case 'save_chat_user':  doSaveChatUser();   break;
+    case 'remove_chat_user': doRemoveChatUser(); break;
+    case 'public_rooms':   doPublicRooms();   break;
+    case 'join_room':      doJoinRoom();      break;
+    case 'search_users':   doSearchUsers();   break;
+    case 'admin_rooms':    doAdminRooms();    break;
+    case 'admin_stats':    doAdminStats();    break;
     default:
         echo json_encode(['error' => 'Unknown action']);
 }
@@ -285,6 +308,14 @@ function initTables(): void
         INDEX idx_cleanup (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    // Add new columns if not exist
+    try { $pdo->exec("ALTER TABLE chat_messages ADD COLUMN is_edited TINYINT(1) NOT NULL DEFAULT 0"); } catch(PDOException $e){}
+    try { $pdo->exec("ALTER TABLE chat_rooms ADD COLUMN pinned_msg_id INT DEFAULT NULL"); } catch(PDOException $e){}
+    try { $pdo->exec("ALTER TABLE chat_rooms ADD COLUMN is_public TINYINT(1) NOT NULL DEFAULT 0"); } catch(PDOException $e){}
+    try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_access TINYINT(1) NOT NULL DEFAULT 0"); } catch(PDOException $e){}
+    try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_username VARCHAR(100) DEFAULT NULL"); } catch(PDOException $e){}
+    try { $pdo->exec("ALTER TABLE employees ADD COLUMN chat_password VARCHAR(255) DEFAULT NULL"); } catch(PDOException $e){}
+
     // Общий канал по умолчанию
     try {
         $pdo->exec("INSERT IGNORE INTO chat_rooms (id, type, name, description, avatar_color, created_by)
@@ -315,6 +346,8 @@ function doPing(): void
     // Чистка старых записей
     $pdo->exec("DELETE FROM chat_presence WHERE last_ping < DATE_SUB(NOW(), INTERVAL 25 SECOND)");
     $pdo->exec("DELETE FROM chat_signals WHERE consumed=1 AND created_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
+    // Also clean very old uncollected signals (e.g. user offline >2min)
+    $pdo->exec("DELETE FROM chat_signals WHERE consumed=0 AND created_at < DATE_SUB(NOW(), INTERVAL 2 MINUTE)");
 
     ok(['ts' => time()]);
 }
@@ -359,13 +392,15 @@ function doRooms(): void
         $r['unread']  = (int)$r['unread'];
         $r['muted']   = (bool)$r['muted'];
 
-        // Для direct — имя = имя собеседника
+        // Для direct — имя и peer_id = собеседник
         if ($r['type'] === 'direct') {
             $other = $pdo->prepare(
-                "SELECT user_name FROM chat_room_members WHERE room_id=? AND user_id!=? LIMIT 1"
+                "SELECT user_id, user_name FROM chat_room_members WHERE room_id=? AND user_id!=? LIMIT 1"
             );
             $other->execute([$r['id'], $uid]);
-            $r['name'] = $other->fetchColumn() ?: 'Личная беседа';
+            $peer = $other->fetch(PDO::FETCH_ASSOC);
+            $r['name']     = $peer ? $peer['user_name'] : 'Личная беседа';
+            $r['_peer_id'] = $peer ? (int)$peer['user_id'] : 0;
         }
     }
     unset($r);
@@ -491,7 +526,7 @@ function doAddMember(): void
     if (!$roomId || !$toId || !$toName) err('Missing fields');
 
     $rr = getRoomRole($roomId);
-    if (!in_array($rr, ['owner','admin'], true)) err('Not enough rights', 403);
+    if (!in_array($rr, ['owner','admin'], true) && !$isAdmin) err('Not enough rights', 403);
 
     $pdo->prepare(
         "INSERT IGNORE INTO chat_room_members (room_id, user_id, user_name, user_role, room_role) VALUES (?,?,?,?,'member')"
@@ -586,7 +621,14 @@ function doMessages(): void
     }
     unset($m);
 
-    echo json_encode(['messages' => $msgs]);
+    // Max last_read_id of OTHER members (for delivery/read status)
+    $rStmt = $pdo->prepare(
+        "SELECT COALESCE(MAX(last_read_id),0) FROM chat_read WHERE room_id=? AND user_id!=?"
+    );
+    $rStmt->execute([$roomId, $uid]);
+    $othersReadId = (int)$rStmt->fetchColumn();
+
+    echo json_encode(['messages' => $msgs, 'others_read_id' => $othersReadId]);
 }
 
 function doSend(): void
@@ -754,44 +796,350 @@ function doPoll(): void
 {
     global $pdo, $uid;
 
+    // Ensure room_id column exists
+    try { $pdo->exec("ALTER TABLE chat_signals ADD COLUMN room_id BIGINT UNSIGNED DEFAULT NULL"); } catch(\PDOException $e){}
+
+    // Direct signals (calls)
     $stmt = $pdo->prepare(
-        "SELECT id, call_id, from_id, from_name, sig_type, payload
-         FROM chat_signals WHERE to_id=? AND consumed=0 ORDER BY id ASC LIMIT 20"
+        "SELECT id, call_id, from_id, from_name, sig_type, payload, room_id
+         FROM chat_signals WHERE to_id=? AND consumed=0 ORDER BY id ASC LIMIT 50"
     );
     $stmt->execute([$uid]);
     $sigs = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Room-scoped signals (typing) — not consumed, just read; exclude own
+    $stmtR = $pdo->prepare(
+        "SELECT id, call_id, from_id, from_name, sig_type, payload, room_id
+         FROM chat_signals
+         WHERE room_id IS NOT NULL AND from_id != ? AND consumed=0
+           AND created_at > DATE_SUB(NOW(), INTERVAL 5 SECOND)
+         ORDER BY id ASC LIMIT 50"
+    );
+    $stmtR->execute([$uid]);
+    $roomSigs = $stmtR->fetchAll(PDO::FETCH_ASSOC);
+
     if ($sigs) {
         $ids = implode(',', array_map(fn($s) => (int)$s['id'], $sigs));
         $pdo->exec("UPDATE chat_signals SET consumed=1 WHERE id IN ($ids)");
-        foreach ($sigs as &$s) {
-            $s['id']      = (int)$s['id'];
-            $s['from_id'] = (int)$s['from_id'];
-            $s['payload'] = $s['payload'] ? json_decode($s['payload'], true) : null;
-        }
-        unset($s);
     }
 
-    echo json_encode(['signals' => $sigs]);
+    $all = array_merge($sigs, $roomSigs);
+    foreach ($all as &$s) {
+        $s['id']      = (int)$s['id'];
+        $s['from_id'] = (int)$s['from_id'];
+        $s['room_id'] = $s['room_id'] ? (int)$s['room_id'] : null;
+        $s['payload'] = $s['payload'] ? json_decode($s['payload'], true) : null;
+    }
+    unset($s);
+
+    echo json_encode(['signals' => $all]);
 }
 
 function doSignal(): void
 {
     global $pdo, $uid, $uname;
 
+    // Ensure room_id column exists (typing signals use it)
+    try { $pdo->exec("ALTER TABLE chat_signals ADD COLUMN room_id BIGINT UNSIGNED DEFAULT NULL"); } catch(\PDOException $e){}
+
     $b = jsonBody();
     $callId  = preg_replace('/[^a-zA-Z0-9_-]/', '', $b['call_id']  ?? '');
     $toId    = isset($b['to_id']) ? (int)$b['to_id'] : null;
-    $sigType = preg_replace('/[^a-z]/', '', $b['sig_type'] ?? '');
+    $roomId  = isset($b['room_id']) ? (int)$b['room_id'] : null;
+    $sigType = preg_replace('/[^a-z_]/', '', $b['sig_type'] ?? '');
     $payload = isset($b['payload']) ? json_encode($b['payload']) : null;
 
-    $allowed = ['invite','answer','ice','reject','hangup','busy'];
-    if (!$callId || !in_array($sigType, $allowed, true)) err('Invalid signal');
+    $allowed = ['invite','answer','ice','reject','hangup','busy','typing'];
+    if (!in_array($sigType, $allowed, true)) err('Invalid signal');
+    if ($sigType !== 'typing' && !$callId) err('Missing call_id');
 
     $pdo->prepare(
-        "INSERT INTO chat_signals (call_id, from_id, from_name, to_id, sig_type, payload)
-         VALUES (?,?,?,?,?,?)"
-    )->execute([$callId, $uid, $uname, $toId, $sigType, $payload]);
+        "INSERT INTO chat_signals (call_id, from_id, from_name, to_id, room_id, sig_type, payload)
+         VALUES (?,?,?,?,?,?,?)"
+    )->execute([$callId ?: null, $uid, $uname, $toId, $roomId, $sigType, $payload]);
 
     ok();
+}
+
+function doUpdateRoom(): void {
+    global $pdo, $isAdmin;
+    Csrf::guard();
+    $b      = jsonBody();
+    $roomId = (int)($b['room_id'] ?? 0);
+    $name   = mb_substr(trim($b['name'] ?? ''), 0, 100);
+    $desc   = mb_substr(trim($b['description'] ?? ''), 0, 300);
+    $color  = trim($b['avatar_color'] ?? '');
+
+    if (!$roomId) err('Missing room_id');
+    if (getRoomType($roomId) === 'direct') err('Cannot edit direct chat', 400);
+    $rr = getRoomRole($roomId);
+    if (!$isAdmin && !in_array($rr, ['owner','admin'], true)) err('Forbidden', 403);
+
+    $pdo->prepare("UPDATE chat_rooms SET name=?, description=?, avatar_color=? WHERE id=?")
+        ->execute([$name ?: null, $desc ?: null, $color ?: null, $roomId]);
+    ok();
+}
+
+function doDeleteRoom(): void {
+    global $pdo, $urole, $isAdmin;
+    Csrf::guard();
+    $b      = jsonBody();
+    $roomId = (int)($b['room_id'] ?? 0);
+    if (!$roomId) err('Missing room_id');
+    // Only super_admin / global admin can delete direct chats; regular owners cannot
+    $isDirect = getRoomType($roomId) === 'direct';
+    if ($isDirect && !$isAdmin && $urole !== 'super_admin') err('Cannot delete direct chat', 400);
+    $rr = getRoomRole($roomId);
+    if (!$isAdmin && $rr !== 'owner' && $urole !== 'super_admin') err('Forbidden', 403);
+
+    $pdo->prepare("DELETE FROM chat_room_members WHERE room_id=?")->execute([$roomId]);
+    $pdo->prepare("DELETE FROM chat_messages WHERE room_id=?")->execute([$roomId]);
+    $pdo->prepare("DELETE FROM chat_rooms WHERE id=?")->execute([$roomId]);
+    ok();
+}
+
+function doKickMember(): void {
+    global $pdo, $uid, $uname;
+    Csrf::guard();
+    $b      = jsonBody();
+    $roomId = (int)($b['room_id'] ?? 0);
+    $toId   = (int)($b['user_id'] ?? 0);
+    if (!$roomId || !$toId) err('Missing fields');
+    $rr = getRoomRole($roomId);
+    if (!in_array($rr, ['owner','admin'], true)) err('Forbidden', 403);
+    if ($toId === $uid) err('Cannot kick yourself');
+
+    $stmt = $pdo->prepare("SELECT user_name, room_role FROM chat_room_members WHERE room_id=? AND user_id=?");
+    $stmt->execute([$roomId, $toId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) err('Member not found', 404);
+    if ($row['room_role'] === 'owner') err('Cannot kick owner', 403);
+
+    $pdo->prepare("DELETE FROM chat_room_members WHERE room_id=? AND user_id=?")->execute([$roomId, $toId]);
+    insertSystemMsg($pdo, $roomId, "{$uname} исключил(а) {$row['user_name']}");
+    ok();
+}
+
+function doSetMemberRole(): void {
+    global $pdo, $uid;
+    Csrf::guard();
+    $b      = jsonBody();
+    $roomId = (int)($b['room_id'] ?? 0);
+    $toId   = (int)($b['user_id'] ?? 0);
+    $role   = $b['role'] ?? '';
+    if (!$roomId || !$toId || !in_array($role, ['admin','member'], true)) err('Invalid fields');
+    if (getRoomRole($roomId) !== 'owner') err('Forbidden — owner only', 403);
+    if ($toId === $uid) err('Cannot change own role');
+
+    $pdo->prepare("UPDATE chat_room_members SET room_role=? WHERE room_id=? AND user_id=?")
+        ->execute([$role, $roomId, $toId]);
+    ok();
+}
+
+function doEditMsg(): void {
+    global $pdo, $uid;
+    Csrf::guard();
+    $b    = jsonBody();
+    $mid  = (int)($b['id'] ?? 0);
+    $text = mb_substr(trim($b['text'] ?? ''), 0, 8000);
+    if (!$mid || !$text) err('Missing fields');
+
+    $stmt = $pdo->prepare("SELECT sender_id, room_id, is_deleted FROM chat_messages WHERE id=?");
+    $stmt->execute([$mid]);
+    $msg = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$msg)              err('Not found', 404);
+    if ($msg['is_deleted']) err('Message deleted');
+
+    $rr = getRoomRole((int)$msg['room_id']);
+    if ($msg['sender_id'] != $uid && !in_array($rr, ['owner','admin'], true)) err('Forbidden', 403);
+
+    $pdo->prepare("UPDATE chat_messages SET body=?, is_edited=1 WHERE id=?")->execute([$text, $mid]);
+    ok();
+}
+
+function doPinMsg(): void {
+    global $pdo;
+    Csrf::guard();
+    $b      = jsonBody();
+    $roomId = (int)($b['room_id'] ?? 0);
+    $msgId  = isset($b['msg_id']) ? (int)$b['msg_id'] : null;
+    if (!$roomId) err('Missing room_id');
+    $rr = getRoomRole($roomId);
+    if (!in_array($rr, ['owner','admin'], true)) err('Forbidden', 403);
+
+    $pdo->prepare("UPDATE chat_rooms SET pinned_msg_id=? WHERE id=?")->execute([$msgId, $roomId]);
+    ok();
+}
+
+function doPinned(): void {
+    global $pdo;
+    $roomId = (int)($_GET['room_id'] ?? 0);
+    if (!$roomId || !isMember($roomId)) err('Forbidden', 403);
+
+    $stmt = $pdo->prepare(
+        "SELECT m.id, m.body, m.sender_name, m.msg_type
+         FROM chat_messages m
+         JOIN chat_rooms r ON r.pinned_msg_id = m.id
+         WHERE r.id=? AND m.is_deleted=0"
+    );
+    $stmt->execute([$roomId]);
+    $msg = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    if ($msg) $msg['id'] = (int)$msg['id'];
+    echo json_encode(['pinned' => $msg]);
+}
+
+// ═════════════════════════════════════════════════════
+//  CHAT USER MANAGEMENT (admin only)
+// ═════════════════════════════════════════════════════
+
+function doRoomCandidates(): void {
+    global $pdo, $uid;
+    $q = trim($_GET['q'] ?? '');
+    $sql = "SELECT id, full_name AS name, role FROM employees
+            WHERE is_active=1 AND (role IN ('admin','super_admin') OR chat_access=1) AND id!=?";
+    $params = [$uid];
+    if ($q) { $sql .= " AND full_name LIKE ?"; $params[] = "%{$q}%"; }
+    $sql .= " ORDER BY full_name LIMIT 50";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$r) $r['id'] = (int)$r['id'];
+    echo json_encode(['users' => $rows]);
+}
+
+function doChatUsers(): void {
+    global $pdo, $isAdmin;
+    if (!$isAdmin) err('Forbidden', 403);
+    $rows = $pdo->query(
+        "SELECT id, full_name, role, chat_access,
+                chat_username, chat_password IS NOT NULL AS has_password,
+                qr_code IS NOT NULL AS has_qr
+         FROM employees WHERE is_active=1 ORDER BY full_name"
+    )->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$r) {
+        $r['id'] = (int)$r['id'];
+        $r['chat_access'] = (int)$r['chat_access'];
+        $r['has_password'] = (int)$r['has_password'];
+        $r['has_qr'] = (int)$r['has_qr'];
+    }
+    echo json_encode(['users' => $rows]);
+}
+
+function doSaveChatUser(): void {
+    global $pdo, $isAdmin;
+    if (!$isAdmin) err('Forbidden', 403);
+
+    $data = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+    $empId   = (int)($data['id'] ?? 0);
+    $access  = isset($data['chat_access']) ? (int)(bool)$data['chat_access'] : null;
+    $chatUser = isset($data['chat_username']) ? trim($data['chat_username']) : null;
+    $chatPass = isset($data['chat_password']) ? $data['chat_password'] : null;
+
+    if (!$empId) err('Bad request');
+
+    if ($access !== null) {
+        $pdo->prepare("UPDATE employees SET chat_access=? WHERE id=?")->execute([$access, $empId]);
+    }
+    if ($chatUser !== null) {
+        // Check uniqueness
+        if ($chatUser !== '') {
+            $exists = $pdo->prepare("SELECT id FROM employees WHERE chat_username=? AND id!=?");
+            $exists->execute([$chatUser, $empId]);
+            if ($exists->fetch()) err('Логин уже занят');
+        }
+        $pdo->prepare("UPDATE employees SET chat_username=? WHERE id=?")
+            ->execute([$chatUser ?: null, $empId]);
+    }
+    if ($chatPass !== null) {
+        if ($chatPass === '') {
+            $pdo->prepare("UPDATE employees SET chat_password=NULL WHERE id=?")->execute([$empId]);
+        } else {
+            $hash = password_hash($chatPass, PASSWORD_DEFAULT);
+            $pdo->prepare("UPDATE employees SET chat_password=? WHERE id=?")->execute([$hash, $empId]);
+        }
+    }
+    echo json_encode(['ok' => true]);
+}
+
+function doRemoveChatUser(): void {
+    global $pdo, $isAdmin;
+    if (!$isAdmin) err('Forbidden', 403);
+    $data = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+    $empId = (int)($data['id'] ?? 0);
+    if (!$empId) err('Bad request');
+    $pdo->prepare("UPDATE employees SET chat_access=0, chat_username=NULL, chat_password=NULL WHERE id=?")
+        ->execute([$empId]);
+    echo json_encode(['ok' => true]);
+}
+
+function doPublicRooms(): void {
+    global $pdo, $uid;
+    $rows = $pdo->prepare(
+        "SELECT r.id, r.type, r.name, r.description, r.avatar_color,
+                (SELECT COUNT(*) FROM chat_room_members WHERE room_id=r.id) AS member_count,
+                (SELECT 1 FROM chat_room_members WHERE room_id=r.id AND user_id=?) AS is_member
+         FROM chat_rooms r WHERE r.is_public=1 AND r.type IN ('group','channel')
+         ORDER BY r.last_msg_at DESC"
+    );
+    $rows->execute([$uid]);
+    $list = $rows->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($list as &$r) { $r['id']=(int)$r['id']; $r['member_count']=(int)$r['member_count']; $r['is_member']=(int)$r['is_member']; }
+    echo json_encode(['rooms' => $list]);
+}
+
+function doJoinRoom(): void {
+    global $pdo, $uid, $uname, $urole;
+    $roomId = (int)(json_decode(file_get_contents('php://input'),true)['room_id'] ?? 0);
+    if (!$roomId) err('Bad request');
+    $r = $pdo->prepare("SELECT is_public,type FROM chat_rooms WHERE id=?");
+    $r->execute([$roomId]);
+    $room = $r->fetch(PDO::FETCH_ASSOC);
+    if (!$room || !$room['is_public']) err('Комната закрыта', 403);
+    // Add if not already member
+    $pdo->prepare("INSERT IGNORE INTO chat_room_members (room_id,user_id,user_name,user_role,room_role)
+                   VALUES (?,?,?,?,'member')")->execute([$roomId,$uid,$uname,$urole]);
+    echo json_encode(['ok'=>true]);
+}
+
+function doSearchUsers(): void {
+    global $pdo, $uid;
+    $q = trim($_GET['q'] ?? '');
+    if (strlen($q) < 2) { echo json_encode(['users'=>[]]); return; }
+    $stmt = $pdo->prepare(
+        "SELECT id, full_name, role, chat_username
+         FROM employees WHERE is_active=1 AND (chat_access=1 OR role IN ('admin','super_admin'))
+           AND (full_name LIKE ? OR chat_username LIKE ?) AND id!=?
+         LIMIT 20"
+    );
+    $like = "%{$q}%";
+    $stmt->execute([$like,$like,$uid]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$r) $r['id']=(int)$r['id'];
+    echo json_encode(['users'=>$rows]);
+}
+
+function doAdminRooms(): void {
+    global $pdo, $isAdmin;
+    if (!$isAdmin) err('Forbidden', 403);
+    $rows = $pdo->query("
+        SELECT r.id, r.type, r.name, r.avatar_color, r.last_msg_at,
+               COUNT(m.user_id) as member_count
+        FROM chat_rooms r
+        LEFT JOIN chat_room_members m ON m.room_id = r.id
+        GROUP BY r.id ORDER BY r.last_msg_at DESC
+    ")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$r) { $r['id'] = (int)$r['id']; $r['member_count'] = (int)$r['member_count']; }
+    echo json_encode(['rooms' => $rows]);
+}
+
+function doAdminStats(): void {
+    global $pdo, $isAdmin;
+    if (!$isAdmin) err('Forbidden', 403);
+    $stats = [];
+    $stats['messages'] = (int)$pdo->query("SELECT COUNT(*) FROM chat_messages WHERE is_deleted=0")->fetchColumn();
+    $stats['rooms']    = (int)$pdo->query("SELECT COUNT(*) FROM chat_rooms")->fetchColumn();
+    $stats['users']    = (int)$pdo->query("SELECT COUNT(DISTINCT user_id) FROM chat_room_members")->fetchColumn();
+    try { $stats['files'] = (int)$pdo->query("SELECT COUNT(*) FROM chat_files")->fetchColumn(); } catch(\PDOException $e){ $stats['files']=0; }
+    $stats['online']   = (int)$pdo->query("SELECT COUNT(*) FROM chat_presence")->fetchColumn();
+    echo json_encode(['stats' => $stats]);
 }
