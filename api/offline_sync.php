@@ -43,7 +43,8 @@ switch ($action) {
     case 'meal_points':doMealPoints(); break;
     case 'logs':       doLogs();       break;
     case 'push':       doPush();       break;
-    case 'auth':       doAuth();       break;
+    case 'auth':       doAuth();           break;
+    case 'mobile_chat_login': doMobileChatLogin(); break;
     default:
         http_response_code(400);
         echo json_encode(['error' => 'Unknown action']);
@@ -303,4 +304,33 @@ function doAuth(): void
         'expires_at'    => date('c', time() + 30 * 86400),
         'ts'            => time(),
     ]);
+}
+
+function doMobileChatLogin(): void {
+    global $pdo;
+    $body    = json_decode(file_get_contents('php://input'), true) ?? [];
+    $qrCode  = trim($body['qr_code'] ?? '');
+    if (!$qrCode) { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'qr_code required']); exit; }
+
+    $stmt = $pdo->prepare("SELECT * FROM employees WHERE qr_code=? AND is_active=1 LIMIT 1");
+    $stmt->execute([$qrCode]);
+    $emp = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$emp) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'QR-код не найден']); exit; }
+
+    // Generate mobile chat token (random, stored in sync_meta as JSON map)
+    $token    = bin2hex(random_bytes(32));
+    $expires  = time() + 30 * 86400;
+
+    // Store token → employee_id mapping in sync_meta table
+    $mapRaw = $pdo->query("SELECT value FROM sync_meta WHERE `key`='mobile_chat_tokens' LIMIT 1")->fetchColumn();
+    $map    = $mapRaw ? json_decode($mapRaw, true) : [];
+    // Clean expired tokens
+    foreach ($map as $t => $data) { if ($data['exp'] < time()) unset($map[$t]); }
+    $map[$token] = ['uid' => (int)$emp['id'], 'uname' => $emp['full_name'], 'urole' => $emp['role'], 'exp' => $expires];
+    $json = json_encode($map);
+    $pdo->prepare("INSERT INTO sync_meta(`key`,value) VALUES('mobile_chat_tokens',?) ON DUPLICATE KEY UPDATE value=?")->execute([$json,$json]);
+
+    unset($emp['password']);
+    $emp['id'] = (int)$emp['id'];
+    echo json_encode(['ok'=>true,'mobile_token'=>$token,'employee'=>$emp,'expires_at'=>date('c',$expires)]);
 }

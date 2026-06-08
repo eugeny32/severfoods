@@ -28,6 +28,14 @@ if (ob_get_level() === 0) ob_start();
 require_once dirname(__DIR__) . '/config.php';
 
 header('Content-Type: application/json; charset=utf-8');
+// CORS for mobile app
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if ($origin) header("Access-Control-Allow-Origin: $origin");
+else header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Credentials: true');
+header('Access-Control-Allow-Headers: Content-Type, X-Mobile-Token, X-Sync-Token');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
 // Глобальный перехватчик: любое необработанное исключение → JSON
 set_exception_handler(function (Throwable $e): void {
@@ -48,8 +56,25 @@ set_error_handler(function (int $no, string $msg, string $file, int $line): bool
     exit;
 });
 
+// ── Mobile token auth (X-Mobile-Token header) ────────────
+$mobileToken = $_SERVER['HTTP_X_MOBILE_TOKEN'] ?? '';
+if ($mobileToken) {
+    $mapRaw = DB::queryOne("SELECT value FROM sync_meta WHERE `key`='mobile_chat_tokens' LIMIT 1");
+    $map    = ($mapRaw && $mapRaw['value']) ? json_decode($mapRaw['value'], true) : [];
+    $td     = $map[$mobileToken] ?? null;
+    if ($td && $td['exp'] > time()) {
+        $uid     = (int)$td['uid'];
+        $uname   = $td['uname'];
+        $urole   = $td['urole'];
+        $isAdmin = in_array($urole, ['admin','super_admin'], true);
+    } else {
+        http_response_code(401);
+        echo json_encode(['error' => 'Invalid or expired mobile token']);
+        exit;
+    }
+}
 // Accept both main admin session and chat-specific session
-if (!empty($_SESSION['chat_uid'])) {
+elseif (!empty($_SESSION['chat_uid'])) {
     $uid   = (int)$_SESSION['chat_uid'];
     $uname = $_SESSION['chat_uname']    ?? 'User';
     $urole = $_SESSION['chat_urole']    ?? 'member';
