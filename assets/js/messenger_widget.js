@@ -10,8 +10,8 @@
 
 (function() {
 
-const MESSENGER_URL = window.MESSENGER_SERVER_URL || 'https://ntrip.host/messenger';
-const BADGE_API     = window.MESSENGER_API_URL    || 'https://ntrip.host/messenger/api/badge.php';
+const MESSENGER_URL = window.MESSENGER_SERVER_URL || 'https://ntrip.host';
+const BADGE_API     = window.MESSENGER_API_URL    || 'https://ntrip.host/api/badge.php';
 const POLL_INTERVAL = 30000; // 30 s
 
 // Token stored by the QR-login flow in main site
