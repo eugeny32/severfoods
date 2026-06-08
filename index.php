@@ -865,5 +865,11 @@ function deleteChatUser(id, name) {
 </script>
 <script src="assets/js/qr-input.js"></script>
 <script src="assets/js/app.js?v=2"></script>
+<script>
+// NTRIP Messenger widget config
+window.MESSENGER_SERVER_URL = 'https://ntrip.host/messenger';
+window.MESSENGER_API_URL    = 'https://ntrip.host/messenger/api/badge.php';
+</script>
+<script src="assets/js/messenger_widget.js" defer></script>
 </body>
 </html>
