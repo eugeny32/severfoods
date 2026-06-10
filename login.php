@@ -229,6 +229,55 @@ body::after {
 .btn-login:active { transform: translateY(0); }
 .hint-row { text-align: center; margin-top: 20px; font-size: 12px; color: var(--gray-500); line-height: 1.6; }
 .version { text-align: center; margin-top: 20px; font-size: 11px; color: rgba(255,255,255,.25); }
+
+/* ── Camera button ── */
+.qr-field-wrap { position: relative; }
+.qr-field-wrap input { padding-right: 48px; }
+.btn-cam {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 34px; height: 34px; border-radius: 8px;
+    background: var(--blue-800); border: none; color: #fff;
+    font-size: 15px; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; transition: background .15s;
+}
+.btn-cam:hover { background: var(--blue-500); }
+
+/* ── Camera overlay ── */
+.camera-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,.92); flex-direction: column;
+    align-items: center; justify-content: center;
+}
+.camera-overlay.open { display: flex; }
+.camera-frame {
+    position: relative; border-radius: 16px; overflow: hidden;
+    border: 3px solid rgba(255,255,255,.25);
+    box-shadow: 0 0 0 4000px rgba(0,0,0,.5);
+}
+.camera-frame video { display: block; width: min(90vw, 420px); }
+.camera-frame::before, .camera-frame::after,
+.camera-corner-bl, .camera-corner-tr {
+    content: ''; position: absolute; width: 28px; height: 28px;
+    border-color: #f59e0b; border-style: solid;
+}
+.camera-frame::before  { top: 0; left: 0;  border-width: 3px 0 0 3px; }
+.camera-frame::after   { top: 0; right: 0; border-width: 3px 3px 0 0; }
+.camera-corner-bl { bottom: 0; left: 0;  border-width: 0 0 3px 3px; }
+.camera-corner-tr { bottom: 0; right: 0; border-width: 0 3px 3px 0; }
+.camera-scan-line {
+    position: absolute; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg,transparent,#f59e0b,transparent);
+    animation: scanLine 2s linear infinite;
+}
+@keyframes scanLine { 0%{top:10%} 100%{top:90%} }
+.camera-hint { color: rgba(255,255,255,.7); font-size: 14px; margin-top: 16px; font-weight: 500; }
+.camera-close {
+    margin-top: 20px; padding: 10px 28px; border-radius: 10px;
+    background: rgba(255,255,255,.12); border: 1.5px solid rgba(255,255,255,.2);
+    color: #fff; font-family: 'Onest', sans-serif; font-size: 14px;
+    font-weight: 600; cursor: pointer; transition: background .15s;
+}
+.camera-close:hover { background: rgba(255,255,255,.2); }
 </style>
 </head>
 <body>
@@ -278,11 +327,14 @@ body::after {
 
             <div class="field">
                 <label><i class="fas fa-qrcode"></i> QR-код сотрудника</label>
-                <input type="text" name="login"
-                    placeholder="Отсканируйте или введите QR-код"
-                    autocomplete="off" autofocus>
+                <div class="qr-field-wrap">
+                    <input type="text" name="login" id="loginOp"
+                        placeholder="Отсканируйте или введите QR-код"
+                        autocomplete="off" autofocus>
+                    <button type="button" class="btn-cam" onclick="openLoginCamera('loginOp')" title="Открыть камеру"><i class="fas fa-camera"></i></button>
+                </div>
                 <div class="qr-hint">
-                    <span><i class="fas fa-search"></i></span> Используйте сканер или введите код вручную
+                    <span><i class="fas fa-camera"></i></span> Нажмите камеру для сканирования или введите код вручную
                 </div>
             </div>
 
@@ -296,10 +348,13 @@ body::after {
 
             <div class="field">
                 <label><i class="fas fa-user-shield"></i> QR-код администратора</label>
-                <input type="text" name="login" placeholder="Введите QR-код"
-                    autocomplete="off">
+                <div class="qr-field-wrap">
+                    <input type="text" name="login" id="loginAdmin" placeholder="Введите QR-код"
+                        autocomplete="off">
+                    <button type="button" class="btn-cam" onclick="openLoginCamera('loginAdmin')" title="Открыть камеру"><i class="fas fa-camera"></i></button>
+                </div>
                 <div class="qr-hint">
-                    <span><i class="fas fa-key"></i></span> Введите QR-код сотрудника с ролью администратора
+                    <span><i class="fas fa-camera"></i></span> Нажмите камеру или введите QR-код администратора
                 </div>
             </div>
 
@@ -319,8 +374,76 @@ body::after {
         </a>
     </div>
 
+<!-- Camera overlay -->
+<div class="camera-overlay" id="loginCameraOverlay">
+    <div style="color:#fff;font-size:18px;font-weight:700;margin-bottom:16px"><i class="fas fa-camera"></i> Сканирование QR-кода</div>
+    <div class="camera-frame">
+        <video id="loginCameraVideo" playsinline autoplay muted></video>
+        <div class="camera-scan-line"></div>
+        <div class="camera-corner-bl"></div>
+        <div class="camera-corner-tr"></div>
+    </div>
+    <div class="camera-hint">Наведите камеру на QR-код сотрудника</div>
+    <button class="camera-close" onclick="closeLoginCamera()"><i class="fas fa-times"></i> Закрыть</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script src="assets/js/qr-input.js"></script>
 <script>
+let _camStream = null, _camActive = false, _camTarget = null;
+let _camCanvas = null, _camCtx = null, _camFrame = null;
+
+async function openLoginCamera(targetId) {
+    _camTarget = document.getElementById(targetId);
+    const overlay = document.getElementById('loginCameraOverlay');
+    const video   = document.getElementById('loginCameraVideo');
+    try {
+        _camStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }
+        });
+        video.srcObject = _camStream;
+        await video.play();
+        overlay.classList.add('open');
+        _camActive = true;
+        _camCanvas = _camCanvas || document.createElement('canvas');
+        _camCtx    = _camCtx    || _camCanvas.getContext('2d');
+        _scanLoop(video);
+    } catch(e) {
+        alert('Не удалось открыть камеру: ' + e.message);
+    }
+}
+
+function closeLoginCamera() {
+    _camActive = false;
+    cancelAnimationFrame(_camFrame);
+    if (_camStream) { _camStream.getTracks().forEach(t => t.stop()); _camStream = null; }
+    document.getElementById('loginCameraOverlay').classList.remove('open');
+}
+
+function _scanLoop(video) {
+    if (!_camActive || !window.jsQR) return;
+    _camFrame = requestAnimationFrame(() => {
+        if (!_camActive) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            _camCanvas.width  = video.videoWidth;
+            _camCanvas.height = video.videoHeight;
+            _camCtx.drawImage(video, 0, 0);
+            const img  = _camCtx.getImageData(0, 0, _camCanvas.width, _camCanvas.height);
+            const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+            if (code && code.data) {
+                closeLoginCamera();
+                if (_camTarget) {
+                    _camTarget.value = code.data;
+                    _camTarget.dispatchEvent(new Event('input', { bubbles: true }));
+                    _camTarget.closest('form').submit();
+                }
+                return;
+            }
+        }
+        _scanLoop(video);
+    });
+}
+
 function switchTab(tab) {
     const isOp = tab === 'operator';
     document.getElementById('formOperator').classList.toggle('active', isOp);
