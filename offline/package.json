@@ -1,0 +1,86 @@
+{
+  "name": "severfoods-offline",
+  "version": "1.0.0",
+  "description": "Система учёта питания — СеверФудс",
+  "main": "main.js",
+  "author": "Palchenkov E.I. / OOO Sever",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "jsqr": "^1.4.0",
+    "node-fetch": "^2.7.0",
+    "sql.js": "^1.12.0"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "ru.severfoods.offline",
+    "productName": "SeverFoods",
+    "copyright": "2026 OOO Sever",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/sql.js/dist/sql-wasm.wasm"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build-res"
+    },
+    "files": [
+      "main.js",
+      "src/**/*",
+      "public/**/*",
+      "node_modules/**/*",
+      "!node_modules/**/{CHANGELOG.md,README.md,readme.md,test,tests,__tests__,example,examples,coverage,.travis.yml,.eslintrc,.eslintignore,.gitignore,.github}",
+      "!node_modules/**/*.{ts,map,md}"
+    ],
+    "extraResources": [
+      {
+        "from": ".env.example",
+        "to": ".env.example"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/assets/img/icon.ico",
+      "requestedExecutionLevel": "asInvoker",
+      "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "public/assets/img/icon.png",
+      "category": "public.app-category.business"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "public/assets/img/icon.png",
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "public/assets/img/icon.ico",
+      "uninstallerIcon": "public/assets/img/icon.ico",
+      "installerHeader": "public/assets/img/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "СеверФудс",
+      "license": "LICENSE.txt",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Настройка СеверФудс</title>
+<style>
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    font-family: -apple-system, 'Segoe UI', sans-serif;
+    background: #17212b;
+    color: #e8e8e8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    padding: 24px;
+  }
+  .card{
+    background: #232f3e;
+    border-radius: 14px;
+    padding: 36px 40px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  }
+  .logo{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+  .logo svg{ flex-shrink:0; }
+  .logo-text{ font-size: 20px; font-weight: 700; color: #fff; }
+  .logo-sub{ font-size: 12px; color: #8096a7; margin-top: 2px; }
+  h2{ font-size: 17px; font-weight: 600; color: #fff; margin-bottom: 6px; }
+  p{ font-size: 13px; color: #8096a7; margin-bottom: 24px; line-height: 1.5; }
+  label{ display:block; font-size: 12px; color: #8096a7; margin-bottom: 6px; font-weight:500; text-transform:uppercase; letter-spacing:.5px; }
+  .field{ margin-bottom: 18px; }
+  input{
+    width: 100%;
+    background: #17212b;
+    border: 1px solid #344a5e;
+    border-radius: 8px;
+    color: #e8e8e8;
+    font-size: 14px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  input:focus{ border-color: #2b9cf2; }
+  input.error{ border-color: #e74c3c; }
+  .hint{ font-size: 11px; color: #8096a7; margin-top: 5px; }
+  .btn{
+    width: 100%;
+    background: #2b9cf2;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background .2s;
+  }
+  .btn:hover{ background: #1a85d9; }
+  .btn:disabled{ background: #344a5e; cursor:default; }
+  .status{ font-size: 13px; margin-top: 14px; text-align:center; min-height:20px; }
+  .status.ok{ color: #2ecc71; }
+  .status.err{ color: #e74c3c; }
+  .status.info{ color: #8096a7; }
+  .divider{ border-top: 1px solid #344a5e; margin: 20px 0; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+      <rect width="36" height="36" rx="9" fill="#2b9cf2"/>
+      <path d="M8 13h20M8 18h14M8 23h17" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <div class="logo-text">СеверФудс</div>
+      <div class="logo-sub">Система учёта питания</div>
+    </div>
+  </div>
+
+  <h2>Первоначальная настройка</h2>
+  <p>Введите данные для подключения к серверу синхронизации. Токен выдаётся администратором системы.</p>
+
+  <div class="field">
+    <label>Токен синхронизации</label>
+    <input id="token" type="password" placeholder="Вставьте токен из настроек сервера" autocomplete="off" spellcheck="false">
+    <div class="hint">Токен хранится в разделе «Настройки» на сервере SeverFoods</div>
+  </div>
+
+  <div class="field">
+    <label>URL сервера <span style="color:#8096a7;font-weight:400;text-transform:none">(необязательно)</span></label>
+    <input id="serverUrl" type="url" placeholder="https://www.severfoods.ru" value="https://www.severfoods.ru">
+    <div class="hint">Оставьте по умолчанию если не знаете</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <button class="btn" id="saveBtn" onclick="save()">Сохранить и запустить</button>
+  <div class="status info" id="status"></div>
+</div>
+
+<script>
+  // Pre-fill current values when reopened from Settings
+  window.electronSetup.getCurrent().then(d => {
+    if (d.token)     document.getElementById('token').value = d.token;
+    if (d.serverUrl) document.getElementById('serverUrl').value = d.serverUrl;
+  });
+
+  async function save() {
+    const token = document.getElementById('token').value.trim();
+    const serverUrl = document.getElementById('serverUrl').value.trim() || 'https://www.severfoods.ru';
+    const tokenEl = document.getElementById('token');
+    const btn = document.getElementById('saveBtn');
+    const status = document.getElementById('status');
+
+    tokenEl.classList.remove('error');
+
+    if (!token) {
+      tokenEl.classList.add('error');
+      tokenEl.focus();
+      status.className = 'status err';
+      status.textContent = 'Введите токен синхронизации';
+      return;
+    }
+
+    btn.disabled = true;
+    status.className = 'status info';
+    status.textContent = 'Проверка соединения…';
+
+    try {
+      const result = await window.electronSetup.saveConfig({ token, serverUrl });
+      if (result.ok) {
+        status.className = 'status ok';
+        status.textContent = '✅ Настройки сохранены. Запуск…';
+        setTimeout(() => window.electronSetup.finishSetup(), 800);
+      } else {
+        status.className = 'status err';
+        status.textContent = '❌ ' + (result.error || 'Ошибка сохранения');
+        btn.disabled = false;
+      }
+    } catch(e) {
+      status.className = 'status err';
+      status.textContent = '❌ ' + e.message;
+      btn.disabled = false;
+    }
+  }
+
+  document.addEventListener('keydown', e => { if(e.key === 'Enter') save(); });
+</script>
+</body>
+</html>
