@@ -10,7 +10,7 @@ Unicode true
 !define INSTALL_DIR  "$LOCALAPPDATA\SeverFoods"
 
 Name "${APP_NAME} ${APP_VERSION}"
-OutFile "dist\SeverFoods-Setup-${APP_VERSION}.exe"
+OutFile "dist/SeverFoods-Setup-${APP_VERSION}.exe"
 InstallDir "${INSTALL_DIR}"
 InstallDirRegKey HKCU "Software\${APP_NAME}" "InstallDir"
 RequestExecutionLevel user
@@ -21,8 +21,8 @@ SetCompressor /SOLID lzma
 !include "nsDialogs.nsh"
 !include "LogicLib.nsh"
 
-!define MUI_ICON     "public\assets\img\icon.ico"
-!define MUI_UNICON   "public\assets\img\icon.ico"
+!define MUI_ICON     "public/assets/img/icon.ico"
+!define MUI_UNICON   "public/assets/img/icon.ico"
 !define MUI_ABORTWARNING
 !define MUI_WELCOMEPAGE_TITLE   "Установка ${APP_NAME}"
 !define MUI_WELCOMEPAGE_TEXT    "Система учёта питания.$\n$\nАвтор: Пальченков Евгений Иванович$\nООО «Север»$\n$\nНажмите «Далее» для продолжения."
@@ -95,7 +95,40 @@ Section "Основные файлы" SecMain
   SectionIn RO
   SetOutPath "$INSTDIR"
 
-  File /r "dist\win-unpacked\"
+  ; Root files
+  File "dist/win-unpacked/SeverFoods.exe"
+  File "dist/win-unpacked/LICENSE.electron.txt"
+  File "dist/win-unpacked/LICENSES.chromium.html"
+  File "dist/win-unpacked/chrome_100_percent.pak"
+  File "dist/win-unpacked/chrome_200_percent.pak"
+  File "dist/win-unpacked/d3dcompiler_47.dll"
+  File "dist/win-unpacked/ffmpeg.dll"
+  File "dist/win-unpacked/icudtl.dat"
+  File "dist/win-unpacked/libEGL.dll"
+  File "dist/win-unpacked/libGLESv2.dll"
+  File "dist/win-unpacked/resources.pak"
+  File "dist/win-unpacked/snapshot_blob.bin"
+  File "dist/win-unpacked/v8_context_snapshot.bin"
+  File "dist/win-unpacked/vk_swiftshader.dll"
+  File "dist/win-unpacked/vk_swiftshader_icd.json"
+  File "dist/win-unpacked/vulkan-1.dll"
+
+  ; locales/
+  SetOutPath "$INSTDIR\locales"
+  File /r "dist/win-unpacked/locales/*"
+
+  ; resources/
+  SetOutPath "$INSTDIR\resources"
+  File "dist/win-unpacked/resources/app-update.yml"
+  File "dist/win-unpacked/resources/app.asar"
+  File "dist/win-unpacked/resources/elevate.exe"
+
+  ; resources/app.asar.unpacked/node_modules/...
+  SetOutPath "$INSTDIR\resources\app.asar.unpacked"
+  File /r "dist/win-unpacked/resources/app.asar.unpacked/"
+
+  ; Back to root for .env and uninstaller
+  SetOutPath "$INSTDIR"
 
   ; Write .env with sync token
   FileOpen $0 "$INSTDIR\.env" w
