@@ -129,7 +129,7 @@ body { background: #e8edf2; padding: 20px; }
 @media print {
     @page {
         size: A4 portrait;
-        margin: 8mm 8mm 8mm 8mm;
+        margin: 8mm;
     }
     body { background: white; padding: 0; margin: 0; }
     .toolbar, .legend, .sel-bar { display: none !important; }
@@ -138,16 +138,15 @@ body { background: #e8edf2; padding: 20px; }
     .card-wrap:not(.selected) { display: none !important; }
     .grid.none-selected .card-wrap { display: block !important; }
 
-    /* A4 printable area: 210-16=194mm wide, 297-16=281mm tall
-       ISO 7810 ID-1: 85.6 × 54mm
-       2 cols × gap: 2×85.6 + 1×4 = 175.2mm < 194mm ✓
-       5 rows × gap: 5×54  + 4×4 = 286mm  > 281mm — use 53mm height
-       5×53 + 4×4 = 281mm ✓ */
+    /* A4 − 16mm margins = 194×281mm
+       ISO 7810 ID-1: 85.6×54mm
+       2 cols: 2×85.6 + 4mm gap = 175.2mm ✓
+       5 rows: 5×54  + 4×4mm gap = 286mm — не влезает, уменьшаем gap до 2.75mm
+       5×54 + 4×2.75 = 281mm ✓                                                 */
     .grid {
         display: grid;
         grid-template-columns: 85.6mm 85.6mm;
-        grid-template-rows: repeat(auto-fill, 54mm);
-        gap: 4mm;
+        gap: 2.75mm;
         width: 175.2mm;
         margin: 0 auto;
     }
@@ -159,9 +158,9 @@ body { background: #e8edf2; padding: 20px; }
         page-break-inside: avoid;
     }
     .card-wrap .qr-card {
-        width: 85.6mm;
-        height: 54mm;
-        border-radius: 3mm;
+        width: 85.6mm !important;
+        height: 54mm !important;
+        border-radius: 2.5mm;
         box-shadow: none;
         outline: none !important;
         opacity: 1 !important;
@@ -169,23 +168,40 @@ body { background: #e8edf2; padding: 20px; }
         display: flex;
         flex-direction: column;
     }
-    /* Scale card internals to fit 54mm height */
+
+    /* Header — compact, ~12mm tall */
     .card-header {
-        padding: 5px 8px 4px;
+        padding: 2mm 3mm;
         flex-shrink: 0;
     }
-    .card-header img { height: 22px; max-width: 50px; }
-    .brand-name  { font-size: 10px; }
-    .brand-sub   { font-size: 7px; }
-    .role-badge  { font-size: 7px; padding: 2px 5px; }
-    .card-body   { padding: 5px 8px 5px 6px; flex: 1; align-items: center; }
-    .qr-img      { width: 68px; height: 68px; }
-    .emp-name    { font-size: 9px; margin-bottom: 2px; }
-    .emp-meta    { font-size: 8px; }
-    .status-pill { font-size: 7px; padding: 1px 5px; }
-    .expires     { font-size: 7px; }
-    .qr-code-txt { font-size: 6.5px; margin-top: 3px; }
-    .status-row  { margin-top: 4px; gap: 4px; }
+    .card-header img { height: 6mm; max-width: 14mm; }
+    .brand-name  { font-size: 8pt; letter-spacing: .2px; }
+    .brand-sub   { font-size: 5.5pt; }
+    .role-badge  { font-size: 5.5pt; padding: 1px 4px; }
+
+    /* Body — fills remaining ~42mm, QR gets full height */
+    .card-body {
+        flex: 1;
+        padding: 2mm 3mm 2mm 2mm;
+        gap: 0;
+        align-items: center;
+        overflow: hidden;
+    }
+    /* QR: fill body height (54-12mm header - 4mm padding = ~38mm) */
+    .qr-wrap { flex-shrink: 0; }
+    .qr-img {
+        width: 35mm;
+        height: 35mm;
+        border-radius: 1.5mm;
+        padding: 1mm;
+    }
+    .emp-info    { padding-left: 2.5mm; }
+    .emp-name    { font-size: 8pt; margin-bottom: 1mm; line-height: 1.2; }
+    .emp-meta    { font-size: 6.5pt; margin-bottom: 0.5mm; }
+    .status-row  { margin-top: 1.5mm; gap: 1.5mm; }
+    .status-pill { font-size: 6pt; padding: 0.5mm 2mm; }
+    .expires     { font-size: 6pt; }
+    .qr-code-txt { font-size: 5.5pt; margin-top: 1mm; }
 
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
