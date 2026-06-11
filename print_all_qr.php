@@ -235,6 +235,10 @@ body { background: #e8edf2; padding: 20px; }
         <?php endif; ?>
     </form>
 
+    <input id="empSearch" placeholder="Поиск сотрудника..."
+        style="padding:8px 14px;border-radius:8px;font-family:'Onest',sans-serif;font-size:13px;font-weight:600;border:1.5px solid #e2e8f0;background:#fff;cursor:text;color:#0f172a;min-width:220px"
+        oninput="filterCards(this.value)">
+
     <button class="btn-print" id="printBtn" onclick="doPrint()">
         <svg style="display:inline;vertical-align:middle;margin-right:6px" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
@@ -261,7 +265,11 @@ body { background: #e8edf2; padding: 20px; }
 
 <div class="grid none-selected" id="grid">
 <?php foreach ($employees as $emp): ?>
-    <div class="card-wrap" onclick="toggleCard(this)">
+    <div class="card-wrap"
+         data-name="<?= htmlspecialchars(mb_strtolower($emp['full_name'] ?? '')) ?>"
+         data-org="<?= htmlspecialchars(mb_strtolower($emp['organization'] ?? '')) ?>"
+         data-dep="<?= htmlspecialchars(mb_strtolower($emp['department'] ?? '')) ?>"
+         onclick="toggleCard(this)">
         <input type="checkbox" class="card-cb" onclick="event.stopPropagation(); toggleCard(this.closest('.card-wrap'))">
         <?= renderCard($emp, 220) ?>
     </div>
@@ -303,23 +311,45 @@ function toggleCard(wrap) {
     updateUI();
 }
 
+function visibleCards() {
+    return [...grid.querySelectorAll('.card-wrap')].filter(w => w.style.display !== 'none');
+}
+
 function selectAll() {
-    grid.querySelectorAll('.card-wrap').forEach(w => w.classList.add('selected'));
+    visibleCards().forEach(w => w.classList.add('selected'));
     updateUI();
 }
 
 function selectNone() {
-    grid.querySelectorAll('.card-wrap').forEach(w => w.classList.remove('selected'));
+    visibleCards().forEach(w => w.classList.remove('selected'));
     updateUI();
 }
 
 function invertSelection() {
-    grid.querySelectorAll('.card-wrap').forEach(w => w.classList.toggle('selected'));
+    visibleCards().forEach(w => w.classList.toggle('selected'));
     updateUI();
 }
 
 function doPrint() {
     window.print();
+}
+
+function filterCards(q) {
+    const term = q.trim().toLowerCase();
+    const cards = grid.querySelectorAll('.card-wrap');
+    if (term.length < 3) {
+        // Show all cards, restore display
+        cards.forEach(w => { w.style.display = ''; });
+    } else {
+        cards.forEach(w => {
+            const name = (w.dataset.name || '');
+            const org  = (w.dataset.org  || '');
+            const dep  = (w.dataset.dep  || '');
+            const match = name.includes(term) || org.includes(term) || dep.includes(term);
+            w.style.display = match ? '' : 'none';
+        });
+    }
+    updateUI();
 }
 
 updateUI();

@@ -863,6 +863,31 @@ function deleteChatUser(id, name) {
     .catch(() => alert('Ошибка сервера'));
 }
 </script>
+<!-- Employee stats modal -->
+<div class="modal-overlay" id="empStatsModal">
+    <div class="modal-box" style="max-width:420px">
+        <div class="modal-header">
+            <div class="modal-title"><i class="fas fa-chart-bar"></i> Статистика питания</div>
+            <button class="modal-close" onclick="closeModal('empStatsModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="padding:20px">
+            <div id="empStatsName" style="font-size:15px;font-weight:700;margin-bottom:16px;color:var(--text-main)"></div>
+            <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap">
+                <div>
+                    <label style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;display:block;margin-bottom:4px">С</label>
+                    <input type="date" id="empStatsFrom" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Onest',sans-serif;font-size:13px;color:var(--text-main);background:var(--bg-card)">
+                </div>
+                <div>
+                    <label style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;display:block;margin-bottom:4px">По</label>
+                    <input type="date" id="empStatsTo" style="padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Onest',sans-serif;font-size:13px;color:var(--text-main);background:var(--bg-card)">
+                </div>
+                <button onclick="loadEmpStats()" style="padding:8px 16px;background:var(--blue-700);color:#fff;border:none;border-radius:8px;font-family:'Onest',sans-serif;font-size:13px;font-weight:600;cursor:pointer">Показать</button>
+            </div>
+            <div id="empStatsResult"></div>
+        </div>
+    </div>
+</div>
+
 <script src="assets/js/qr-input.js"></script>
 <script src="assets/js/app.js?v=2"></script>
 </body>

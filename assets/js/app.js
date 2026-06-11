@@ -390,7 +390,9 @@ function renderOrgRows(list) {
         const nameJson = JSON.stringify(e.full_name).replace(/[<>&]/g, function(s){return s==='<'?'\u003c':s==='>'?'\u003e':'\u0026';});
 
         const safeName = escHtml(e.full_name).replace(/'/g, "\\'");
-        let actions = '<button class="btn-sm green" title="Пропустить вручную"'
+        let actions = '<button class="btn-sm" title="Статистика питания"'
+            + ' onclick="openEmpStats(' + e.id + ',\'' + safeName + '\')"><i class="fas fa-chart-bar"></i></button>'
+            + '<button class="btn-sm green" title="Пропустить вручную"'
             + ' onclick="openManualFromOrg(' + e.id + ',\'' + safeName + '\')"><i class="fas fa-sign-out-alt"></i></button>'
             + '<a class="btn-sm" href="print_qr.php?id=' + e.id + '" target="_blank" title="Печать QR"><i class="fas fa-print"></i></a>';
 
@@ -456,6 +458,7 @@ function renderEmployeeTable(list) {
             </td>
             <td>
                 <div class="emp-actions">
+                    <button class="btn-sm" title="Статистика питания" onclick="openEmpStats(${e.id},'${escHtml(e.full_name.replace(/'/g,"\\'"))}')"><i class='fas fa-chart-bar'></i></button>
                     <button class="btn-sm green" title="Пропустить вручную"
                         onclick="openManualModal(${e.id},'${escHtml(e.full_name.replace(/'/g,"\\'"))}')"><i class='fas fa-sign-out-alt'></i></button>
                     <a class="btn-sm" href="print_qr.php?id=${e.id}" target="_blank" title="Печать QR"><i class='fas fa-print'></i></a>
@@ -1088,6 +1091,50 @@ function openExcelExport(e) {
     window.open(url, '_blank');
 }
 window.openExcelExport = openExcelExport;
+
+// ── Employee Stats Modal ──────────────────────────────
+let _empStatsId = null;
+
+function openEmpStats(id, name) {
+    _empStatsId = id;
+    const modal = $('empStatsModal');
+    if (!modal) return;
+    $('empStatsName').textContent = name;
+    // Default dates: last 30 days
+    const to   = new Date();
+    const from = new Date(); from.setDate(from.getDate() - 30);
+    $('empStatsFrom').value = from.toISOString().slice(0,10);
+    $('empStatsTo').value   = to.toISOString().slice(0,10);
+    $('empStatsResult').innerHTML = '';
+    openModal('empStatsModal');
+    loadEmpStats();
+}
+
+async function loadEmpStats() {
+    if (!_empStatsId) return;
+    const from = $('empStatsFrom').value;
+    const to   = $('empStatsTo').value;
+    const res  = $('empStatsResult');
+    res.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:20px"><i class="fas fa-spinner fa-spin"></i> Загрузка...</div>';
+    try {
+        const d = await fetch(`api/employee_stats.php?id=${_empStatsId}&from=${from}&to=${to}`).then(r=>r.json());
+        if (!d.ok) { res.innerHTML = '<div class="empty">Ошибка загрузки</div>'; return; }
+        const mealLabels = { breakfast:'Завтрак', lunch:'Обед', dinner:'Ужин', snack:'Перекус' };
+        const rows = Object.entries(d.by_type).map(([k,v]) =>
+            `<tr><td>${mealLabels[k]||k}</td><td><strong>${v}</strong></td></tr>`
+        ).join('');
+        res.innerHTML = `
+            <div style="text-align:center;margin-bottom:16px">
+                <div style="font-size:32px;font-weight:800;color:var(--blue-700)">${d.total}</div>
+                <div style="font-size:12px;color:var(--text-3)">приёмов пищи за период</div>
+            </div>
+            ${rows ? `<table class="emp-table"><thead><tr><th>Тип</th><th>Кол-во</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty" style="padding:12px">Нет данных за период</div>'}`;
+    } catch(e) {
+        res.innerHTML = '<div class="empty">Ошибка сети</div>';
+    }
+}
+window.openEmpStats = openEmpStats;
+window.loadEmpStats = loadEmpStats;
 
 // ── Expose globals for inline onclick ───────────────
 window.showManualPass     = openManualModal;
