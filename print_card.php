@@ -46,11 +46,12 @@ function cardColors(string $role = ''): array {
 }
 
 function renderCard(array $emp, int $qrSize = 240): string {
-    $qrUrl   = generateQRCode($emp['qr_code'], $qrSize);
     $valid   = isQrCodeValid($emp);
     $expires = $emp['qr_expires_at'] ? date('d.m.Y', strtotime($emp['qr_expires_at'])) : 'Бессрочно';
     $role    = $emp['role'] ?? '';
     $c       = cardColors($role);
+    $qrText  = htmlspecialchars($emp['qr_code'], ENT_QUOTES);
+    $fgColor = ltrim($c['header'], '#');
 
     ob_start(); ?>
 <div class="qr-card" style="background:<?= $c['bg'] ?>;border-color:<?= $c['border'] ?>">
@@ -66,7 +67,7 @@ function renderCard(array $emp, int $qrSize = 240): string {
     </div>
     <div class="card-body">
         <div class="qr-wrap">
-            <img class="qr-img" src="<?= htmlspecialchars($qrUrl) ?>" alt="QR">
+            <canvas class="qr-img" data-qr="<?= $qrText ?>" data-qr-fg="#<?= $fgColor ?>"></canvas>
         </div>
         <div class="emp-info">
             <div class="emp-name"><?= htmlspecialchars($emp['full_name']) ?></div>

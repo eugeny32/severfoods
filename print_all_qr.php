@@ -268,7 +268,19 @@ body { background: #e8edf2; padding: 20px; }
 <?php endforeach; ?>
 </div>
 
+<script src="assets/js/qrious.min.js"></script>
 <script>
+function initQR() {
+    document.querySelectorAll('canvas[data-qr]').forEach(function(c) {
+        if (c._qrDone) return;
+        c._qrDone = true;
+        var size = Math.round(c.offsetWidth) || 220;
+        new QRious({ element: c, value: c.dataset.qr, size: size * 2,
+            foreground: c.dataset.qrFg || '#003366', background: '#ffffff', padding: 6 });
+    });
+}
+window.addEventListener('load', initQR);
+
 const grid = document.getElementById('grid');
 const selCountEl = document.getElementById('selCount');
 const printLabel = document.getElementById('printLabel');

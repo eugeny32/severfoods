@@ -57,5 +57,14 @@ body {
     </svg>
     Распечатать карточку
 </button>
+<script src="assets/js/qrious.min.js"></script>
+<script>
+document.querySelectorAll('canvas[data-qr]').forEach(function(c) {
+    var size = Math.round(c.offsetWidth) || 220;
+    new QRious({ element: c, value: c.dataset.qr, size: size * 2,
+        foreground: c.dataset.qrFg || '#003366', background: '#ffffff', padding: 6 });
+    c.style.width = c.style.height = '';
+});
+</script>
 </body>
 </html>
