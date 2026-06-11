@@ -4,7 +4,7 @@
 Unicode true
 
 !define APP_NAME     "SeverFoods"
-!define APP_VERSION  "1.1.0"
+!define APP_VERSION  "1.2.0"
 !define APP_EXE      "SeverFoods.exe"
 !define APP_GUID     "{0E402777-487E-58D5-817C-42180FAB4AE7}"
 !define INSTALL_DIR  "$LOCALAPPDATA\SeverFoods"
