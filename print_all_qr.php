@@ -127,25 +127,66 @@ body { background: #e8edf2; padding: 20px; }
 }
 
 @media print {
-    body { background: white; padding: 6mm; }
+    @page {
+        size: A4 portrait;
+        margin: 8mm 8mm 8mm 8mm;
+    }
+    body { background: white; padding: 0; margin: 0; }
     .toolbar, .legend, .sel-bar { display: none !important; }
     .card-wrap { cursor: default; }
-    .card-cb  { display: none !important; }
+    .card-cb   { display: none !important; }
     .card-wrap:not(.selected) { display: none !important; }
     .grid.none-selected .card-wrap { display: block !important; }
+
+    /* A4 printable area: 210-16=194mm wide, 297-16=281mm tall
+       ISO 7810 ID-1: 85.6 × 54mm
+       2 cols × gap: 2×85.6 + 1×4 = 175.2mm < 194mm ✓
+       5 rows × gap: 5×54  + 4×4 = 286mm  > 281mm — use 53mm height
+       5×53 + 4×4 = 281mm ✓ */
     .grid {
         display: grid;
-        grid-template-columns: repeat(3, 85.6mm);
+        grid-template-columns: 85.6mm 85.6mm;
+        grid-template-rows: repeat(auto-fill, 54mm);
         gap: 4mm;
+        width: 175.2mm;
+        margin: 0 auto;
+    }
+    .card-wrap {
+        width: 85.6mm;
+        height: 54mm;
+        overflow: hidden;
+        break-inside: avoid;
+        page-break-inside: avoid;
     }
     .card-wrap .qr-card {
         width: 85.6mm;
-        border-radius: 4mm;
+        height: 54mm;
+        border-radius: 3mm;
         box-shadow: none;
         outline: none !important;
         opacity: 1 !important;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
     }
-    .qr-img { width: 96px; height: 96px; }
+    /* Scale card internals to fit 54mm height */
+    .card-header {
+        padding: 5px 8px 4px;
+        flex-shrink: 0;
+    }
+    .card-header img { height: 22px; max-width: 50px; }
+    .brand-name  { font-size: 10px; }
+    .brand-sub   { font-size: 7px; }
+    .role-badge  { font-size: 7px; padding: 2px 5px; }
+    .card-body   { padding: 5px 8px 5px 6px; flex: 1; align-items: center; }
+    .qr-img      { width: 68px; height: 68px; }
+    .emp-name    { font-size: 9px; margin-bottom: 2px; }
+    .emp-meta    { font-size: 8px; }
+    .status-pill { font-size: 7px; padding: 1px 5px; }
+    .expires     { font-size: 7px; }
+    .qr-code-txt { font-size: 6.5px; margin-top: 3px; }
+    .status-row  { margin-top: 4px; gap: 4px; }
+
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 </style>
