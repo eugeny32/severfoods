@@ -390,10 +390,12 @@ function renderOrgRows(list) {
         const nameJson = JSON.stringify(e.full_name).replace(/[<>&]/g, function(s){return s==='<'?'\u003c':s==='>'?'\u003e':'\u0026';});
 
         const safeName = escHtml(e.full_name).replace(/'/g, "\\'");
-        let actions = '<button class="btn-sm" title="Статистика питания"'
-            + ' data-stats-id="' + e.id + '" data-stats-name="' + escHtml(e.full_name) + '"><i class="fas fa-chart-bar"></i></button>'
-            + '<button class="btn-sm green" title="Пропустить вручную"'
+        let actions = '<button class="btn-sm green" title="Пропустить вручную"'
             + ' onclick="openManualFromOrg(' + e.id + ',\'' + safeName + '\')"><i class="fas fa-sign-out-alt"></i></button>'
+            + '<button class="btn-sm" title="Статистика питания"'
+            + ' data-stats-id="' + e.id + '" data-stats-name="' + escHtml(e.full_name) + '">'
+            + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8"/><line x1="12" y1="12" x2="12" y2="16"/></svg>'
+            + '</button>'
             + '<a class="btn-sm" href="print_qr.php?id=' + e.id + '" target="_blank" title="Печать QR"><i class="fas fa-print"></i></a>';
 
         if (window.isAdmin) {
@@ -458,9 +460,11 @@ function renderEmployeeTable(list) {
             </td>
             <td>
                 <div class="emp-actions">
-                    <button class="btn-sm" title="Статистика питания" data-stats-id="${e.id}" data-stats-name="${escHtml(e.full_name)}"><i class='fas fa-chart-bar'></i></button>
                     <button class="btn-sm green" title="Пропустить вручную"
                         onclick="openManualModal(${e.id},'${escHtml(e.full_name).replace(/'/g,"&#39;")}');event.stopPropagation()"><i class='fas fa-sign-out-alt'></i></button>
+                    <button class="btn-sm" title="Статистика питания" data-stats-id="${e.id}" data-stats-name="${escHtml(e.full_name)}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
+                    </button>
                     <a class="btn-sm" href="print_qr.php?id=${e.id}" target="_blank" title="Печать QR" onclick="event.stopPropagation()"><i class='fas fa-print'></i></a>
                     ${window.isAdmin ? `
                         <button class="btn-sm" title="Редактировать" onclick="openEditModal(${e.id});event.stopPropagation()"><i class='fas fa-pencil-alt'></i></button>
