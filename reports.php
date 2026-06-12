@@ -50,8 +50,30 @@ $logs = $stmt->fetchAll();
 
 // CSV убран — используем Excel (export_excel.php)
 
-// Статистика
-$by_type  = ['breakfast'=>0,'lunch'=>0,'dinner'=>0,'night'=>0,'total'=>0];
+// Сводный отчёт по сотрудникам: кол-во приёмов + уникальных дней, сгруппировано по организациям
+$sqlEmp = "SELECT e.id, e.full_name, e.organization, e.department,
+                  COUNT(*) as meals,
+                  COUNT(DISTINCT DATE(ml.scanned_at)) as days
+           FROM meal_logs ml
+           JOIN employees e ON ml.employee_id = e.id
+           WHERE DATE(ml.scanned_at) BETWEEN :start AND :end
+             AND ml.access_granted = 1";
+$paramsEmp = [':start' => $start_date, ':end' => $end_date];
+if ($meal_type !== 'all')  { $sqlEmp .= " AND ml.meal_type = :mt";        $paramsEmp[':mt']  = $meal_type; }
+if ($filter_point_id)      { $sqlEmp .= " AND ml.meal_point_id = :pid";   $paramsEmp[':pid'] = $filter_point_id; }
+$sqlEmp .= " GROUP BY e.id, e.full_name, e.organization, e.department
+             ORDER BY e.organization, e.full_name";
+$stmtEmp = $pdo->prepare($sqlEmp);
+$stmtEmp->execute($paramsEmp);
+$empStats = $stmtEmp->fetchAll(PDO::FETCH_ASSOC);
+
+// Группируем по организациям
+$empByOrg = [];
+foreach ($empStats as $row) {
+    $empByOrg[$row['organization']][] = $row;
+}
+ksort($empByOrg);
+
 $by_point = [];
 $by_org   = [];
 $by_date  = [];
@@ -167,7 +189,9 @@ arsort($by_point); arsort($by_org);
         <div style="display:flex;gap:8px">
             <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Применить</button>
             <a href="export_excel.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
-               class="btn btn-success" style="background:#1d6f42"><i class="fas fa-table"></i> Excel</a>
+               class="btn btn-success" style="background:#1d6f42"><i class="fas fa-table"></i> Excel (детали)</a>
+            <a href="export_excel_employees.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
+               class="btn btn-success" style="background:#15803d"><i class="fas fa-users"></i> Excel (сотрудники)</a>
         </div>
     </div>
 </form>
@@ -280,6 +304,68 @@ arsort($by_point); arsort($by_org);
             </tbody>
         </table>
     </div>
+    <?php endif; ?>
+</div>
+
+<!-- Сводный отчёт по сотрудникам -->
+<div class="card" style="margin-top:20px">
+    <div class="card-header">
+        <div class="card-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+            Сводный отчёт по сотрудникам (<?= count($empStats) ?> чел.)
+        </div>
+        <a href="export_excel_employees.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
+           class="btn btn-success" style="background:#15803d;padding:6px 14px;font-size:12px;text-decoration:none;border-radius:7px;color:#fff;font-weight:600">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+            Excel
+        </a>
+    </div>
+
+    <?php if (empty($empStats)): ?>
+    <div class="empty"><div class="empty-icon">👤</div>Нет данных за выбранный период</div>
+    <?php else: ?>
+    <?php foreach ($empByOrg as $org => $rows):
+        $orgMeals = array_sum(array_column($rows, 'meals'));
+        $orgDays  = array_sum(array_column($rows, 'days'));
+    ?>
+    <div style="margin-bottom:24px">
+        <div style="background:var(--bg-input,#f1f5f9);padding:8px 16px;border-radius:8px;margin-bottom:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span style="font-size:13px;font-weight:700;color:var(--text-main)"><?= htmlspecialchars($org ?: '—') ?></span>
+            <span style="font-size:11px;color:var(--text-3);margin-left:auto"><?= count($rows) ?> сотр. · <?= $orgMeals ?> приёмов · <?= $orgDays ?> дней</span>
+        </div>
+        <div class="report-table-wrap">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px">#</th>
+                        <th>ФИО</th>
+                        <th>Подразделение</th>
+                        <th style="text-align:center">Приёмов пищи</th>
+                        <th style="text-align:center">Дней в столовой</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($rows as $i => $r): ?>
+                    <tr>
+                        <td style="color:var(--text-3);font-size:12px"><?= $i+1 ?></td>
+                        <td style="font-weight:600"><?= htmlspecialchars($r['full_name']) ?></td>
+                        <td style="color:var(--text-3)"><?= htmlspecialchars($r['department'] ?: '—') ?></td>
+                        <td style="text-align:center;font-weight:700;font-variant-numeric:tabular-nums"><?= $r['meals'] ?></td>
+                        <td style="text-align:center;font-weight:700;font-variant-numeric:tabular-nums;color:var(--blue-700,#003366)"><?= $r['days'] ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+                <tfoot>
+                    <tr style="background:var(--bg-input,#f8fafc)">
+                        <td colspan="3" style="font-weight:700;font-size:12px;padding:8px 12px">Итого по организации</td>
+                        <td style="text-align:center;font-weight:800"><?= $orgMeals ?></td>
+                        <td style="text-align:center;font-weight:800;color:var(--blue-700,#003366)"><?= $orgDays ?></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    <?php endforeach; ?>
     <?php endif; ?>
 </div>
 
