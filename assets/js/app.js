@@ -391,7 +391,7 @@ function renderOrgRows(list) {
 
         const safeName = escHtml(e.full_name).replace(/'/g, "\\'");
         let actions = '<button class="btn-sm" title="Статистика питания"'
-            + ' onclick="openEmpStats(' + e.id + ',\'' + safeName + '\')"><i class="fas fa-chart-bar"></i></button>'
+            + ' data-stats-id="' + e.id + '" data-stats-name="' + escHtml(e.full_name) + '"><i class="fas fa-chart-bar"></i></button>'
             + '<button class="btn-sm green" title="Пропустить вручную"'
             + ' onclick="openManualFromOrg(' + e.id + ',\'' + safeName + '\')"><i class="fas fa-sign-out-alt"></i></button>'
             + '<a class="btn-sm" href="print_qr.php?id=' + e.id + '" target="_blank" title="Печать QR"><i class="fas fa-print"></i></a>';
@@ -405,7 +405,7 @@ function renderOrgRows(list) {
                 + ' onclick="closeModal(&quot;orgModal&quot;);openDeleteModal(' + e.id + ',' + nameJson + ')"><i class="fas fa-trash"></i></button>';
         }
 
-        return '<tr>'
+        return '<tr class="emp-row" data-emp-id="' + e.id + '" data-emp-name="' + escHtml(e.full_name) + '" style="cursor:pointer" title="Статистика питания">'
             + '<td><div class="emp-name">' + escHtml(e.full_name) + '</div>'
             + '<div class="emp-org">' + escHtml(e.department || '') + '</div></td>'
             + '<td><span class="qr-status-badge ' + sc + '">' + (statusLabels[sc] || sc) + '</span>'
@@ -446,7 +446,7 @@ function renderEmployeeTable(list) {
         const expiryWarn = e.expiry_status === 'expired' ? '<i class="fas fa-circle" style="color:#e53935"></i>' : (e.expiry_status === 'warning' ? '<i class="fas fa-circle" style="color:#f59e0b"></i>' : '');
 
         return `
-        <tr>
+        <tr class="emp-row" data-emp-id="${e.id}" data-emp-name="${escHtml(e.full_name)}" style="cursor:pointer" title="Статистика питания">
             <td>
                 <div class="emp-name">${escHtml(e.full_name)}</div>
                 <div class="emp-org">${escHtml(e.organization)}${e.department ? ' · '+escHtml(e.department) : ''}</div>
@@ -458,13 +458,13 @@ function renderEmployeeTable(list) {
             </td>
             <td>
                 <div class="emp-actions">
-                    <button class="btn-sm" title="Статистика питания" onclick="openEmpStats(${e.id},'${escHtml(e.full_name.replace(/'/g,"\\'"))}')"><i class='fas fa-chart-bar'></i></button>
+                    <button class="btn-sm" title="Статистика питания" data-stats-id="${e.id}" data-stats-name="${escHtml(e.full_name)}"><i class='fas fa-chart-bar'></i></button>
                     <button class="btn-sm green" title="Пропустить вручную"
-                        onclick="openManualModal(${e.id},'${escHtml(e.full_name.replace(/'/g,"\\'"))}')"><i class='fas fa-sign-out-alt'></i></button>
-                    <a class="btn-sm" href="print_qr.php?id=${e.id}" target="_blank" title="Печать QR"><i class='fas fa-print'></i></a>
+                        onclick="openManualModal(${e.id},'${escHtml(e.full_name).replace(/'/g,"&#39;")}');event.stopPropagation()"><i class='fas fa-sign-out-alt'></i></button>
+                    <a class="btn-sm" href="print_qr.php?id=${e.id}" target="_blank" title="Печать QR" onclick="event.stopPropagation()"><i class='fas fa-print'></i></a>
                     ${window.isAdmin ? `
-                        <button class="btn-sm" title="Редактировать" onclick="openEditModal(${e.id})"><i class='fas fa-pencil-alt'></i></button>
-                        ${window.isSuperAdmin ? `<button class="btn-sm danger" title="Удалить" onclick="openDeleteModal(${e.id},'${escHtml(e.full_name.replace(/'/g,"\\'"))}')"><i class='fas fa-trash'></i></button>` : ''}
+                        <button class="btn-sm" title="Редактировать" onclick="openEditModal(${e.id});event.stopPropagation()"><i class='fas fa-pencil-alt'></i></button>
+                        ${window.isSuperAdmin ? `<button class="btn-sm danger" title="Удалить" onclick="openDeleteModal(${e.id},'${escHtml(e.full_name).replace(/'/g,"&#39;")}');event.stopPropagation()"><i class='fas fa-trash'></i></button>` : ''}
                     ` : ''}
                 </div>
             </td>
@@ -811,6 +811,18 @@ document.addEventListener('click', e => {
         const id = e.target.id;
         closeModal(id || '');
         if (!id) { e.target.classList.remove('open'); }
+        return;
+    }
+    // Stats button or clickable emp-row → open stats modal
+    const statsBtn = e.target.closest('[data-stats-id]');
+    if (statsBtn) {
+        e.stopPropagation();
+        openEmpStats(+statsBtn.dataset.statsId, statsBtn.dataset.statsName);
+        return;
+    }
+    const empRow = e.target.closest('.emp-row[data-emp-id]');
+    if (empRow && !e.target.closest('button') && !e.target.closest('a')) {
+        openEmpStats(+empRow.dataset.empId, empRow.dataset.empName);
     }
 });
 // Close on Escape
