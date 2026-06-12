@@ -669,14 +669,6 @@ function doSend(): void
 
     if (!$roomId || !isMember($roomId)) err('Forbidden', 403);
 
-    // Для каналов: только owner/admin могут писать
-    $roomStmt = $pdo->prepare("SELECT type FROM chat_rooms WHERE id=?");
-    $roomStmt->execute([$roomId]);
-    $rType = $roomStmt->fetchColumn();
-    if ($rType === 'channel' && !in_array(getRoomRole($roomId), ['owner','admin'], true)) {
-        err('Only admins can post in channels', 403);
-    }
-
     if (!$text && !$fileId) err('Empty message');
     if (mb_strlen($text) > 8000) err('Message too long');
 
