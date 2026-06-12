@@ -1099,6 +1099,8 @@ function openEmpStats(id, name) {
     _empStatsId = id;
     const modal = $('empStatsModal');
     if (!modal) return;
+    // Close any open modal (orgModal, empTableWrap parent, etc.) first
+    closeAllModals();
     $('empStatsName').textContent = name;
     // Default dates: last 30 days
     const to   = new Date();
@@ -1133,8 +1135,9 @@ async function loadEmpStats() {
         res.innerHTML = '<div class="empty">Ошибка сети</div>';
     }
 }
-window.openEmpStats = openEmpStats;
-window.loadEmpStats = loadEmpStats;
+window.openEmpStats   = openEmpStats;
+window.loadEmpStats   = loadEmpStats;
+window.closeAllModals = closeAllModals;
 
 // ── Expose globals for inline onclick ───────────────
 window.showManualPass     = openManualModal;
