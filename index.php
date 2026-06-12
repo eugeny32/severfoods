@@ -167,8 +167,10 @@ $allEmployeesJson = array_map(function($e) {
         </div>
         <div class="header-actions">
             <?php if ($is_admin): ?>
-            <a href="chat.php" class="btn-logout" style="background:rgba(0,85,165,.15);color:var(--blue-400,#1a6fc4);border-color:rgba(0,85,165,.25)" title="Чат администраторов">
-                <i class="fas fa-comments"></i> Чат
+            <a href="chat.php" class="btn-logout" id="chatNavBtn" style="background:rgba(0,85,165,.15);color:var(--blue-400,#1a6fc4);border-color:rgba(0,85,165,.25);position:relative" title="Чат администраторов">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="display:inline;vertical-align:middle;margin-right:5px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Чат
+                <span id="chatUnreadBadge" style="display:none;position:absolute;top:-6px;right:-6px;background:#e53e3e;color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;padding:0 4px;line-height:18px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.25)"></span>
             </a>
             <?php endif; ?>
             <a href="?logout=1" class="btn-logout"
@@ -890,5 +892,30 @@ function deleteChatUser(id, name) {
 
 <script src="assets/js/qr-input.js"></script>
 <script src="assets/js/app.js?v=2"></script>
+<?php if ($is_admin): ?>
+<script>
+(function() {
+    const badge = document.getElementById('chatUnreadBadge');
+    if (!badge) return;
+    function fetchUnread() {
+        fetch('api/chat.php?action=rooms', {credentials:'same-origin'})
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data || !data.rooms) return;
+                const total = data.rooms.reduce((s, r) => s + (parseInt(r.unread) || 0), 0);
+                if (total > 0) {
+                    badge.textContent = total > 99 ? '99+' : total;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            })
+            .catch(() => {});
+    }
+    fetchUnread();
+    setInterval(fetchUnread, 30000);
+})();
+</script>
+<?php endif; ?>
 </body>
 </html>
