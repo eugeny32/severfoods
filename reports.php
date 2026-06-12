@@ -74,6 +74,7 @@ foreach ($empStats as $row) {
 }
 ksort($empByOrg);
 
+$by_type  = ['total' => 0];
 $by_point = [];
 $by_org   = [];
 $by_date  = [];
