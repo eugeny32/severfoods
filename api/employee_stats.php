@@ -30,10 +30,20 @@ foreach ($rows as $r) {
     $total += (int)$r['cnt'];
 }
 
+// Count unique days served (any number of meals in a day = 1 day)
+$stmtDays = $pdo->prepare("
+    SELECT COUNT(DISTINCT DATE(scanned_at)) as days
+    FROM meal_logs
+    WHERE employee_id = ? AND DATE(scanned_at) BETWEEN ? AND ?
+");
+$stmtDays->execute([$id, $from, $to]);
+$days = (int)$stmtDays->fetchColumn();
+
 header('Content-Type: application/json');
 echo json_encode([
     'ok'     => true,
     'name'   => $emp['full_name'],
     'total'  => $total,
+    'days'   => $days,
     'by_type'=> $byType,
 ]);

@@ -1142,11 +1142,17 @@ async function loadEmpStats() {
             `<tr><td>${mealLabels[k]||k}</td><td><strong>${v}</strong></td></tr>`
         ).join('');
         res.innerHTML = `
-            <div style="text-align:center;margin-bottom:16px">
-                <div style="font-size:32px;font-weight:800;color:var(--blue-700)">${d.total}</div>
-                <div style="font-size:12px;color:var(--text-3)">приёмов пищи за период</div>
+            <div style="display:flex;gap:12px;margin-bottom:16px">
+                <div style="flex:1;text-align:center;background:var(--bg-input,#f8fafc);border-radius:10px;padding:12px 8px">
+                    <div style="font-size:30px;font-weight:800;color:var(--blue-700,#003366)">${d.total}</div>
+                    <div style="font-size:11px;color:var(--text-3,#64748b);margin-top:2px">приёмов пищи</div>
+                </div>
+                <div style="flex:1;text-align:center;background:var(--bg-input,#f8fafc);border-radius:10px;padding:12px 8px">
+                    <div style="font-size:30px;font-weight:800;color:var(--blue-700,#003366)">${d.days}</div>
+                    <div style="font-size:11px;color:var(--text-3,#64748b);margin-top:2px">дней в столовой</div>
+                </div>
             </div>
-            ${rows ? `<table class="emp-table"><thead><tr><th>Тип</th><th>Кол-во</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty" style="padding:12px">Нет данных за период</div>'}`;
+            ${rows ? `<table class="emp-table"><thead><tr><th>Тип приёма</th><th>Кол-во</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty" style="padding:12px">Нет данных за период</div>'}`;
     } catch(e) {
         res.innerHTML = '<div class="empty">Ошибка сети</div>';
     }
