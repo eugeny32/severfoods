@@ -893,18 +893,192 @@ function deleteChatUser(id, name) {
 <script src="assets/js/qr-input.js"></script>
 <script src="assets/js/app.js?v=2"></script>
 <?php if ($is_admin): ?>
+<style>
+#chatToastContainer {
+    position: fixed; bottom: 20px; left: 20px; z-index: 99999;
+    display: flex; flex-direction: column-reverse; gap: 10px;
+    pointer-events: none;
+}
+.chat-toast {
+    pointer-events: all;
+    display: flex; align-items: flex-start; gap: 10px;
+    background: #fff; border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.18);
+    padding: 12px 14px; max-width: 320px; min-width: 240px;
+    cursor: pointer; position: relative; overflow: hidden;
+    animation: toastIn .3s cubic-bezier(.22,1,.36,1);
+    border: 1.5px solid #e2e8f0;
+    font-family: 'Onest', 'Segoe UI', sans-serif;
+}
+.chat-toast.hiding {
+    animation: toastOut .3s ease forwards;
+}
+@keyframes toastIn  { from { opacity:0; transform:translateX(-30px) scale(.95); } to { opacity:1; transform:none; } }
+@keyframes toastOut { to   { opacity:0; transform:translateX(-30px) scale(.95); } }
+.chat-toast-bar {
+    position: absolute; bottom: 0; left: 0; height: 3px;
+    background: var(--tc, #003366); border-radius: 0 0 0 12px;
+    animation: toastBar 6s linear forwards;
+}
+@keyframes toastBar { from { width:100%; } to { width:0%; } }
+.chat-toast-avatar {
+    width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 15px; font-weight: 700;
+}
+.chat-toast-body { flex: 1; min-width: 0; }
+.chat-toast-room  { font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 2px; }
+.chat-toast-sender{ font-size: 13px; font-weight: 700; color: #0f172a; }
+.chat-toast-text  { font-size: 12px; color: #374151; margin-top: 2px;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-toast-close {
+    position: absolute; top: 8px; right: 10px;
+    font-size: 16px; color: #94a3b8; cursor: pointer;
+    line-height: 1; background: none; border: none; padding: 0;
+}
+.chat-toast-close:hover { color: #475569; }
+</style>
+
+<div id="chatToastContainer"></div>
+
 <script>
 (function() {
-    const badge = document.getElementById('chatUnreadBadge');
+    const badge      = document.getElementById('chatUnreadBadge');
+    const container  = document.getElementById('chatToastContainer');
     if (!badge) return;
-    function fetchUnread() {
+
+    // roomStates: { id: { unread, lastMsgId, name, type, color } }
+    const roomStates = {};
+    let initialized  = false;
+
+    /* ── Sound (Web Audio API) ── */
+    function playNotif() {
+        try {
+            const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+            [[660, 0], [880, 0.13], [1100, 0.26]].forEach(([freq, delay]) => {
+                const osc = ctx.createOscillator();
+                const g   = ctx.createGain();
+                osc.connect(g); g.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                const t = ctx.currentTime + delay;
+                g.gain.setValueAtTime(0, t);
+                g.gain.linearRampToValueAtTime(0.25, t + 0.03);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+                osc.start(t); osc.stop(t + 0.3);
+            });
+        } catch(e) {}
+    }
+
+    /* ── Toast ── */
+    function showToast(room, msg) {
+        const color   = room.avatar_color || '#003366';
+        const initial = (room.name || '?').charAt(0).toUpperCase();
+        const toast   = document.createElement('div');
+        toast.className = 'chat-toast';
+        toast.style.setProperty('--tc', color);
+        toast.innerHTML =
+            '<div class="chat-toast-avatar" style="background:' + color + '">' + initial + '</div>' +
+            '<div class="chat-toast-body">' +
+                '<div class="chat-toast-room">' + esc(room.name || 'Чат') + '</div>' +
+                '<div class="chat-toast-sender">' + esc(msg.sender_name) + '</div>' +
+                '<div class="chat-toast-text">' + esc(previewText(msg)) + '</div>' +
+            '</div>' +
+            '<button class="chat-toast-close" title="Закрыть">×</button>' +
+            '<div class="chat-toast-bar"></div>';
+
+        toast.addEventListener('click', function(e) {
+            if (e.target.classList.contains('chat-toast-close')) { dismiss(toast); return; }
+            window.location.href = 'chat.php';
+        });
+        toast.querySelector('.chat-toast-close').addEventListener('click', function(e) {
+            e.stopPropagation(); dismiss(toast);
+        });
+
+        container.appendChild(toast);
+        const tid = setTimeout(() => dismiss(toast), 6000);
+        toast._tid = tid;
+    }
+
+    function dismiss(toast) {
+        clearTimeout(toast._tid);
+        toast.classList.add('hiding');
+        toast.addEventListener('animationend', () => toast.remove(), {once: true});
+    }
+
+    function previewText(msg) {
+        if (msg.msg_type === 'image') return '📷 Фото';
+        if (msg.msg_type === 'file')  return '📎 ' + (msg.orig_name || 'Файл');
+        if (msg.msg_type === 'video') return '🎥 Видео';
+        if (msg.msg_type === 'audio') return '🎵 Аудио';
+        return msg.body || '';
+    }
+
+    function esc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    /* ── Fetch new messages for a room ── */
+    function fetchNewMsgs(room, afterId) {
+        if (room.type === 'direct') return; // DM — только звук, без тоста
+        fetch('api/chat.php?action=messages&room_id=' + room.id + '&after=' + afterId + '&limit=5', {credentials:'same-origin'})
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data || !data.messages) return;
+                data.messages
+                    .filter(m => m.msg_type !== 'system' && m.sender_id != 0)
+                    .forEach(m => showToast(room, m));
+            })
+            .catch(() => {});
+    }
+
+    /* ── Main poll ── */
+    function poll() {
         fetch('api/chat.php?action=rooms', {credentials:'same-origin'})
             .then(r => r.ok ? r.json() : null)
             .then(data => {
                 if (!data || !data.rooms) return;
-                const total = data.rooms.reduce((s, r) => s + (parseInt(r.unread) || 0), 0);
-                if (total > 0) {
-                    badge.textContent = total > 99 ? '99+' : total;
+
+                let totalUnread = 0;
+                let hasNew = false;
+
+                data.rooms.forEach(room => {
+                    const id     = room.id;
+                    const unread = parseInt(room.unread) || 0;
+                    totalUnread += unread;
+
+                    if (!initialized) {
+                        // Первый запрос — запоминаем состояние, не показываем тосты
+                        roomStates[id] = { unread, name: room.name, type: room.type, avatar_color: room.avatar_color };
+                        return;
+                    }
+
+                    const prev = roomStates[id];
+                    if (!prev) {
+                        // Новая комната появилась
+                        roomStates[id] = { unread, name: room.name, type: room.type, avatar_color: room.avatar_color };
+                        if (unread > 0) {
+                            hasNew = true;
+                            fetchNewMsgs(room, 0);
+                        }
+                        return;
+                    }
+
+                    if (unread > prev.unread) {
+                        hasNew = true;
+                        // lastMsgId = нужен для запроса; берём из room.last_read_id если есть
+                        const afterId = room.last_read_id || 0;
+                        fetchNewMsgs(room, afterId);
+                    }
+                    roomStates[id] = { unread, name: room.name, type: room.type, avatar_color: room.avatar_color };
+                });
+
+                if (!initialized) { initialized = true; }
+                else if (hasNew) { playNotif(); }
+
+                // Обновляем badge
+                if (totalUnread > 0) {
+                    badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
                     badge.style.display = 'inline-block';
                 } else {
                     badge.style.display = 'none';
@@ -912,8 +1086,9 @@ function deleteChatUser(id, name) {
             })
             .catch(() => {});
     }
-    fetchUnread();
-    setInterval(fetchUnread, 30000);
+
+    poll();
+    setInterval(poll, 30000);
 })();
 </script>
 <?php endif; ?>
