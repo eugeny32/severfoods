@@ -944,3 +944,5 @@ body.flash-error   { animation: flashError   .5s ease; }
     .stat-num { font-size: 18px; }
     .stat-icon-row { font-size: 15px; }
 }
+
+@keyframes spin { to { transform: rotate(360deg); } }

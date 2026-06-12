@@ -97,7 +97,7 @@ function showNotif(data) {
     if (!notif) return;
 
     const type    = data.success ? 'success' : (data.code === 'ALREADY_ATE' ? 'warning' : 'error');
-    const icons   = { success:'<i class="fas fa-check-circle"></i>', warning:'<i class="fas fa-exclamation-triangle"></i>', error:'<i class="fas fa-times-circle"></i>', info:'<i class="fas fa-info-circle"></i>' };
+    const icons   = { success:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg>', warning:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12" y2="17"/></svg>', error:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>', info:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="8"/></svg>' };
     const icon    = icons[type] || '•';
 
     let title = data.message || '';
@@ -108,8 +108,8 @@ function showNotif(data) {
         sub = [
             emp.organization,
             data.meal_type ? getMealName(data.meal_type) : '',
-            data.price ? '<i class="fas fa-coins"></i> ' + data.price : '',
-            data.point ? '<i class="fas fa-map-marker-alt"></i> ' + data.point : '',
+            data.price ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1110.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg> ' + data.price : '',
+            data.point ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> ' + data.point : '',
         ].filter(Boolean).join(' · ');
     }
 
@@ -155,14 +155,14 @@ function setScannerMode(active) {
     if (active) {
         pill?.classList.remove('off'); pill?.classList.add('on');
         dot?.classList.remove('off');
-        if (badge) { badge.className = 'mode-badge'; badge.innerHTML = '<i class="fas fa-crosshairs"></i> Режим сканирования'; }
+        if (badge) { badge.className = 'mode-badge'; badge.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/></svg> Режим сканирования'; }
         if (manBtn) manBtn.style.display = 'none';
         inp.classList.add('scanner-active');
         inp.placeholder = 'Наведите сканер на QR-код…';
     } else {
         pill?.classList.remove('on'); pill?.classList.add('off');
         dot?.classList.add('off');
-        if (badge) { badge.className = 'mode-badge manual'; badge.innerHTML = '<i class="fas fa-keyboard"></i> Ручной ввод'; }
+        if (badge) { badge.className = 'mode-badge manual'; badge.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg> Ручной ввод'; }
         if (manBtn) manBtn.style.display = 'inline-flex';
         inp.classList.remove('scanner-active');
         inp.placeholder = 'Введите QR-код вручную…';
@@ -339,7 +339,7 @@ function openOrgModal(org) {
     const bodyEl  = $('orgModalBody');
     if (!titleEl || !bodyEl) return;
 
-    titleEl.innerHTML = '<i class="fas fa-users"></i> ' + org;
+    titleEl.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> ' + org;
 
     // Нормализуем: trim + collapse spaces + decode HTML entities
     function normalizeOrg(s) {
@@ -357,7 +357,7 @@ function openOrgModal(org) {
         .sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'));
 
     if (!list.length) {
-        bodyEl.innerHTML = '<div class="empty"><div class="empty-icon"><i class="fas fa-user"></i></div>Нет сотрудников</div>';
+        bodyEl.innerHTML = '<div class="empty"><div class="empty-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>Нет сотрудников</div>';
     } else {
         bodyEl.innerHTML = `
             <div style="font-size:12px;color:var(--text-3);padding:0 0 10px;border-bottom:1px solid var(--border);margin-bottom:12px">
@@ -384,27 +384,27 @@ function renderOrgRows(list) {
     const statusLabels = { active:'Активен', expired:'Истёк', blocked:'Заблок.' };
     return list.map(function(e) {
         const sc   = e.qr_status || 'active';
-        const warn = e.expiry_status === 'expired' ? '<i class="fas fa-circle" style="color:#e53935"></i>' : (e.expiry_status === 'warning' ? '<i class="fas fa-circle" style="color:#f59e0b"></i>' : '');
+        const warn = e.expiry_status === 'expired' ? '<svg width="8" height="8" viewBox="0 0 24 24" style="color:#e53935"><circle cx="12" cy="12" r="10" fill="currentColor"/></svg>' : (e.expiry_status === 'warning' ? '<svg width="8" height="8" viewBox="0 0 24 24" style="color:#f59e0b"><circle cx="12" cy="12" r="10" fill="currentColor"/></svg>' : '');
         const exp  = e.qr_expires_at
             ? '<div style="font-size:10px;color:#94a3b8;margin-top:2px">до ' + escHtml(e.qr_expires_at) + '</div>' : '';
         const nameJson = JSON.stringify(e.full_name).replace(/[<>&]/g, function(s){return s==='<'?'\u003c':s==='>'?'\u003e':'\u0026';});
 
         const safeName = escHtml(e.full_name).replace(/'/g, "\\'");
         let actions = '<button class="btn-sm green" title="Пропустить вручную"'
-            + ' onclick="openManualFromOrg(' + e.id + ',\'' + safeName + '\')"><i class="fas fa-sign-out-alt"></i></button>'
+            + ' onclick="openManualFromOrg(' + e.id + ',\'' + safeName + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>'
             + '<button class="btn-sm" title="Статистика питания"'
             + ' data-stats-id="' + e.id + '" data-stats-name="' + escHtml(e.full_name) + '">'
             + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8"/><line x1="12" y1="12" x2="12" y2="16"/></svg>'
             + '</button>'
-            + '<a class="btn-sm" href="print_qr.php?id=' + e.id + '" target="_blank" title="Печать QR"><i class="fas fa-print"></i></a>';
+            + '<a class="btn-sm" href="print_qr.php?id=' + e.id + '" target="_blank" title="Печать QR"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></a>';
 
         if (window.isAdmin) {
             actions += '<button class="btn-sm" title="Редактировать"'
-                + ' onclick="closeModal(&quot;orgModal&quot;);openEditModal(' + e.id + ')"><i class="fas fa-pencil-alt"></i></button>';
+                + ' onclick="closeModal(&quot;orgModal&quot;);openEditModal(' + e.id + ')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
         }
         if (window.isSuperAdmin) {
             actions += '<button class="btn-sm danger" title="Удалить"'
-                + ' onclick="closeModal(&quot;orgModal&quot;);openDeleteModal(' + e.id + ',' + nameJson + ')"><i class="fas fa-trash"></i></button>';
+                + ' onclick="closeModal(&quot;orgModal&quot;);openDeleteModal(' + e.id + ',' + nameJson + ')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>';
         }
 
         return '<tr class="emp-row" data-emp-id="' + e.id + '" data-emp-name="' + escHtml(e.full_name) + '" style="cursor:pointer" title="Статистика питания">'
@@ -445,7 +445,7 @@ function renderEmployeeTable(list) {
     tbody.innerHTML = list.map(e => {
         const statusClass = e.qr_status || 'active';
         const statusLabels = { active:'Активен', expired:'Истёк', blocked:'Заблок.' };
-        const expiryWarn = e.expiry_status === 'expired' ? '<i class="fas fa-circle" style="color:#e53935"></i>' : (e.expiry_status === 'warning' ? '<i class="fas fa-circle" style="color:#f59e0b"></i>' : '');
+        const expiryWarn = e.expiry_status === 'expired' ? '<svg width="8" height="8" viewBox="0 0 24 24" style="color:#e53935"><circle cx="12" cy="12" r="10" fill="currentColor"/></svg>' : (e.expiry_status === 'warning' ? '<svg width="8" height="8" viewBox="0 0 24 24" style="color:#f59e0b"><circle cx="12" cy="12" r="10" fill="currentColor"/></svg>' : '');
 
         return `
         <tr class="emp-row" data-emp-id="${e.id}" data-emp-name="${escHtml(e.full_name)}" style="cursor:pointer" title="Статистика питания">
@@ -461,14 +461,14 @@ function renderEmployeeTable(list) {
             <td>
                 <div class="emp-actions">
                     <button class="btn-sm green" title="Пропустить вручную"
-                        onclick="openManualModal(${e.id},'${escHtml(e.full_name).replace(/'/g,"&#39;")}');event.stopPropagation()"><i class='fas fa-sign-out-alt'></i></button>
+                        onclick="openManualModal(${e.id},'${escHtml(e.full_name).replace(/'/g,"&#39;")}');event.stopPropagation()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
                     <button class="btn-sm" title="Статистика питания" data-stats-id="${e.id}" data-stats-name="${escHtml(e.full_name)}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
                     </button>
-                    <a class="btn-sm" href="print_qr.php?id=${e.id}" target="_blank" title="Печать QR" onclick="event.stopPropagation()"><i class='fas fa-print'></i></a>
+                    <a class="btn-sm" href="print_qr.php?id=${e.id}" target="_blank" title="Печать QR" onclick="event.stopPropagation()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></a>
                     ${window.isAdmin ? `
-                        <button class="btn-sm" title="Редактировать" onclick="openEditModal(${e.id});event.stopPropagation()"><i class='fas fa-pencil-alt'></i></button>
-                        ${window.isSuperAdmin ? `<button class="btn-sm danger" title="Удалить" onclick="openDeleteModal(${e.id},'${escHtml(e.full_name).replace(/'/g,"&#39;")}');event.stopPropagation()"><i class='fas fa-trash'></i></button>` : ''}
+                        <button class="btn-sm" title="Редактировать" onclick="openEditModal(${e.id});event.stopPropagation()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                        ${window.isSuperAdmin ? `<button class="btn-sm danger" title="Удалить" onclick="openDeleteModal(${e.id},'${escHtml(e.full_name).replace(/'/g,"&#39;")}');event.stopPropagation()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>` : ''}
                     ` : ''}
                 </div>
             </td>
@@ -522,7 +522,7 @@ function confirmManualPass() {
 
 // ── Employee Modal (Add / Edit) ───────────────────────
 function openAddModal() {
-    $('empModalTitle').innerHTML = '<i class="fas fa-plus"></i> Добавление сотрудника';
+    $('empModalTitle').innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Добавление сотрудника';
     $('empForm').reset();
     $('editId').value = '';
     $('regenerateQrRow')?.setAttribute('style','display:none');
@@ -541,7 +541,7 @@ function openEditModal(id) {
     fetch('get_employee.php?id=' + id, { headers:{ 'X-Requested-With':'XMLHttpRequest' } })
     .then(r => r.json())
     .then(emp => {
-        $('empModalTitle').innerHTML = '<i class="fas fa-pencil-alt"></i> Редактирование';
+        $('empModalTitle').innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Редактирование';
         $('editId').value       = emp.id;
         $('empFullName').value  = emp.full_name || '';
         $('empBirthDate').value = emp.birth_date || '';
@@ -646,7 +646,7 @@ function closeDeleteModal() { closeModal('deleteModal'); }
 function confirmDelete() {
     if (!deleteId) return;
     const btn = $('confirmDeleteBtn');
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-hourglass-half"></i> Удаляю…'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14M5 2h14M17 22v-4.172a2 2 0 00-.586-1.414L12 12M7 22v-4.172a2 2 0 01.586-1.414L12 12M7 2v4.172a2 2 0 00.586 1.414L12 12M17 2v4.172a2 2 0 01-.586 1.414L12 12"/></svg> Удаляю…'; }
 
     fetch('delete_employee.php', {
         method:  'POST',
@@ -738,7 +738,7 @@ function addScheduleRow(data) {
             </div>
         </td>
         <td><input type="number" name="sort_order" value="${data?.sort_order||0}" style="width:50px" min="0"></td>
-        <td><button type="button" class="btn-sm danger" onclick="this.closest('tr').remove()" title="Удалить"><i class='fas fa-trash'></i></button></td>
+        <td><button type="button" class="btn-sm danger" onclick="this.closest('tr').remove()" title="Удалить"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button></td>
     `;
     tbody.appendChild(tr);
 }
@@ -774,10 +774,10 @@ function saveSchedule() {
     .then(data => {
         const msgEl = $('scheduleMsg');
         if (data.success) {
-            if (msgEl) { msgEl.className='msg success'; msgEl.innerHTML='<i class="fas fa-check-circle"></i> Расписание сохранено!'; }
+            if (msgEl) { msgEl.className='msg success'; msgEl.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg> Расписание сохранено!'; }
             setTimeout(() => closeModal('scheduleModal'), 1500);
         } else {
-            if (msgEl) { msgEl.className='msg error'; msgEl.innerHTML='<i class="fas fa-times-circle"></i> '+data.message; }
+            if (msgEl) { msgEl.className='msg error'; msgEl.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg> '+data.message; }
         }
     })
     .catch(() => {
@@ -1016,7 +1016,7 @@ function addScheduleRowTab(data) {
             </div>
         </td>
         <td><input type="number" name="sort_order" value="${(data&&data.sort_order!=null)?data.sort_order:0}" style="width:50px" min="0"></td>
-        <td><button type="button" class="btn-sm danger" onclick="this.closest('tr').remove()" title="Удалить строку"><i class='fas fa-trash'></i></button></td>
+        <td><button type="button" class="btn-sm danger" onclick="this.closest('tr').remove()" title="Удалить строку"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button></td>
     `;
     tbody.appendChild(tr);
 }
@@ -1059,7 +1059,7 @@ function saveScheduleTab() {
     }
 
     const saveBtn = $('saveScheduleTab');
-    if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fas fa-hourglass-half"></i> Сохраняю…'; }
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14M5 2h14M17 22v-4.172a2 2 0 00-.586-1.414L12 12M7 22v-4.172a2 2 0 01.586-1.414L12 12M7 2v4.172a2 2 0 00.586 1.414L12 12M17 2v4.172a2 2 0 01-.586 1.414L12 12"/></svg> Сохраняю…'; }
 
     fetch('api_schedule.php', {
         method:  'POST',
@@ -1075,20 +1075,20 @@ function saveScheduleTab() {
         return r.json();
     })
     .then(data => {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fas fa-save"></i> Сохранить'; }
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Сохранить'; }
         if (!msg) return;
         if (data && data.success) {
             msg.className = 'msg success';
-            msg.innerHTML = '<i class="fas fa-check-circle"></i> ' + (data.message || 'Расписание сохранено');
+            msg.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-5"/></svg> ' + (data.message || 'Расписание сохранено');
             setTimeout(() => { if (msg) msg.className = ''; }, 3000);
         } else {
             msg.className = 'msg error';
-            msg.innerHTML = '<i class="fas fa-times-circle"></i> ' + (data && data.message ? data.message : 'Неизвестная ошибка');
+            msg.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg> ' + (data && data.message ? data.message : 'Неизвестная ошибка');
         }
     })
     .catch(err => {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fas fa-save"></i> Сохранить'; }
-        if (msg) { msg.className='msg error'; msg.innerHTML='<i class="fas fa-times-circle"></i> Ошибка соединения: '+err.message; }
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Сохранить'; }
+        if (msg) { msg.className='msg error'; msg.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg> Ошибка соединения: '+err.message; }
     });
 }
 
@@ -1133,7 +1133,7 @@ async function loadEmpStats() {
     const from = $('empStatsFrom').value;
     const to   = $('empStatsTo').value;
     const res  = $('empStatsResult');
-    res.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:20px"><i class="fas fa-spinner fa-spin"></i> Загрузка...</div>';
+    res.innerHTML = '<div style="text-align:center;color:var(--text-3);padding:20px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg> Загрузка...</div>';
     try {
         const d = await fetch(`api/employee_stats.php?id=${_empStatsId}&from=${from}&to=${to}`).then(r=>r.json());
         if (!d.ok) { res.innerHTML = '<div class="empty">Ошибка загрузки</div>'; return; }
