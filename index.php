@@ -866,7 +866,7 @@ function deleteChatUser(id, name) {
             <div class="modal-title"><i class="fas fa-chart-bar"></i> Статистика питания</div>
             <button class="modal-close" onclick="closeModal('empStatsModal')"><i class="fas fa-times"></i></button>
         </div>
-        <div style="padding:20px">
+        <div style="padding:20px;max-height:80vh;overflow-y:auto">
             <div id="empStatsName" style="font-size:15px;font-weight:700;margin-bottom:16px;color:var(--text-main)"></div>
             <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap">
                 <div>
@@ -885,7 +885,7 @@ function deleteChatUser(id, name) {
                 <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
                     Сухой паёк / Выездное питание <span id="empRationsCount" style="color:var(--blue-700)"></span>
                 </div>
-                <div id="empRationsList" style="margin-bottom:10px"></div>
+                <div id="empRationsList" style="margin-bottom:10px;max-height:200px;overflow-y:auto"></div>
                 <div id="empRationsAdd" style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
                     <div>
                         <label style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;display:block;margin-bottom:3px">С</label>

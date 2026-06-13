@@ -1248,7 +1248,7 @@ async function addRation() {
 
 async function deleteRation(id) {
     const d = await fetch(`api/dry_rations.php?id=${id}`, { method:'DELETE' }).then(r=>r.json()).catch(()=>({ok:false}));
-    if (d.ok) loadRations();
+    if (d.ok) loadEmpStats();
 }
 
 window.openEmpStats   = openEmpStats;
