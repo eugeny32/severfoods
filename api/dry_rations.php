@@ -66,8 +66,8 @@ if ($method === 'POST') {
     $existing = (int)$cntStmt->fetchColumn();
     $newInPeriod = count(array_filter($dates, fn($d) => $d >= $statsFrom && $d <= $statsTo));
 
-    if ($existing + $newInPeriod > 5) {
-        echo json_encode(['ok'=>false,'error'=>'Превышен лимит 5 активных дней за период (уже: '.$existing.', добавляется: '.$newInPeriod.')']); exit;
+    if ($existing + $newInPeriod > 4) {
+        echo json_encode(['ok'=>false,'error'=>'Превышен лимит 4 дней за период (уже: '.$existing.', добавляется: '.$newInPeriod.')']); exit;
     }
 
     $inserted = 0; $skipped = 0;

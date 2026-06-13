@@ -1129,7 +1129,7 @@ async function loadEmpStats() {
     try {
         const d = await fetch(`api/employee_stats.php?id=${_empStatsId}&from=${from}&to=${to}`).then(r=>r.json());
         if (!d.ok) { res.innerHTML = '<div class="empty">Ошибка загрузки</div>'; return; }
-        const mealLabels = { breakfast:'Завтрак', lunch:'Обед', dinner:'Ужин', snack:'Перекус' };
+        const mealLabels = { breakfast:'Завтрак', lunch:'Обед', dinner:'Ужин', snack:'Перекус', night:'Ночное' };
         const rows = Object.entries(d.by_type).map(([k,v]) =>
             `<tr><td>${mealLabels[k]||k}</td><td><strong>${v}</strong></td></tr>`
         ).join('');
@@ -1182,8 +1182,8 @@ async function loadRations() {
         const typeLabels = { dry_ration:'Сухой паёк', field:'Выездное питание' };
         // Count only those within stats period for limit display
         const inPeriod = d.items.filter(r => r.ration_date >= from && r.ration_date <= to).length;
-        const atLimit = inPeriod >= 5;
-        countEl.textContent = `(${inPeriod}/5 в периоде${d.count > inPeriod ? ', всего: '+d.count : ''})`;
+        const atLimit = inPeriod >= 4;
+        countEl.textContent = `(${inPeriod}/4 в периоде${d.count > inPeriod ? ', всего: '+d.count : ''})`;
         countEl.style.color = atLimit ? '#dc2626' : 'var(--blue-700)';
         if (addBtn) { addBtn.style.opacity = atLimit ? '0.4' : '1'; addBtn.disabled = atLimit; }
 
