@@ -67,14 +67,16 @@ body{font-family:'Onest',sans-serif;background:#f1f5f9;color:#0f172a;min-height:
 <body>
 <div class="page-header">
     <div>
-        <h1>📥 Загрузка оффлайн-приложения</h1>
+        <h1><svg style="display:inline;vertical-align:middle;margin-right:8px;margin-bottom:2px" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Загрузка оффлайн-приложения</h1>
     </div>
     <a href="javascript:history.back()" class="back-btn">← Назад</a>
 </div>
 
 <div class="container">
 <div class="card">
-    <div class="app-icon">🖥️</div>
+    <div class="app-icon">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    </div>
     <div class="app-name">SeverFoods Offline</div>
     <div class="app-sub">Автономное приложение для точки питания · Windows</div>
 

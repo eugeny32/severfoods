@@ -47,7 +47,7 @@ hr{border:none;border-top:1.5px solid #e2e8f0;margin:24px 0}
 <body>
 <div class="page-header">
     <div>
-        <h1>📋 Справочное руководство</h1>
+        <h1><svg style="display:inline;vertical-align:middle;margin-right:8px;margin-bottom:2px" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>Справочное руководство</h1>
         <div class="sub">Система учёта питания СеверФудс · ООО «Север»</div>
     </div>
     <a href="javascript:history.back()" class="back-btn" style="margin-left:auto">← Назад</a>
@@ -101,9 +101,9 @@ hr{border:none;border-top:1.5px solid #e2e8f0;margin:24px 0}
 <h3 id="s23">2.3 Сканер QR (главная страница)</h3>
 <p>Основное рабочее место оператора. Сканер подключается как HID-клавиатура. Результаты:</p>
 <ul>
-<li>🟢 <strong>Зелёный</strong> — приём зафиксирован, выводятся ФИО и организация</li>
-<li>🟠 <strong>Оранжевый</strong> — повторный приём (уже питался сегодня)</li>
-<li>🔴 <strong>Красный</strong> — не найден, заблокирован или ошибка</li>
+<li><svg style="display:inline;vertical-align:middle;margin-right:5px" width="13" height="13" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#16a34a"/></svg><strong>Зелёный</strong> — приём зафиксирован, выводятся ФИО и организация</li>
+<li><svg style="display:inline;vertical-align:middle;margin-right:5px" width="13" height="13" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#d97706"/></svg><strong>Оранжевый</strong> — повторный приём (уже питался сегодня)</li>
+<li><svg style="display:inline;vertical-align:middle;margin-right:5px" width="13" height="13" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#dc2626"/></svg><strong>Красный</strong> — не найден, заблокирован или ошибка</li>
 </ul>
 
 <h3 id="s24">2.4 Сотрудники</h3>
@@ -116,12 +116,12 @@ hr{border:none;border-top:1.5px solid #e2e8f0;margin:24px 0}
 <p>Корпоративный мессенджер. Типы комнат: личные диалоги (DM), группы, каналы. Все участники могут писать в группах и каналах. Уведомления: бейдж на кнопке «Чат» + всплывающие тосты + звуковой перезвон.</p>
 
 <h3 id="s27">2.7 Статистика питания сотрудника</h3>
-<p>Открывается кнопкой 📊 в списке сотрудников. Показывает: общее число приёмов, дней питания (столовая + выездное), разбивку по типам. Блок <strong>Выездное питание</strong>:</p>
+<p>Открывается кнопкой <svg style="display:inline;vertical-align:middle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#003366" stroke-width="2.2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> в списке сотрудников. Показывает: общее число приёмов, дней питания (столовая + выездное), разбивку по типам. Блок <strong>Выездное питание</strong>:</p>
 <ul>
 <li>Добавление диапазоном дат (можно указывать будущие даты — командировки заранее), лимит <strong>4 дня</strong> за период</li>
-<li>🟢 Зелёный — сотрудник был на выезде (дата прошла)</li>
-<li>🟠 Оранжевый — запланировано (будущая дата)</li>
-<li>🔴 Красный — аннулировано: сотрудник явился в столовую в этот день</li>
+<li><svg style="display:inline;vertical-align:middle;margin-right:5px" width="13" height="13" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#16a34a"/></svg>Зелёный — сотрудник был на выезде (дата прошла)</li>
+<li><svg style="display:inline;vertical-align:middle;margin-right:5px" width="13" height="13" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#d97706"/></svg>Оранжевый — запланировано (будущая дата)</li>
+<li><svg style="display:inline;vertical-align:middle;margin-right:5px" width="13" height="13" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#dc2626"/></svg>Красный — аннулировано: сотрудник явился в столовую в этот день</li>
 </ul>
 
 <h2 id="s3">3. Оффлайн-приложение</h2>
