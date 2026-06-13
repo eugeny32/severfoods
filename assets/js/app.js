@@ -1191,11 +1191,31 @@ async function loadRations() {
             list.innerHTML = '<div style="font-size:12px;color:var(--text-3);margin-bottom:6px">Нет записей</div>';
         } else {
             list.innerHTML = d.items.map(r => {
-                const isFuture = r.ration_date > today;
-                return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
-                    <span style="font-size:13px;font-weight:600;min-width:90px;color:${isFuture?'#b45309':'inherit'}">${r.ration_date.split('-').reverse().join('.')}${isFuture?' ⏳':''}</span>
-                    <span style="font-size:12px;color:var(--text-3);flex:1">${typeLabels[r.ration_type]||r.ration_type}</span>
-                    <button onclick="deleteRation(${r.id})" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:16px;line-height:1;padding:2px 4px" title="Удалить">×</button>
+                const isFuture   = r.ration_date > today;
+                const isCancelled = r.status === 'cancelled';
+                // colour coding
+                let dotColor, dateColor, badge;
+                if (isCancelled) {
+                    dotColor  = '#dc2626';
+                    dateColor = '#dc2626';
+                    badge     = '<span style="font-size:10px;background:#fee2e2;color:#dc2626;border-radius:4px;padding:1px 5px;margin-left:4px">отменено — был в столовой</span>';
+                } else if (isFuture) {
+                    dotColor  = '#b45309';
+                    dateColor = '#b45309';
+                    badge     = '<span style="font-size:10px;background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;margin-left:4px">запланировано</span>';
+                } else {
+                    dotColor  = '#16a34a';
+                    dateColor = 'inherit';
+                    badge     = '<span style="font-size:10px;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;margin-left:4px">выполнено</span>';
+                }
+                const canDelete = !isCancelled;
+                return `<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border)">
+                    <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0"></span>
+                    <span style="font-size:13px;font-weight:700;min-width:82px;color:${dateColor}">${r.ration_date.split('-').reverse().join('.')}</span>
+                    <span style="font-size:12px;color:var(--text-3)">${typeLabels[r.ration_type]||r.ration_type}</span>
+                    ${badge}
+                    <span style="flex:1"></span>
+                    ${canDelete ? `<button onclick="deleteRation(${r.id})" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:16px;line-height:1;padding:2px 4px" title="Удалить">×</button>` : ''}
                 </div>`;
             }).join('');
         }

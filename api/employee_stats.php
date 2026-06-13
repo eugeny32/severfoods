@@ -52,10 +52,14 @@ try {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE KEY uq_emp_date (employee_id, ration_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    $stmtRat = $pdo->prepare("SELECT ration_date, ration_type FROM dry_rations WHERE employee_id=? AND ration_date BETWEEN ? AND ? ORDER BY ration_date");
+    // Add status column if missing (schema migration)
+    try { $pdo->exec("ALTER TABLE dry_rations ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active'"); } catch (PDOException $e) {}
+    try { $pdo->exec("ALTER TABLE dry_rations ADD COLUMN cancelled_at DATETIME DEFAULT NULL"); } catch (PDOException $e) {}
+    $stmtRat = $pdo->prepare("SELECT ration_date, ration_type, status FROM dry_rations WHERE employee_id=? AND ration_date BETWEEN ? AND ? ORDER BY ration_date");
     $stmtRat->execute([$id, $from, $to]);
     $rationItems = $stmtRat->fetchAll(PDO::FETCH_ASSOC);
-    $rationDays = count($rationItems);
+    // Only active (not cancelled) count toward days
+    $rationDays = count(array_filter($rationItems, fn($r) => $r['status'] === 'active'));
 } catch (PDOException $e) {}
 
 // Total days = unique cafeteria days + field/ration days not already covered
@@ -65,7 +69,7 @@ try {
     $stmtDates->execute([$id, $from, $to]);
     $cafeDates = array_column($stmtDates->fetchAll(PDO::FETCH_ASSOC), 'd');
 } catch (PDOException $e) {}
-$rationDatesOnly = array_column($rationItems, 'ration_date');
+$rationDatesOnly = array_column(array_filter($rationItems, fn($r) => $r['status'] === 'active'), 'ration_date');
 $allDays = array_unique(array_merge($cafeDates, $rationDatesOnly));
 $totalDays = count($allDays);
 

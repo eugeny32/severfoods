@@ -175,10 +175,10 @@ function processAccess(PDO $pdo, string $qr_code, ?string $ip = null): array
         $meal_point_id, $meal_point_name,
     ]);
 
-    // Аннулировать выездное питание на сегодня если сотрудник пришёл в столовую
+    // Аннулировать выездное питание на сегодня (отметить красным, не удалять)
     try {
         $pdo->prepare(
-            "DELETE FROM dry_rations WHERE employee_id=? AND ration_date=? AND ration_type='field'"
+            "UPDATE dry_rations SET status='cancelled', cancelled_at=NOW() WHERE employee_id=? AND ration_date=? AND ration_type='field' AND status='active'"
         )->execute([$employee['id'], date('Y-m-d')]);
     } catch (PDOException $e) {}
 
