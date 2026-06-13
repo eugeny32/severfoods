@@ -567,10 +567,13 @@ $allEmployeesJson = array_map(function($e) {
                     </div>
                     <?php
                     $dlDir = __DIR__ . '/offline/dist/';
-                    $dlLatest = null; $dlTime = 0;
+                    $dlLatest = null; $dlLatestVer = [0,0,0];
                     if (is_dir($dlDir)) {
                         foreach (glob($dlDir . '*.exe') as $f) {
-                            $t = filemtime($f); if ($t > $dlTime) { $dlTime = $t; $dlLatest = $f; }
+                            if (preg_match('/(\d+)\.(\d+)\.(\d+)/', basename($f), $m)) {
+                                $ver = [(int)$m[1],(int)$m[2],(int)$m[3]];
+                                if ($ver > $dlLatestVer) { $dlLatestVer = $ver; $dlLatest = $f; }
+                            }
                         }
                     }
                     if ($dlLatest):

@@ -4,14 +4,16 @@
  * Файлы дистрибутива кладите в папку downloads/ рядом с этим файлом.
  */
 
-// Найти последний .exe в папке downloads/
+// Найти .exe с максимальным номером версии в имени
 $dir = __DIR__ . '/offline/dist/';
 $latest = null;
-$latestTime = 0;
+$latestVer = [0,0,0];
 if (is_dir($dir)) {
     foreach (glob($dir . '*.exe') as $f) {
-        $t = filemtime($f);
-        if ($t > $latestTime) { $latestTime = $t; $latest = $f; }
+        if (preg_match('/(\d+)\.(\d+)\.(\d+)/', basename($f), $m)) {
+            $ver = [(int)$m[1], (int)$m[2], (int)$m[3]];
+            if ($ver > $latestVer) { $latestVer = $ver; $latest = $f; }
+        }
     }
 }
 $hasFile   = $latest !== null;
