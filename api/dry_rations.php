@@ -9,14 +9,14 @@ if (!isset($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['
 // Create table if not exists
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS dry_rations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        employee_id INTEGER NOT NULL,
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        employee_id INT NOT NULL,
         ration_date DATE NOT NULL,
         ration_type VARCHAR(20) NOT NULL DEFAULT 'dry_ration',
-        created_by INTEGER,
+        created_by INT DEFAULT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(employee_id, ration_date)
-    )");
+        UNIQUE KEY uq_emp_date (employee_id, ration_date)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 } catch (PDOException $e) {}
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -47,7 +47,9 @@ if ($method === 'POST') {
     if (!$empId || !$date) { echo json_encode(['ok'=>false,'error'=>'Нет данных']); exit; }
 
     // Check 5-day limit in selected period
-    $cnt = (int)$pdo->prepare("SELECT COUNT(*) FROM dry_rations WHERE employee_id=? AND ration_date BETWEEN ? AND ?")->execute([$empId, $from, $to]) ? $pdo->query("SELECT COUNT(*) FROM dry_rations WHERE employee_id=$empId AND ration_date BETWEEN '$from' AND '$to'")->fetchColumn() : 0;
+    $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM dry_rations WHERE employee_id=? AND ration_date BETWEEN ? AND ?");
+    $cntStmt->execute([$empId, $from, $to]);
+    $cnt = (int)$cntStmt->fetchColumn();
     if ($cnt >= 5) {
         echo json_encode(['ok'=>false,'error'=>'Превышен лимит 5 дней за период']); exit;
     }
