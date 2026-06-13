@@ -566,7 +566,7 @@ $allEmployeesJson = array_map(function($e) {
                         </div>
                     </div>
                     <?php
-                    $dlDir = __DIR__ . '/downloads/';
+                    $dlDir = __DIR__ . '/offline/dist/';
                     $dlLatest = null; $dlTime = 0;
                     if (is_dir($dlDir)) {
                         foreach (glob($dlDir . '*.exe') as $f) {
@@ -588,7 +588,7 @@ $allEmployeesJson = array_map(function($e) {
                     </a>
                     <?php else: ?>
                     <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e">
-                        Файл не найден. Поместите <code>SeverFoods-Setup-X.X.X.exe</code> в папку <code>downloads/</code> на сервере.
+                        Файл не найден. Поместите <code>SeverFoods-Setup-X.X.X.exe</code> в папку <code>offline/dist/</code> на сервере.
                     </div>
                     <a href="download.php" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:var(--bg-input);color:var(--text-main);border:1.5px solid var(--border);border-radius:10px;padding:10px 18px;font-size:14px;font-weight:600;text-decoration:none;justify-content:center">
                         Страница загрузки ↗

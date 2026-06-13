@@ -5,7 +5,7 @@
  */
 
 // Найти последний .exe в папке downloads/
-$dir = __DIR__ . '/downloads/';
+$dir = __DIR__ . '/offline/dist/';
 $latest = null;
 $latestTime = 0;
 if (is_dir($dir)) {
@@ -89,7 +89,7 @@ body{font-family:'Onest',sans-serif;background:#f1f5f9;color:#0f172a;min-height:
     <?php else: ?>
         <div class="no-file">
             <strong>Файл дистрибутива не найден.</strong><br>
-            Администратору: поместите файл <code>SeverFoods-Setup-X.X.X.exe</code> в папку <code>downloads/</code> на сервере.
+            Администратору: поместите файл <code>SeverFoods-Setup-X.X.X.exe</code> в папку <code>offline/dist/</code> на сервере.
         </div>
     <?php endif; ?>
 
