@@ -39,11 +39,28 @@ $stmtDays = $pdo->prepare("
 $stmtDays->execute([$id, $from, $to]);
 $days = (int)$stmtDays->fetchColumn();
 
+// Dry rations count in period
+try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS dry_rations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER NOT NULL,
+        ration_date DATE NOT NULL,
+        ration_type VARCHAR(20) NOT NULL DEFAULT 'dry_ration',
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(employee_id, ration_date)
+    )");
+} catch (PDOException $e) {}
+$stmtRat = $pdo->prepare("SELECT COUNT(*) FROM dry_rations WHERE employee_id=? AND ration_date BETWEEN ? AND ?");
+$stmtRat->execute([$id, $from, $to]);
+$rationDays = (int)$stmtRat->fetchColumn();
+
 header('Content-Type: application/json');
 echo json_encode([
-    'ok'     => true,
-    'name'   => $emp['full_name'],
-    'total'  => $total,
-    'days'   => $days,
-    'by_type'=> $byType,
+    'ok'          => true,
+    'name'        => $emp['full_name'],
+    'total'       => $total,
+    'days'        => $days,
+    'by_type'     => $byType,
+    'ration_days' => $rationDays,
 ]);

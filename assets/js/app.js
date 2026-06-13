@@ -549,7 +549,6 @@ function openEditModal(id) {
         $('empDept').value      = emp.department || '';
         $('empPos').value       = emp.position || '';
         $('empVjg').value       = emp.vjg_type || '';
-        $('empPrice').value     = emp.price || '';
         $('empExpires').value   = emp.qr_expires_at || '';
         $('empQrStatus').value  = emp.qr_status || 'active';
         $('empIsActive').checked = emp.is_active == 1;
@@ -587,7 +586,6 @@ document.addEventListener('DOMContentLoaded', () => {
             department:      $('empDept').value || '',
             position:        $('empPos').value  || '',
             vjg_type:        $('empVjg').value  || '',
-            price:           $('empPrice').value  || 0,
             qr_expires_at:   $('empExpires').value || null,
             qr_status:       $('empQrStatus').value,
             is_active:       $('empIsActive').checked ? 1 : 0,
@@ -624,14 +622,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // VJG → auto-fill price
-    const vjgSel = $('empVjg');
-    if (vjgSel) {
-        vjgSel.addEventListener('change', () => {
-            const opt = vjgSel.options[vjgSel.selectedIndex];
-            if (opt && opt.dataset.price) $('empPrice').value = opt.dataset.price;
-        });
-    }
 });
 
 // ── Delete Modal ──────────────────────────────────────
@@ -1153,12 +1143,80 @@ async function loadEmpStats() {
                 </div>
             </div>
             ${rows ? `<table class="emp-table"><thead><tr><th>Тип приёма</th><th>Кол-во</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty" style="padding:12px">Нет данных за период</div>'}`;
+
+        // Show rations section
+        const sec = $('empRationsSection');
+        if (sec) {
+            sec.style.display = '';
+            // Set default date to today for new entry
+            const dateInput = $('empRationDate');
+            if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0,10);
+            loadRations();
+        }
     } catch(e) {
         res.innerHTML = '<div class="empty">Ошибка сети</div>';
     }
 }
+
+async function loadRations() {
+    if (!_empStatsId) return;
+    const from = $('empStatsFrom').value;
+    const to   = $('empStatsTo').value;
+    const list = $('empRationsList');
+    const countEl = $('empRationsCount');
+    const addBtn = $('empRationAddBtn');
+    try {
+        const d = await fetch(`api/dry_rations.php?employee_id=${_empStatsId}&from=${from}&to=${to}`).then(r=>r.json());
+        if (!d.ok) return;
+        const typeLabels = { dry_ration:'Сухой паёк', field:'Выездное питание' };
+        const atLimit = d.count >= 5;
+        countEl.textContent = `(${d.count}/5)`;
+        countEl.style.color = atLimit ? '#dc2626' : 'var(--blue-700)';
+        if (addBtn) addBtn.style.opacity = atLimit ? '0.4' : '1';
+
+        if (!d.items.length) {
+            list.innerHTML = '<div style="font-size:12px;color:var(--text-3);margin-bottom:6px">Нет записей за период</div>';
+        } else {
+            list.innerHTML = d.items.map(r => `
+                <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+                    <span style="font-size:13px;font-weight:600;min-width:90px">${r.ration_date.split('-').reverse().join('.')}</span>
+                    <span style="font-size:12px;color:var(--text-3);flex:1">${typeLabels[r.ration_type]||r.ration_type}</span>
+                    <button onclick="deleteRation(${r.id})" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:16px;line-height:1;padding:2px 4px" title="Удалить">×</button>
+                </div>`).join('');
+        }
+    } catch(e) {}
+}
+
+async function addRation() {
+    if (!_empStatsId) return;
+    const from = $('empStatsFrom').value;
+    const to   = $('empStatsTo').value;
+    const date = $('empRationDate').value;
+    const type = $('empRationType').value;
+    const msgEl = $('empRationsMsg');
+
+    if (!date) { msgEl.textContent = 'Укажите дату'; msgEl.style.display=''; return; }
+    msgEl.style.display = 'none';
+
+    const d = await fetch('api/dry_rations.php', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ employee_id: _empStatsId, ration_date: date, ration_type: type, from, to }),
+    }).then(r=>r.json()).catch(()=>({ok:false,error:'Ошибка сети'}));
+
+    if (!d.ok) { msgEl.textContent = d.error || 'Ошибка'; msgEl.style.display=''; return; }
+    loadRations();
+}
+
+async function deleteRation(id) {
+    const d = await fetch(`api/dry_rations.php?id=${id}`, { method:'DELETE' }).then(r=>r.json()).catch(()=>({ok:false}));
+    if (d.ok) loadRations();
+}
+
 window.openEmpStats   = openEmpStats;
 window.loadEmpStats   = loadEmpStats;
+window.addRation      = addRation;
+window.deleteRation   = deleteRation;
 window.closeAllModals = closeAllModals;
 
 // ── Expose globals for inline onclick ───────────────

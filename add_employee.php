@@ -33,9 +33,13 @@ $is_active    = isset($data['is_active']) ? (int)(bool)$data['is_active'] : 1;
 $role         = !empty($data['role']) ? $data['role'] : null;
 $assigned_point_id = !empty($data['assigned_point_id']) ? intval($data['assigned_point_id']) : null;
 
+// Генерируем случайную дату рождения если не указана
+if (empty($birth_date)) {
+    $birth_date = sprintf('%04d-%02d-%02d', rand(1960, 1990), rand(1, 12), rand(1, 28));
+}
+
 $errors = [];
 if (empty($full_name))    $errors[] = 'ФИО обязательно';
-if (empty($birth_date))   $errors[] = 'Дата рождения обязательна';
 if (empty($organization)) $errors[] = 'Организация обязательна';
 
 if (!empty($errors)) {

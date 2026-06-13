@@ -78,7 +78,7 @@ function renderCard(array $emp, int $qrSize = 240): string {
             <div class="emp-meta"><?= htmlspecialchars($emp['department']) ?></div>
             <?php endif; ?>
             <?php if (!empty($emp['vjg_type'])): ?>
-            <div class="emp-meta">ВЖГ: <?= htmlspecialchars($emp['vjg_type']) ?></div>
+            <div class="emp-meta">ВЖГ <?= htmlspecialchars($emp['vjg_type']) ?></div>
             <?php endif; ?>
             <div class="status-row">
                 <span class="status-pill <?= $valid ? 'pill-ok' : 'pill-err' ?>"

@@ -658,8 +658,8 @@ $allEmployeesJson = array_map(function($e) {
                     <input type="text" id="empFullName" required placeholder="Иванов Иван Иванович">
                 </div>
                 <div class="form-group">
-                    <label>Дата рождения *</label>
-                    <input type="date" id="empBirthDate" required>
+                    <label>Дата рождения</label>
+                    <input type="date" id="empBirthDate">
                 </div>
                 <div class="form-group">
                     <label>Организация *</label>
@@ -675,22 +675,16 @@ $allEmployeesJson = array_map(function($e) {
                     <input type="text" id="empPos" placeholder="Инженер">
                 </div>
                 <div class="form-group">
-                    <label>ВЖГ</label>
+                    <label>Вахтовый жилой городок</label>
                     <select id="empVjg">
                         <option value="">— Выберите ВЖГ —</option>
                         <?php foreach ($vjgList as $vjg): ?>
-                        <option value="<?= htmlspecialchars($vjg['vjg_code']) ?>"
-                            data-price="<?= $vjg['price'] ?>">
+                        <option value="<?= htmlspecialchars($vjg['vjg_code']) ?>">
                             <?= htmlspecialchars($vjg['vjg_name']) ?>
                             (<?= htmlspecialchars($vjg['vjg_code']) ?>)
-                            — <?= number_format($vjg['price'],0,'.',' ') ?> ₽
                         </option>
                         <?php endforeach; ?>
                     </select>
-                </div>
-                <div class="form-group">
-                    <label>Цена (₽)</label>
-                    <input type="number" id="empPrice" step="0.01" min="0" placeholder="0">
                 </div>
                 <div class="form-group">
                     <label>Срок действия QR</label>
@@ -886,6 +880,22 @@ function deleteChatUser(id, name) {
                 <button onclick="loadEmpStats()" style="padding:8px 16px;background:var(--blue-700);color:#fff;border:none;border-radius:8px;font-family:'Onest',sans-serif;font-size:13px;font-weight:600;cursor:pointer">Показать</button>
             </div>
             <div id="empStatsResult"></div>
+            <!-- Dry rations section -->
+            <div id="empRationsSection" style="margin-top:16px;border-top:1.5px solid var(--border);padding-top:16px;display:none">
+                <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
+                    Сухой паёк / Выездное питание <span id="empRationsCount" style="color:var(--blue-700)"></span>
+                </div>
+                <div id="empRationsList" style="margin-bottom:10px"></div>
+                <div id="empRationsAdd" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                    <input type="date" id="empRationDate" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Onest',sans-serif;font-size:13px;color:var(--text-main);background:var(--bg-card)">
+                    <select id="empRationType" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Onest',sans-serif;font-size:13px;color:var(--text-main);background:var(--bg-card)">
+                        <option value="dry_ration">Сухой паёк</option>
+                        <option value="field">Выездное питание</option>
+                    </select>
+                    <button onclick="addRation()" id="empRationAddBtn" style="padding:7px 14px;background:var(--blue-700);color:#fff;border:none;border-radius:8px;font-family:'Onest',sans-serif;font-size:13px;font-weight:600;cursor:pointer">+ Добавить</button>
+                </div>
+                <div id="empRationsMsg" style="font-size:12px;color:#dc2626;margin-top:6px;display:none"></div>
+            </div>
         </div>
     </div>
 </div>

@@ -57,7 +57,7 @@ if ($meal_type !== 'all') $title .= ' / ' . getMealTypeName($meal_type);
 
 $headers = [
     'Дата', 'Время', 'ФИО', 'Организация', 'Отдел',
-    'ВЖГ', 'Цена (руб)', 'Тип питания', 'Точка питания', 'Оператор'
+    'Вахтовый жилой городок', 'Тип питания', 'Точка питания', 'Оператор'
 ];
 
 // Строим содержимое файла
@@ -84,7 +84,7 @@ echo '<Worksheet ss:Name="Питание">' . "\n";
 echo '<Table>' . "\n";
 
 // Ширины колонок
-$widths = [80, 60, 200, 180, 130, 60, 80, 90, 170, 120];
+$widths = [80, 60, 200, 180, 130, 140, 90, 170, 120];
 foreach ($widths as $w) {
     echo '<Column ss:Width="' . $w . '"/>' . "\n";
 }
@@ -112,7 +112,6 @@ foreach ($logs as $log) {
     echo '<Cell ss:StyleID="s5"><Data ss:Type="String">' . ec($log['organization']     ?? '')            . '</Data></Cell>' . "\n";
     echo '<Cell ss:StyleID="s3"><Data ss:Type="String">' . ec($log['department']       ?? '')            . '</Data></Cell>' . "\n";
     echo '<Cell ss:StyleID="s3"><Data ss:Type="String">' . ec($log['vjg_type']         ?? '')            . '</Data></Cell>' . "\n";
-    echo '<Cell ss:StyleID="s4"><Data ss:Type="Number">' . (float)($log['price']        ?? 0)            . '</Data></Cell>' . "\n";
     echo '<Cell ss:StyleID="s3"><Data ss:Type="String">' . ec(getMealTypeName($log['meal_type'] ?? ''))  . '</Data></Cell>' . "\n";
     echo '<Cell ss:StyleID="s3"><Data ss:Type="String">' . ec($log['meal_point_name'] ?? '')             . '</Data></Cell>' . "\n";
     echo '<Cell ss:StyleID="s3"><Data ss:Type="String">' . ec($log['operator_name']   ?? '')             . '</Data></Cell>' . "\n";

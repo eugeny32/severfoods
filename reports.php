@@ -276,8 +276,7 @@ arsort($by_point); arsort($by_org);
                     <th>ФИО</th>
                     <th>Организация</th>
                     <th>Отдел</th>
-                    <th>ВЖГ</th>
-                    <th>Цена</th>
+                    <th>Вахтовый жилой городок</th>
                     <th>Тип питания</th>
                     <th>Точка</th>
                     <th>Оператор</th>
@@ -294,9 +293,6 @@ arsort($by_point); arsort($by_org);
                     <td><?= htmlspecialchars($log['organization']) ?></td>
                     <td style="color:var(--text-3)"><?= htmlspecialchars($log['department'] ?? '—') ?></td>
                     <td><?= htmlspecialchars($log['vjg_type'] ?? '—') ?></td>
-                    <td style="font-variant-numeric:tabular-nums">
-                        <?= $log['price'] ? number_format($log['price'],0,'.',' ').' ₽' : '—' ?>
-                    </td>
                     <td><span class="meal-badge <?= $log['meal_type'] ?>"><?= getMealTypeName($log['meal_type']) ?></span></td>
                     <td style="font-size:12px"><?= htmlspecialchars($log['meal_point_name'] ?? '—') ?></td>
                     <td style="font-size:12px;color:var(--text-3)"><?= htmlspecialchars($log['operator_name'] ?? '—') ?></td>
