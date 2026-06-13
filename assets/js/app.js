@@ -1105,15 +1105,17 @@ function openEmpStats(id, name) {
     _empStatsId = id;
     const modal = $('empStatsModal');
     if (!modal) return;
-    // Close any open modal (orgModal, empTableWrap parent, etc.) first
     closeAllModals();
     $('empStatsName').textContent = name;
-    // Default dates: last 30 days
-    const to   = new Date();
-    const from = new Date(); from.setDate(from.getDate() - 30);
+    // Default: last 30 days + next 30 days (чтобы видеть запланированное выездное питание)
+    const now  = new Date();
+    const from = new Date(); from.setDate(now.getDate() - 30);
+    const to   = new Date(); to.setDate(now.getDate() + 30);
     $('empStatsFrom').value = from.toISOString().slice(0,10);
     $('empStatsTo').value   = to.toISOString().slice(0,10);
     $('empStatsResult').innerHTML = '';
+    const sec = $('empRationsSection');
+    if (sec) sec.style.display = 'none';
     openModal('empStatsModal');
     loadEmpStats();
 }
@@ -1131,6 +1133,8 @@ async function loadEmpStats() {
         const rows = Object.entries(d.by_type).map(([k,v]) =>
             `<tr><td>${mealLabels[k]||k}</td><td><strong>${v}</strong></td></tr>`
         ).join('');
+        const rationBadge = d.ration_days > 0
+            ? `<div style="font-size:10px;color:#b45309;background:#fef3c7;border-radius:4px;padding:2px 5px;margin-top:3px">+ ${d.ration_days} выездн.</div>` : '';
         res.innerHTML = `
             <div style="display:flex;gap:12px;margin-bottom:16px">
                 <div style="flex:1;text-align:center;background:var(--bg-input,#f8fafc);border-radius:10px;padding:12px 8px">
@@ -1139,18 +1143,21 @@ async function loadEmpStats() {
                 </div>
                 <div style="flex:1;text-align:center;background:var(--bg-input,#f8fafc);border-radius:10px;padding:12px 8px">
                     <div style="font-size:30px;font-weight:800;color:var(--blue-700,#003366)">${d.days}</div>
-                    <div style="font-size:11px;color:var(--text-3,#64748b);margin-top:2px">дней в столовой</div>
+                    <div style="font-size:11px;color:var(--text-3,#64748b);margin-top:2px">дней всего</div>
+                    ${rationBadge}
                 </div>
             </div>
-            ${rows ? `<table class="emp-table"><thead><tr><th>Тип приёма</th><th>Кол-во</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty" style="padding:12px">Нет данных за период</div>'}`;
+            ${rows ? `<table class="emp-table"><thead><tr><th>Тип приёма</th><th>Кол-во</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty" style="padding:12px">Нет приёмов в столовой за период</div>'}`;
 
         // Show rations section
         const sec = $('empRationsSection');
         if (sec) {
             sec.style.display = '';
-            // Set default date to today for new entry
-            const dateInput = $('empRationDate');
-            if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0,10);
+            // Default range for new entry: tomorrow to tomorrow
+            const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+            const tStr = tomorrow.toISOString().slice(0,10);
+            if ($('empRationDateFrom') && !$('empRationDateFrom').value) $('empRationDateFrom').value = tStr;
+            if ($('empRationDateTo')   && !$('empRationDateTo').value)   $('empRationDateTo').value   = tStr;
             loadRations();
         }
     } catch(e) {
@@ -1162,50 +1169,61 @@ async function loadRations() {
     if (!_empStatsId) return;
     const from = $('empStatsFrom').value;
     const to   = $('empStatsTo').value;
+    // Show rations from stats-from to +90 days (future)
+    const futureEnd = new Date(); futureEnd.setDate(futureEnd.getDate() + 90);
+    const ratTo = futureEnd.toISOString().slice(0,10);
     const list = $('empRationsList');
     const countEl = $('empRationsCount');
     const addBtn = $('empRationAddBtn');
+    const today = new Date().toISOString().slice(0,10);
     try {
-        const d = await fetch(`api/dry_rations.php?employee_id=${_empStatsId}&from=${from}&to=${to}`).then(r=>r.json());
+        const d = await fetch(`api/dry_rations.php?employee_id=${_empStatsId}&from=${from}&to=${ratTo}`).then(r=>r.json());
         if (!d.ok) return;
         const typeLabels = { dry_ration:'Сухой паёк', field:'Выездное питание' };
-        const atLimit = d.count >= 5;
-        countEl.textContent = `(${d.count}/5)`;
+        // Count only those within stats period for limit display
+        const inPeriod = d.items.filter(r => r.ration_date >= from && r.ration_date <= to).length;
+        const atLimit = inPeriod >= 5;
+        countEl.textContent = `(${inPeriod}/5 в периоде${d.count > inPeriod ? ', всего: '+d.count : ''})`;
         countEl.style.color = atLimit ? '#dc2626' : 'var(--blue-700)';
-        if (addBtn) addBtn.style.opacity = atLimit ? '0.4' : '1';
+        if (addBtn) { addBtn.style.opacity = atLimit ? '0.4' : '1'; addBtn.disabled = atLimit; }
 
         if (!d.items.length) {
-            list.innerHTML = '<div style="font-size:12px;color:var(--text-3);margin-bottom:6px">Нет записей за период</div>';
+            list.innerHTML = '<div style="font-size:12px;color:var(--text-3);margin-bottom:6px">Нет записей</div>';
         } else {
-            list.innerHTML = d.items.map(r => `
-                <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
-                    <span style="font-size:13px;font-weight:600;min-width:90px">${r.ration_date.split('-').reverse().join('.')}</span>
+            list.innerHTML = d.items.map(r => {
+                const isFuture = r.ration_date > today;
+                return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+                    <span style="font-size:13px;font-weight:600;min-width:90px;color:${isFuture?'#b45309':'inherit'}">${r.ration_date.split('-').reverse().join('.')}${isFuture?' ⏳':''}</span>
                     <span style="font-size:12px;color:var(--text-3);flex:1">${typeLabels[r.ration_type]||r.ration_type}</span>
                     <button onclick="deleteRation(${r.id})" style="background:none;border:none;cursor:pointer;color:#dc2626;font-size:16px;line-height:1;padding:2px 4px" title="Удалить">×</button>
-                </div>`).join('');
+                </div>`;
+            }).join('');
         }
     } catch(e) {}
 }
 
 async function addRation() {
     if (!_empStatsId) return;
-    const from = $('empStatsFrom').value;
-    const to   = $('empStatsTo').value;
-    const date = $('empRationDate').value;
-    const type = $('empRationType').value;
-    const msgEl = $('empRationsMsg');
+    const from     = $('empStatsFrom').value;
+    const to       = $('empStatsTo').value;
+    const dateFrom = $('empRationDateFrom').value;
+    const dateTo   = $('empRationDateTo').value || dateFrom;
+    const type     = $('empRationType').value;
+    const msgEl    = $('empRationsMsg');
 
-    if (!date) { msgEl.textContent = 'Укажите дату'; msgEl.style.display=''; return; }
+    if (!dateFrom) { msgEl.textContent = 'Укажите дату начала'; msgEl.style.display=''; return; }
+    if (dateTo < dateFrom) { msgEl.textContent = 'Дата «по» раньше «с»'; msgEl.style.display=''; return; }
     msgEl.style.display = 'none';
 
     const d = await fetch('api/dry_rations.php', {
         method: 'POST',
         headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify({ employee_id: _empStatsId, ration_date: date, ration_type: type, from, to }),
+        body: JSON.stringify({ employee_id: _empStatsId, ration_date_from: dateFrom, ration_date_to: dateTo, ration_type: type, from, to }),
     }).then(r=>r.json()).catch(()=>({ok:false,error:'Ошибка сети'}));
 
     if (!d.ok) { msgEl.textContent = d.error || 'Ошибка'; msgEl.style.display=''; return; }
-    loadRations();
+    // Refresh stats too (days count changed)
+    loadEmpStats();
 }
 
 async function deleteRation(id) {

@@ -39,30 +39,43 @@ $stmtDays = $pdo->prepare("
 $stmtDays->execute([$id, $from, $to]);
 $days = (int)$stmtDays->fetchColumn();
 
-// Dry rations count in period
+// Dry rations / field catering in period
+$rationDays = 0;
+$rationItems = [];
 try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS dry_rations (
         id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         employee_id INT NOT NULL,
         ration_date DATE NOT NULL,
-        ration_type VARCHAR(20) NOT NULL DEFAULT 'dry_ration',
+        ration_type VARCHAR(20) NOT NULL DEFAULT 'field',
         created_by INT DEFAULT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE KEY uq_emp_date (employee_id, ration_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    $stmtRat = $pdo->prepare("SELECT COUNT(*) FROM dry_rations WHERE employee_id=? AND ration_date BETWEEN ? AND ?");
+    $stmtRat = $pdo->prepare("SELECT ration_date, ration_type FROM dry_rations WHERE employee_id=? AND ration_date BETWEEN ? AND ? ORDER BY ration_date");
     $stmtRat->execute([$id, $from, $to]);
-    $rationDays = (int)$stmtRat->fetchColumn();
-} catch (PDOException $e) {
-    $rationDays = 0;
-}
+    $rationItems = $stmtRat->fetchAll(PDO::FETCH_ASSOC);
+    $rationDays = count($rationItems);
+} catch (PDOException $e) {}
+
+// Total days = unique cafeteria days + field/ration days not already covered
+$cafeDates = [];
+try {
+    $stmtDates = $pdo->prepare("SELECT DISTINCT DATE(scanned_at) as d FROM meal_logs WHERE employee_id=? AND DATE(scanned_at) BETWEEN ? AND ?");
+    $stmtDates->execute([$id, $from, $to]);
+    $cafeDates = array_column($stmtDates->fetchAll(PDO::FETCH_ASSOC), 'd');
+} catch (PDOException $e) {}
+$rationDatesOnly = array_column($rationItems, 'ration_date');
+$allDays = array_unique(array_merge($cafeDates, $rationDatesOnly));
+$totalDays = count($allDays);
 
 header('Content-Type: application/json');
 echo json_encode([
     'ok'          => true,
     'name'        => $emp['full_name'],
     'total'       => $total,
-    'days'        => $days,
+    'days'        => $totalDays,
+    'cafe_days'   => $days,
     'by_type'     => $byType,
     'ration_days' => $rationDays,
 ]);

@@ -56,6 +56,12 @@ try {
     logAction('manual_pass',
         "Ручной пропуск: {$emp['full_name']} — " . getMealTypeName($meal_type) . ($reason ? " ($reason)" : ''));
 
+    // Аннулировать выездное питание на сегодня
+    try {
+        $pdo->prepare("DELETE FROM dry_rations WHERE employee_id=? AND ration_date=? AND ration_type='field'")
+            ->execute([$employee_id, date('Y-m-d')]);
+    } catch (PDOException $e) {}
+
     echo json_encode(['success' => true,
         'message'   => "Пропущен вручную: {$emp['full_name']}",
         'employee'  => $emp,

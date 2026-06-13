@@ -886,12 +886,22 @@ function deleteChatUser(id, name) {
                     Сухой паёк / Выездное питание <span id="empRationsCount" style="color:var(--blue-700)"></span>
                 </div>
                 <div id="empRationsList" style="margin-bottom:10px"></div>
-                <div id="empRationsAdd" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-                    <input type="date" id="empRationDate" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Onest',sans-serif;font-size:13px;color:var(--text-main);background:var(--bg-card)">
-                    <select id="empRationType" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Onest',sans-serif;font-size:13px;color:var(--text-main);background:var(--bg-card)">
-                        <option value="dry_ration">Сухой паёк</option>
-                        <option value="field">Выездное питание</option>
-                    </select>
+                <div id="empRationsAdd" style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
+                    <div>
+                        <label style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;display:block;margin-bottom:3px">С</label>
+                        <input type="date" id="empRationDateFrom" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Onest',sans-serif;font-size:13px;color:var(--text-main);background:var(--bg-card)">
+                    </div>
+                    <div>
+                        <label style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;display:block;margin-bottom:3px">По</label>
+                        <input type="date" id="empRationDateTo" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Onest',sans-serif;font-size:13px;color:var(--text-main);background:var(--bg-card)">
+                    </div>
+                    <div>
+                        <label style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;display:block;margin-bottom:3px">Тип</label>
+                        <select id="empRationType" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-family:'Onest',sans-serif;font-size:13px;color:var(--text-main);background:var(--bg-card)">
+                            <option value="field" selected>Выездное питание</option>
+                            <option value="dry_ration">Сухой паёк</option>
+                        </select>
+                    </div>
                     <button onclick="addRation()" id="empRationAddBtn" style="padding:7px 14px;background:var(--blue-700);color:#fff;border:none;border-radius:8px;font-family:'Onest',sans-serif;font-size:13px;font-weight:600;cursor:pointer">+ Добавить</button>
                 </div>
                 <div id="empRationsMsg" style="font-size:12px;color:#dc2626;margin-top:6px;display:none"></div>

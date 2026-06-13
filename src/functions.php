@@ -175,6 +175,13 @@ function processAccess(PDO $pdo, string $qr_code, ?string $ip = null): array
         $meal_point_id, $meal_point_name,
     ]);
 
+    // Аннулировать выездное питание на сегодня если сотрудник пришёл в столовую
+    try {
+        $pdo->prepare(
+            "DELETE FROM dry_rations WHERE employee_id=? AND ration_date=? AND ration_type='field'"
+        )->execute([$employee['id'], date('Y-m-d')]);
+    } catch (PDOException $e) {}
+
     $price_msg = ($employee['price'] > 0)
         ? number_format($employee['price'], 0, '.', ' ') . ' ₽'
         : null;
