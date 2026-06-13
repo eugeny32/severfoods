@@ -367,6 +367,7 @@ $allEmployeesJson = array_map(function($e) {
             <button class="tab-btn" data-tab="tabSchedule"><i class="fas fa-clock"></i> Расписание</button>
             <?php endif; ?>
             <button class="tab-btn" data-tab="tabQrPrint"><i class="fas fa-print"></i> Печать QR</button>
+            <button class="tab-btn" data-tab="tabOffline"><i class="fas fa-desktop"></i> Оффлайн</button>
             <?php if ($is_super_admin): ?>
             <button class="tab-btn" data-tab="tabChatUsers"><i class="fas fa-comments"></i> Пользователи чата</button>
             <?php endif; ?>
@@ -543,6 +544,85 @@ $allEmployeesJson = array_map(function($e) {
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap">
                 <a href="print_all_qr.php" target="_blank" class="btn btn-primary"><i class="fas fa-print"></i> Печать всех QR-кодов</a>
+            </div>
+        </div>
+
+        <!-- OFFLINE -->
+        <div id="tabOffline" class="tab-pane">
+            <div style="margin-bottom:18px;color:var(--text-2);font-size:13px">
+                Установите оффлайн-приложение на точках питания для автономной работы с QR-сканером.
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+
+                <!-- Download card -->
+                <div style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:12px">
+                    <div style="display:flex;align-items:center;gap:12px">
+                        <div style="width:44px;height:44px;background:#003366;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        </div>
+                        <div>
+                            <div style="font-size:15px;font-weight:700;color:var(--text-main)">Дистрибутив</div>
+                            <div style="font-size:12px;color:var(--text-3)">Установщик для Windows 10/11 x64</div>
+                        </div>
+                    </div>
+                    <?php
+                    $dlDir = __DIR__ . '/downloads/';
+                    $dlLatest = null; $dlTime = 0;
+                    if (is_dir($dlDir)) {
+                        foreach (glob($dlDir . '*.exe') as $f) {
+                            $t = filemtime($f); if ($t > $dlTime) { $dlTime = $t; $dlLatest = $f; }
+                        }
+                    }
+                    if ($dlLatest):
+                        $dlName = basename($dlLatest);
+                        $dlVer = ''; if (preg_match('/(\d+\.\d+\.\d+)/', $dlName, $m)) $dlVer = 'v'.$m[1];
+                        $dlSize = round(filesize($dlLatest)/1024/1024,1).' МБ';
+                    ?>
+                    <div style="background:var(--bg-input);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text-2)">
+                        <span style="font-weight:700;color:var(--blue-700)"><?= htmlspecialchars($dlVer) ?></span>
+                        · <?= htmlspecialchars($dlName) ?> · <?= $dlSize ?>
+                    </div>
+                    <a href="download.php?get=1" style="display:inline-flex;align-items:center;gap:8px;background:#003366;color:#fff;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:700;text-decoration:none;justify-content:center">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Скачать установщик
+                    </a>
+                    <?php else: ?>
+                    <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e">
+                        Файл не найден. Поместите <code>SeverFoods-Setup-X.X.X.exe</code> в папку <code>downloads/</code> на сервере.
+                    </div>
+                    <a href="download.php" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:var(--bg-input);color:var(--text-main);border:1.5px solid var(--border);border-radius:10px;padding:10px 18px;font-size:14px;font-weight:600;text-decoration:none;justify-content:center">
+                        Страница загрузки ↗
+                    </a>
+                    <?php endif; ?>
+                    <div style="font-size:11px;color:var(--text-3)">
+                        Токен синхронизации — в разделе «Точки питания». Обновление: запустите новый установщик, поле токена оставьте пустым.
+                    </div>
+                </div>
+
+                <!-- Manual card -->
+                <div style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:12px">
+                    <div style="display:flex;align-items:center;gap:12px">
+                        <div style="width:44px;height:44px;background:#1e3a5f;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        </div>
+                        <div>
+                            <div style="font-size:15px;font-weight:700;color:var(--text-main)">Справочное руководство</div>
+                            <div style="font-size:12px;color:var(--text-3)">Онлайн и оффлайн системы</div>
+                        </div>
+                    </div>
+                    <div style="font-size:13px;color:var(--text-2);line-height:1.6">
+                        Полное руководство: роли, установка, сканер QR, синхронизация, выездное питание, FAQ.
+                        Доступно без авторизации — сотрудник может открыть по QR-коду.
+                    </div>
+                    <a href="manual.php" target="_blank" style="display:inline-flex;align-items:center;gap:8px;background:#1e3a5f;color:#fff;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:700;text-decoration:none;justify-content:center">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        Открыть руководство
+                    </a>
+                    <div style="font-size:11px;color:var(--text-3)">
+                        Страница публичная — передайте ссылку <code><?= (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] ?>/manual.php</code> или распечатайте QR-код.
+                    </div>
+                </div>
+
             </div>
         </div>
 
