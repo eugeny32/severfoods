@@ -81,10 +81,10 @@ if ($report_type === 'dry_rations') {
     try {
         $sqlDry = "SELECT dr.ration_date, dr.ration_type, dr.status, dr.created_at,
                           e.full_name, e.organization, e.department, e.vjg_type,
-                          u.name as created_by_name
+                          op.full_name as created_by_name
                    FROM dry_rations dr
                    JOIN employees e ON dr.employee_id = e.id
-                   LEFT JOIN users u ON dr.created_by = u.id
+                   LEFT JOIN employees op ON dr.created_by = op.id
                    WHERE dr.ration_date BETWEEN :start AND :end
                    ORDER BY dr.ration_date DESC, e.full_name";
         $stmtDry = $pdo->prepare($sqlDry);
