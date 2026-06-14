@@ -62,13 +62,6 @@ try {
     $rationDays = count(array_filter($rationItems, fn($r) => $r['status'] === 'active'));
 } catch (PDOException $e) {}
 
-// Total days = unique cafeteria days + field/ration days not already covered
-$cafeDates = [];
-try {
-    $stmtDates = $pdo->prepare("SELECT DISTINCT DATE(scanned_at) as d FROM meal_logs WHERE employee_id=? AND DATE(scanned_at) BETWEEN ? AND ?");
-    $stmtDates->execute([$id, $from, $to]);
-    $cafeDates = array_column($stmtDates->fetchAll(PDO::FETCH_ASSOC), 'd');
-} catch (PDOException $e) {}
 // Count dry_ration type and field type separately
 $dryRationCount = count(array_filter($rationItems, fn($r) => $r['status'] === 'active' && $r['ration_type'] === 'dry_ration'));
 $fieldCount     = count(array_filter($rationItems, fn($r) => $r['status'] === 'active' && $r['ration_type'] === 'field'));

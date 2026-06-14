@@ -12,10 +12,10 @@ $user_name      = $_SESSION['user_name']        ?? 'Пользователь';
 $is_super_admin = $user_role === 'super_admin';
 $assigned_pid   = $_SESSION['assigned_point_id'] ?? null;
 
-$start_date  = $_GET['start_date']  ?? date('Y-m-d', strtotime('-30 days'));
-$end_date    = $_GET['end_date']    ?? date('Y-m-d');
-$meal_type   = $_GET['meal_type']   ?? 'all';
-$report_type = $_GET['report_type'] ?? 'meals';
+$start_date  = preg_replace('/[^0-9\-]/', '', $_GET['start_date'] ?? date('Y-m-d', strtotime('-30 days')));
+$end_date    = preg_replace('/[^0-9\-]/', '', $_GET['end_date']   ?? date('Y-m-d'));
+$meal_type   = in_array($_GET['meal_type'] ?? '', ['breakfast','lunch','dinner','night','all']) ? $_GET['meal_type'] : 'all';
+$report_type = in_array($_GET['report_type'] ?? '', ['meals','dry_rations']) ? $_GET['report_type'] : 'meals';
 $export      = $_GET['export']      ?? null;
 $point_id    = isset($_GET['point_id']) && $_GET['point_id'] !== '' ? (int)$_GET['point_id'] : null;
 

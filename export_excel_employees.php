@@ -8,6 +8,15 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['is_admin'])) {
 
 $start_date = preg_replace('/[^0-9\-]/', '', $_GET['start_date'] ?? date('Y-m-d', strtotime('-30 days')));
 $end_date   = preg_replace('/[^0-9\-]/', '', $_GET['end_date']   ?? date('Y-m-d'));
+$meal_type  = in_array($_GET['meal_type'] ?? '', ['breakfast','lunch','dinner','night'])
+              ? $_GET['meal_type'] : 'all';
+$point_id   = (isset($_GET['point_id']) && ctype_digit((string)$_GET['point_id']))
+              ? (int)$_GET['point_id'] : null;
+
+$user_role    = $_SESSION['role']              ?? 'admin';
+$is_super     = ($user_role === 'super_admin');
+$assigned_pid = $_SESSION['assigned_point_id'] ?? null;
+if (!$is_super && $assigned_pid) $point_id = $assigned_pid;
 
 $sql = "SELECT e.id, e.full_name, e.organization, e.department,
                COUNT(*) as meals,
@@ -15,12 +24,14 @@ $sql = "SELECT e.id, e.full_name, e.organization, e.department,
         FROM meal_logs ml
         JOIN employees e ON ml.employee_id = e.id
         WHERE DATE(ml.scanned_at) BETWEEN :s AND :e
-          AND ml.access_granted = 1
-        GROUP BY e.id, e.full_name, e.organization, e.department
-        ORDER BY e.organization, e.full_name";
+          AND ml.access_granted = 1";
+$params = [':s' => $start_date, ':e' => $end_date];
+if ($meal_type !== 'all') { $sql .= " AND ml.meal_type = :mt";      $params[':mt']  = $meal_type; }
+if ($point_id)            { $sql .= " AND ml.meal_point_id = :pid"; $params[':pid'] = $point_id; }
+$sql .= " GROUP BY e.id, e.full_name, e.organization, e.department ORDER BY e.organization, e.full_name";
 
 $stmt = $pdo->prepare($sql);
-$stmt->execute([':s' => $start_date, ':e' => $end_date]);
+$stmt->execute($params);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Dry rations per employee in the period
@@ -101,7 +112,8 @@ foreach ($widths as $w) {
 }
 
 // Title row
-$title = 'Сводный отчёт по сотрудникам: ' . $start_date . ' — ' . $end_date;
+$title = 'Сводный отчёт по сотрудникам: ' . $start_date . ' — ' . $end_date
+       . ($meal_type !== 'all' ? ' / ' . getMealTypeName($meal_type) : '');
 echo '<Row ss:Height="28">' . "\n";
 echo '<Cell ss:StyleID="s_title" ss:MergeAcross="5"><Data ss:Type="String">' . ec($title) . '</Data></Cell>' . "\n";
 echo '</Row>' . "\n";
