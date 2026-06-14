@@ -12,11 +12,12 @@ $user_name      = $_SESSION['user_name']        ?? 'Пользователь';
 $is_super_admin = $user_role === 'super_admin';
 $assigned_pid   = $_SESSION['assigned_point_id'] ?? null;
 
-$start_date = $_GET['start_date'] ?? date('Y-m-d', strtotime('-30 days'));
-$end_date   = $_GET['end_date']   ?? date('Y-m-d');
-$meal_type  = $_GET['meal_type']  ?? 'all';
-$export     = $_GET['export']     ?? null;
-$point_id   = isset($_GET['point_id']) && $_GET['point_id'] !== '' ? (int)$_GET['point_id'] : null;
+$start_date  = $_GET['start_date']  ?? date('Y-m-d', strtotime('-30 days'));
+$end_date    = $_GET['end_date']    ?? date('Y-m-d');
+$meal_type   = $_GET['meal_type']   ?? 'all';
+$report_type = $_GET['report_type'] ?? 'meals';
+$export      = $_GET['export']      ?? null;
+$point_id    = isset($_GET['point_id']) && $_GET['point_id'] !== '' ? (int)$_GET['point_id'] : null;
 
 // Доступные точки
 $points = [];
@@ -73,6 +74,24 @@ foreach ($empStats as $row) {
     $empByOrg[$row['organization']][] = $row;
 }
 ksort($empByOrg);
+
+// Dry rations report
+$dryLogs = [];
+if ($report_type === 'dry_rations') {
+    try {
+        $sqlDry = "SELECT dr.ration_date, dr.ration_type, dr.status, dr.created_at,
+                          e.full_name, e.organization, e.department, e.vjg_type,
+                          u.name as created_by_name
+                   FROM dry_rations dr
+                   JOIN employees e ON dr.employee_id = e.id
+                   LEFT JOIN users u ON dr.created_by = u.id
+                   WHERE dr.ration_date BETWEEN :start AND :end
+                   ORDER BY dr.ration_date DESC, e.full_name";
+        $stmtDry = $pdo->prepare($sqlDry);
+        $stmtDry->execute([':start' => $start_date, ':end' => $end_date]);
+        $dryLogs = $stmtDry->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {}
+}
 
 $by_type  = ['total' => 0, 'breakfast' => 0, 'lunch' => 0, 'dinner' => 0, 'night' => 0];
 $by_point = [];
@@ -161,6 +180,14 @@ arsort($by_point); arsort($by_org);
         <input type="date" name="end_date" value="<?= $end_date ?>">
     </div>
     <div class="form-group">
+        <label><i class="fas fa-list"></i> Раздел</label>
+        <select name="report_type" onchange="this.form.submit()">
+            <option value="meals"       <?= $report_type==='meals'?'selected':''       ?>>Столовая</option>
+            <option value="dry_rations" <?= $report_type==='dry_rations'?'selected':'' ?>>Сухой паёк</option>
+        </select>
+    </div>
+    <?php if ($report_type === 'meals'): ?>
+    <div class="form-group">
         <label><i class="fas fa-utensils"></i> Тип питания</label>
         <select name="meal_type">
             <option value="all" <?= $meal_type==='all'?'selected':'' ?>>Все</option>
@@ -170,6 +197,7 @@ arsort($by_point); arsort($by_org);
             <option value="night"     <?= $meal_type==='night'?'selected':''     ?>>Ночное</option>
         </select>
     </div>
+    <?php endif; ?>
     <?php if ($is_super_admin && !empty($points)): ?>
     <div class="form-group">
         <label><i class="fas fa-map-marker-alt"></i> Точка</label>
@@ -197,6 +225,92 @@ arsort($by_point); arsort($by_org);
     </div>
 </form>
 
+<?php if ($report_type === 'dry_rations'): ?>
+<!-- Dry rations report -->
+<?php
+$dryActive    = count(array_filter($dryLogs, fn($r) => $r['status'] === 'active'));
+$dryCancelled = count(array_filter($dryLogs, fn($r) => $r['status'] === 'cancelled'));
+$dryDryRation = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'dry_ration'));
+$dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'field'));
+?>
+<div class="summary-grid">
+    <div class="summary-card total">
+        <div class="num"><?= count($dryLogs) ?></div>
+        <div class="lbl">Всего записей</div>
+    </div>
+    <div class="summary-card">
+        <div class="num" style="color:#15803d"><?= $dryActive ?></div>
+        <div class="lbl">Активных</div>
+    </div>
+    <div class="summary-card">
+        <div class="num" style="color:#dc2626"><?= $dryCancelled ?></div>
+        <div class="lbl">Аннулировано</div>
+    </div>
+    <div class="summary-card">
+        <div class="num" style="color:#92400e"><?= $dryDryRation ?></div>
+        <div class="lbl">Сухой паёк</div>
+    </div>
+    <div class="summary-card">
+        <div class="num" style="color:#1e3a8a"><?= $dryField ?></div>
+        <div class="lbl">Выездное питание</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title"><i class="fas fa-box"></i> Выданные сухие пайки / выездное питание (<?= count($dryLogs) ?> записей)</div>
+    </div>
+    <?php if (empty($dryLogs)): ?>
+    <div class="empty"><div class="empty-icon"><i class="fas fa-box"></i></div>Нет данных за выбранный период</div>
+    <?php else: ?>
+    <div class="report-table-wrap">
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>ФИО</th>
+                    <th>Организация</th>
+                    <th>Отдел</th>
+                    <th>Вахтовый жилой городок</th>
+                    <th>Тип</th>
+                    <th>Статус</th>
+                    <th>Создал</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($dryLogs as $dr): ?>
+                <tr>
+                    <td style="white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600">
+                        <?= date('d.m.Y', strtotime($dr['ration_date'])) ?>
+                    </td>
+                    <td style="font-weight:600"><?= htmlspecialchars($dr['full_name']) ?></td>
+                    <td><?= htmlspecialchars($dr['organization']) ?></td>
+                    <td style="color:var(--text-3)"><?= htmlspecialchars($dr['department'] ?? '—') ?></td>
+                    <td><?= htmlspecialchars($dr['vjg_type'] ?? '—') ?></td>
+                    <td>
+                        <?php if ($dr['ration_type'] === 'dry_ration'): ?>
+                            <span style="background:#fef9c3;color:#92400e;border-radius:5px;padding:2px 8px;font-size:12px;font-weight:700">Сухой паёк</span>
+                        <?php else: ?>
+                            <span style="background:#dbeafe;color:#1e40af;border-radius:5px;padding:2px 8px;font-size:12px;font-weight:700">Выездное</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ($dr['status'] === 'active'): ?>
+                            <span style="background:#dcfce7;color:#15803d;border-radius:5px;padding:2px 8px;font-size:12px;font-weight:700">Активен</span>
+                        <?php else: ?>
+                            <span style="background:#fee2e2;color:#dc2626;border-radius:5px;padding:2px 8px;font-size:12px;font-weight:700">Аннулирован</span>
+                        <?php endif; ?>
+                    </td>
+                    <td style="font-size:12px;color:var(--text-3)"><?= htmlspecialchars($dr['created_by_name'] ?? '—') ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
+</div>
+
+<?php else: ?>
 <!-- Summary -->
 <div class="summary-grid">
     <div class="summary-card total">
@@ -365,6 +479,8 @@ arsort($by_point); arsort($by_org);
     <?php endforeach; ?>
     <?php endif; ?>
 </div>
+
+<?php endif; // report_type ?>
 
 </div><!-- /page -->
 

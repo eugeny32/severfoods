@@ -69,17 +69,17 @@ try {
     $stmtDates->execute([$id, $from, $to]);
     $cafeDates = array_column($stmtDates->fetchAll(PDO::FETCH_ASSOC), 'd');
 } catch (PDOException $e) {}
-$rationDatesOnly = array_column(array_filter($rationItems, fn($r) => $r['status'] === 'active'), 'ration_date');
-$allDays = array_unique(array_merge($cafeDates, $rationDatesOnly));
-$totalDays = count($allDays);
+// Count dry_ration type and field type separately
+$dryRationCount = count(array_filter($rationItems, fn($r) => $r['status'] === 'active' && $r['ration_type'] === 'dry_ration'));
+$fieldCount     = count(array_filter($rationItems, fn($r) => $r['status'] === 'active' && $r['ration_type'] === 'field'));
 
 header('Content-Type: application/json');
 echo json_encode([
-    'ok'          => true,
-    'name'        => $emp['full_name'],
-    'total'       => $total,
-    'days'        => $totalDays,
-    'cafe_days'   => $days,
-    'by_type'     => $byType,
-    'ration_days' => $rationDays,
+    'ok'               => true,
+    'name'             => $emp['full_name'],
+    'total'            => $total,
+    'days'             => $days,         // cafeteria days only
+    'by_type'          => $byType,
+    'dry_ration_count' => $dryRationCount,
+    'field_count'      => $fieldCount,
 ]);

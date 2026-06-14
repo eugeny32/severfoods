@@ -1133,8 +1133,14 @@ async function loadEmpStats() {
         const rows = Object.entries(d.by_type).map(([k,v]) =>
             `<tr><td>${mealLabels[k]||k}</td><td><strong>${v}</strong></td></tr>`
         ).join('');
-        const rationBadge = d.ration_days > 0
-            ? `<div style="font-size:10px;color:#b45309;background:#fef3c7;border-radius:4px;padding:2px 5px;margin-top:3px">+ ${d.ration_days} выездн.</div>` : '';
+        const dryTotal = (d.dry_ration_count||0) + (d.field_count||0);
+        const dryCard = dryTotal > 0
+            ? `<div style="flex:1;text-align:center;background:#fef9c3;border-radius:10px;padding:12px 8px">
+                    <div style="font-size:30px;font-weight:800;color:#92400e">${dryTotal}</div>
+                    <div style="font-size:11px;color:#92400e;margin-top:2px">сух. паёк / выездн.</div>
+                    ${d.dry_ration_count>0?`<div style="font-size:10px;color:#b45309;margin-top:2px">паёк: ${d.dry_ration_count}</div>`:''}
+                    ${d.field_count>0?`<div style="font-size:10px;color:#b45309">выездн.: ${d.field_count}</div>`:''}
+               </div>` : '';
         res.innerHTML = `
             <div style="display:flex;gap:12px;margin-bottom:16px">
                 <div style="flex:1;text-align:center;background:var(--bg-input,#f8fafc);border-radius:10px;padding:12px 8px">
@@ -1143,9 +1149,9 @@ async function loadEmpStats() {
                 </div>
                 <div style="flex:1;text-align:center;background:var(--bg-input,#f8fafc);border-radius:10px;padding:12px 8px">
                     <div style="font-size:30px;font-weight:800;color:var(--blue-700,#003366)">${d.days}</div>
-                    <div style="font-size:11px;color:var(--text-3,#64748b);margin-top:2px">дней всего</div>
-                    ${rationBadge}
+                    <div style="font-size:11px;color:var(--text-3,#64748b);margin-top:2px">дней в столовой</div>
                 </div>
+                ${dryCard}
             </div>
             ${rows ? `<table class="emp-table"><thead><tr><th>Тип приёма</th><th>Кол-во</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty" style="padding:12px">Нет приёмов в столовой за период</div>'}`;
 
