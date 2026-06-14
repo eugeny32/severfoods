@@ -121,6 +121,7 @@ $allEmployeesJson = array_map(function($e) {
         'qr_status'    => $e['qr_status'],
         'qr_expires_at'=> $expires ? date('d.m.Y', strtotime($expires)) : null,
         'expiry_status'=> $expStatus,
+        'role'         => $e['role'] ?? null,
     ];
 }, $allEmployees);
 ?>

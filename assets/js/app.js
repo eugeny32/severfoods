@@ -306,22 +306,43 @@ function renderOrgChips() {
     const container = $('orgChips');
     if (!container || !window.orgStats) return;
 
-    if (!window.orgStats.length) { container.innerHTML = ''; return; }
+    const all = window.allEmployeesData || [];
+    const opCnt    = all.filter(e => e.role === 'operator').length;
+    const admCnt   = all.filter(e => e.role === 'admin' || e.role === 'super_admin').length;
 
-    // Храним порядковый индекс в data-idx, чтобы избежать проблем
-    // с HTML-эскейпингом названий организаций при сравнении
-    container.innerHTML = window.orgStats.map((o, idx) =>
-        '<button class="org-chip" data-idx="' + idx + '">' +
-        '<div class="org-chip-name">' + escHtml(o.organization) + '</div>' +
-        '<div class="org-chip-count">' + o.cnt + '</div>' +
-        '<div class="org-chip-label">сотрудников</div>' +
-        '</button>'
-    ).join('');
+    const roleChips = [];
+    if (opCnt)  roleChips.push(`<button class="org-chip" data-role-filter="operator" style="border-color:#2563eb20;background:#eff6ff"><div class="org-chip-name" style="color:#1d4ed8">Операторы</div><div class="org-chip-count" style="color:#1d4ed8">${opCnt}</div><div class="org-chip-label">чел.</div></button>`);
+    if (admCnt) roleChips.push(`<button class="org-chip" data-role-filter="admin"    style="border-color:#7c3aed20;background:#f5f3ff"><div class="org-chip-name" style="color:#6d28d9">Администраторы</div><div class="org-chip-count" style="color:#6d28d9">${admCnt}</div><div class="org-chip-label">чел.</div></button>`);
 
-    // Делегирование — один слушатель на контейнере
+    if (!window.orgStats.length && !roleChips.length) { container.innerHTML = ''; return; }
+
+    container.innerHTML =
+        roleChips.join('') +
+        window.orgStats.map((o, idx) =>
+            '<button class="org-chip" data-idx="' + idx + '">' +
+            '<div class="org-chip-name">' + escHtml(o.organization) + '</div>' +
+            '<div class="org-chip-count">' + o.cnt + '</div>' +
+            '<div class="org-chip-label">сотрудников</div>' +
+            '</button>'
+        ).join('');
+
     container.onclick = function(ev) {
         const btn = ev.target.closest('.org-chip');
         if (!btn) return;
+        $$('.org-chip').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+
+        const roleFilter = btn.dataset.roleFilter;
+        if (roleFilter) {
+            // Показываем список по роли
+            const match = roleFilter === 'operator'
+                ? e => e.role === 'operator'
+                : e => e.role === 'admin' || e.role === 'super_admin';
+            const list = all.filter(match).sort((a,b) => a.full_name.localeCompare(b.full_name,'ru'));
+            const label = roleFilter === 'operator' ? 'Операторы' : 'Администраторы';
+            openOrgModal(label, list);
+            return;
+        }
         const idx = parseInt(btn.dataset.idx, 10);
         if (!isNaN(idx) && window.orgStats[idx]) {
             openOrgModal(window.orgStats[idx].organization);
@@ -334,27 +355,29 @@ function filterByOrg(org) {
     openOrgModal(org);
 }
 
-function openOrgModal(org) {
+function openOrgModal(org, prebuiltList) {
     const titleEl = $('orgModalTitle');
     const bodyEl  = $('orgModalBody');
     if (!titleEl || !bodyEl) return;
 
-    titleEl.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> ' + org;
+    titleEl.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> ' + escHtml(org);
 
-    // Нормализуем: trim + collapse spaces + decode HTML entities
-    function normalizeOrg(s) {
-        if (!s) return '';
-        // Декодируем HTML-сущности через DOM
-        const tmp = document.createElement('textarea');
-        tmp.innerHTML = s;
-        return tmp.value.trim().replace(/\s+/g, ' ');
+    let list;
+    if (prebuiltList) {
+        list = prebuiltList;
+    } else {
+        // Нормализуем: trim + collapse spaces + decode HTML entities
+        function normalizeOrg(s) {
+            if (!s) return '';
+            const tmp = document.createElement('textarea');
+            tmp.innerHTML = s;
+            return tmp.value.trim().replace(/\s+/g, ' ');
+        }
+        const orgNorm = normalizeOrg(org);
+        list = (window.allEmployeesData || [])
+            .filter(e => normalizeOrg(e.organization) === orgNorm)
+            .sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'));
     }
-    const orgNorm = normalizeOrg(org);
-
-    // Фильтруем и сортируем по ФИО
-    const list = (window.allEmployeesData || [])
-        .filter(e => normalizeOrg(e.organization) === orgNorm)
-        .sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'));
 
     if (!list.length) {
         bodyEl.innerHTML = '<div class="empty"><div class="empty-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>Нет сотрудников</div>';
@@ -421,7 +444,28 @@ function searchEmployees(q) {
     activeOrgFilter = null;
     $$('.org-chip').forEach(c => c.classList.remove('active'));
     if (!q.trim()) { renderEmployeeTable([]); $('empTableWrap').style.display='none'; return; }
-    const lq = q.toLowerCase();
+    const lq = q.trim().toLowerCase();
+
+    // Ключевые слова роли: полное совпадение слова → фильтр по роли
+    const roleKeywords = {
+        'оператор':        r => r === 'operator',
+        'операторы':       r => r === 'operator',
+        'администратор':   r => r === 'admin' || r === 'super_admin',
+        'администраторы':  r => r === 'admin' || r === 'super_admin',
+        'супер':           r => r === 'super_admin',
+        'суперадмин':      r => r === 'super_admin',
+        'super_admin':     r => r === 'super_admin',
+        'operator':        r => r === 'operator',
+        'admin':           r => r === 'admin' || r === 'super_admin',
+    };
+    if (roleKeywords[lq]) {
+        const match = roleKeywords[lq];
+        const chip = document.querySelector(`.org-chip[data-role-filter]`);
+        const res = window.allEmployeesData.filter(e => match(e.role || ''));
+        renderEmployeeTable(res);
+        return;
+    }
+
     const res = window.allEmployeesData.filter(e =>
         e.full_name.toLowerCase().includes(lq) ||
         (e.organization || '').toLowerCase().includes(lq) ||
