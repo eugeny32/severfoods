@@ -217,10 +217,12 @@ arsort($by_point); arsort($by_org);
         <label>&nbsp;</label>
         <div style="display:flex;gap:8px">
             <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Применить</button>
-            <a href="export_excel.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
+            <a href="export_excel.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&report_type=<?= $report_type ?>&meal_type=<?= $meal_type ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
                class="btn btn-success" style="background:#1d6f42"><i class="fas fa-table"></i> Excel (детали)</a>
+            <?php if ($report_type !== 'dry_rations'): ?>
             <a href="export_excel_employees.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
                class="btn btn-success" style="background:#15803d"><i class="fas fa-users"></i> Excel (сотрудники)</a>
+            <?php endif; ?>
         </div>
     </div>
 </form>

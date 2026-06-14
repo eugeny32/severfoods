@@ -23,6 +23,35 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute([':s' => $start_date, ':e' => $end_date]);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// Dry rations per employee in the period
+$dryByEmp = [];
+$dryDetails = [];
+try {
+    $stmtDry = $pdo->prepare(
+        "SELECT dr.employee_id, dr.ration_date, dr.ration_type, dr.status,
+                e.full_name, e.organization, e.department, e.vjg_type,
+                op.full_name as created_by_name
+         FROM dry_rations dr
+         JOIN employees e ON dr.employee_id = e.id
+         LEFT JOIN employees op ON dr.created_by = op.id
+         WHERE dr.ration_date BETWEEN :s AND :e
+         ORDER BY e.organization, e.full_name, dr.ration_date"
+    );
+    $stmtDry->execute([':s' => $start_date, ':e' => $end_date]);
+    $dryDetails = $stmtDry->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($dryDetails as $d) {
+        if ($d['status'] === 'active') {
+            $dryByEmp[$d['employee_id']] = ($dryByEmp[$d['employee_id']] ?? 0) + 1;
+        }
+    }
+} catch (PDOException $e) {}
+
+// Enrich rows with dry_rations count
+foreach ($rows as &$r) {
+    $r['dry_rations'] = $dryByEmp[$r['id']] ?? 0;
+}
+unset($r);
+
 // Group by org
 $byOrg = [];
 foreach ($rows as $r) {
@@ -66,7 +95,7 @@ echo '</Styles>' . "\n";
 echo '<Worksheet ss:Name="Сотрудники">' . "\n";
 echo '<Table>' . "\n";
 
-$widths = [180, 200, 170, 90, 90];
+$widths = [180, 200, 170, 90, 90, 90];
 foreach ($widths as $w) {
     echo '<Column ss:Width="' . $w . '"/>' . "\n";
 }
@@ -74,11 +103,11 @@ foreach ($widths as $w) {
 // Title row
 $title = 'Сводный отчёт по сотрудникам: ' . $start_date . ' — ' . $end_date;
 echo '<Row ss:Height="28">' . "\n";
-echo '<Cell ss:StyleID="s_title" ss:MergeAcross="4"><Data ss:Type="String">' . ec($title) . '</Data></Cell>' . "\n";
+echo '<Cell ss:StyleID="s_title" ss:MergeAcross="5"><Data ss:Type="String">' . ec($title) . '</Data></Cell>' . "\n";
 echo '</Row>' . "\n";
 
 // Column headers
-$headers = ['Организация', 'ФИО', 'Подразделение', 'Приёмов пищи', 'Дней в столовой'];
+$headers = ['Организация', 'ФИО', 'Подразделение', 'Приёмов пищи', 'Дней в столовой', 'Сух. паёк (дней)'];
 echo '<Row ss:Height="24">' . "\n";
 foreach ($headers as $h) {
     echo '<Cell ss:StyleID="s_head"><Data ss:Type="String">' . ec($h) . '</Data></Cell>' . "\n";
@@ -87,25 +116,30 @@ echo '</Row>' . "\n";
 
 $grandMeals = 0;
 $grandDays  = 0;
+$grandDry   = 0;
 
 foreach ($byOrg as $org => $emps) {
     $orgMeals = array_sum(array_column($emps, 'meals'));
     $orgDays  = array_sum(array_column($emps, 'days'));
+    $orgDry   = array_sum(array_column($emps, 'dry_rations'));
     $grandMeals += $orgMeals;
     $grandDays  += $orgDays;
+    $grandDry   += $orgDry;
 
     // Org header row
     echo '<Row ss:Height="20">' . "\n";
-    echo '<Cell ss:StyleID="s_org" ss:MergeAcross="4"><Data ss:Type="String">' . ec($org) . '</Data></Cell>' . "\n";
+    echo '<Cell ss:StyleID="s_org" ss:MergeAcross="5"><Data ss:Type="String">' . ec($org) . '</Data></Cell>' . "\n";
     echo '</Row>' . "\n";
 
     foreach ($emps as $emp) {
+        $dryStyle = (int)$emp['dry_rations'] > 0 ? 's_subn' : 's_num';
         echo '<Row ss:Height="18">' . "\n";
         echo '<Cell ss:StyleID="s_data"><Data ss:Type="String"></Data></Cell>' . "\n";
-        echo '<Cell ss:StyleID="s_data"><Data ss:Type="String">' . ec($emp['full_name'])  . '</Data></Cell>' . "\n";
-        echo '<Cell ss:StyleID="s_data"><Data ss:Type="String">' . ec($emp['department']) . '</Data></Cell>' . "\n";
-        echo '<Cell ss:StyleID="s_num"><Data ss:Type="Number">' . (int)$emp['meals']      . '</Data></Cell>' . "\n";
-        echo '<Cell ss:StyleID="s_num"><Data ss:Type="Number">' . (int)$emp['days']       . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s_data"><Data ss:Type="String">' . ec($emp['full_name'])       . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s_data"><Data ss:Type="String">' . ec($emp['department'])      . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s_num"><Data ss:Type="Number">'  . (int)$emp['meals']          . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s_num"><Data ss:Type="Number">'  . (int)$emp['days']           . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="' . $dryStyle . '"><Data ss:Type="Number">' . (int)$emp['dry_rations'] . '</Data></Cell>' . "\n";
         echo '</Row>' . "\n";
     }
 
@@ -114,6 +148,7 @@ foreach ($byOrg as $org => $emps) {
     echo '<Cell ss:StyleID="s_sub" ss:MergeAcross="2"><Data ss:Type="String">Итого по ' . ec($org) . '</Data></Cell>' . "\n";
     echo '<Cell ss:StyleID="s_subn"><Data ss:Type="Number">' . $orgMeals . '</Data></Cell>' . "\n";
     echo '<Cell ss:StyleID="s_subn"><Data ss:Type="Number">' . $orgDays  . '</Data></Cell>' . "\n";
+    echo '<Cell ss:StyleID="s_subn"><Data ss:Type="Number">' . $orgDry   . '</Data></Cell>' . "\n";
     echo '</Row>' . "\n";
 
     // Spacer
@@ -125,6 +160,7 @@ echo '<Row ss:Height="24">' . "\n";
 echo '<Cell ss:StyleID="s_total" ss:MergeAcross="2"><Data ss:Type="String">ИТОГО</Data></Cell>' . "\n";
 echo '<Cell ss:StyleID="s_total"><Data ss:Type="Number">' . $grandMeals . '</Data></Cell>' . "\n";
 echo '<Cell ss:StyleID="s_total"><Data ss:Type="Number">' . $grandDays  . '</Data></Cell>' . "\n";
+echo '<Cell ss:StyleID="s_total"><Data ss:Type="Number">' . $grandDry   . '</Data></Cell>' . "\n";
 echo '</Row>' . "\n";
 
 echo '</Table>' . "\n";
@@ -133,6 +169,39 @@ echo '<FreezePanes/><FrozenNoSplit/><SplitHorizontal>2</SplitHorizontal><TopRowB
 echo '<ActivePane>2</ActivePane>' . "\n";
 echo '</WorksheetOptions>' . "\n";
 echo '</Worksheet>' . "\n";
+
+// ── Sheet 2: dry rations detail ──────────────────────────────
+if (!empty($dryDetails)) {
+    echo '<Worksheet ss:Name="Сухой паёк">' . "\n";
+    echo '<Table>' . "\n";
+    $dryWidths = [90, 200, 180, 130, 140, 130, 100, 160];
+    foreach ($dryWidths as $w) echo '<Column ss:Width="' . $w . '"/>' . "\n";
+    $dryTitle = 'Сухой паёк / Выездное питание: ' . $start_date . ' — ' . $end_date;
+    echo '<Row ss:Height="28"><Cell ss:StyleID="s_title" ss:MergeAcross="7"><Data ss:Type="String">' . ec($dryTitle) . '</Data></Cell></Row>' . "\n";
+    echo '<Row ss:Height="24">' . "\n";
+    foreach (['Дата', 'ФИО', 'Организация', 'Отдел', 'ВЖГ', 'Тип', 'Статус', 'Создал'] as $h) {
+        echo '<Cell ss:StyleID="s_head"><Data ss:Type="String">' . ec($h) . '</Data></Cell>' . "\n";
+    }
+    echo '</Row>' . "\n";
+    foreach ($dryDetails as $dr) {
+        $typeLabel   = $dr['ration_type'] === 'dry_ration' ? 'Сухой паёк' : 'Выездное питание';
+        $statusLabel = $dr['status'] === 'active' ? 'Активен' : 'Аннулирован';
+        echo '<Row ss:Height="18">' . "\n";
+        echo '<Cell ss:StyleID="s_data"><Data ss:Type="String">' . ec(date('d.m.Y', strtotime($dr['ration_date']))) . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s_data"><Data ss:Type="String">' . ec($dr['full_name'])       . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s_data"><Data ss:Type="String">' . ec($dr['organization'])    . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s_data"><Data ss:Type="String">' . ec($dr['department'] ?? '') . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s_data"><Data ss:Type="String">' . ec($dr['vjg_type'] ?? '')  . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s_data"><Data ss:Type="String">' . ec($typeLabel)             . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s_data"><Data ss:Type="String">' . ec($statusLabel)           . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s_data"><Data ss:Type="String">' . ec($dr['created_by_name'] ?? '') . '</Data></Cell>' . "\n";
+        echo '</Row>' . "\n";
+    }
+    echo '</Table>' . "\n";
+    echo '<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><FreezePanes/><FrozenNoSplit/><SplitHorizontal>2</SplitHorizontal><TopRowBottomPane>2</TopRowBottomPane><ActivePane>2</ActivePane></WorksheetOptions>' . "\n";
+    echo '</Worksheet>' . "\n";
+}
+
 echo '</Workbook>';
 
 $content = ob_get_clean();

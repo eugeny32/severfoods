@@ -10,19 +10,90 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['is_admin'])) {
     header('Location: index.php'); exit;
 }
 
-$start_date = preg_replace('/[^0-9\-]/', '', $_GET['start_date'] ?? date('Y-m-d', strtotime('-30 days')));
-$end_date   = preg_replace('/[^0-9\-]/', '', $_GET['end_date']   ?? date('Y-m-d'));
-$meal_type  = in_array($_GET['meal_type'] ?? '', ['breakfast','lunch','dinner','night'])
-              ? $_GET['meal_type'] : 'all';
-$point_id   = (isset($_GET['point_id']) && ctype_digit((string)($_GET['point_id'])))
-              ? (int)$_GET['point_id'] : null;
+$start_date  = preg_replace('/[^0-9\-]/', '', $_GET['start_date'] ?? date('Y-m-d', strtotime('-30 days')));
+$end_date    = preg_replace('/[^0-9\-]/', '', $_GET['end_date']   ?? date('Y-m-d'));
+$meal_type   = in_array($_GET['meal_type'] ?? '', ['breakfast','lunch','dinner','night'])
+               ? $_GET['meal_type'] : 'all';
+$report_type = ($_GET['report_type'] ?? 'meals') === 'dry_rations' ? 'dry_rations' : 'meals';
+$point_id    = (isset($_GET['point_id']) && ctype_digit((string)($_GET['point_id'])))
+               ? (int)$_GET['point_id'] : null;
 
 $user_role    = $_SESSION['role']              ?? 'admin';
 $is_super     = ($user_role === 'super_admin');
 $assigned_pid = $_SESSION['assigned_point_id'] ?? null;
 if (!$is_super && $assigned_pid) $point_id = $assigned_pid;
 
-// Данные
+if ($report_type === 'dry_rations') {
+    // Данные по сухим пайкам
+    $sqlDry = "SELECT dr.ration_date, dr.ration_type, dr.status, dr.created_at,
+                      e.full_name, e.organization, e.department, e.vjg_type,
+                      op.full_name as created_by_name
+               FROM dry_rations dr
+               JOIN employees e ON dr.employee_id = e.id
+               LEFT JOIN employees op ON dr.created_by = op.id
+               WHERE dr.ration_date BETWEEN :s AND :e
+               ORDER BY dr.ration_date DESC, e.full_name";
+    $stmtDry = $pdo->prepare($sqlDry);
+    $stmtDry->execute([':s' => $start_date, ':e' => $end_date]);
+    $dryLogs = $stmtDry->fetchAll(PDO::FETCH_ASSOC);
+
+    $title   = 'Сухой паёк / Выездное питание: ' . $start_date . ' — ' . $end_date;
+    $headers = ['Дата', 'ФИО', 'Организация', 'Отдел', 'Вахтовый жилой городок', 'Тип', 'Статус', 'Создал'];
+    $widths  = [90, 200, 180, 130, 140, 130, 100, 160];
+
+    ob_start();
+    echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
+    echo '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"' . "\n";
+    echo '  xmlns:o="urn:schemas-microsoft-com:office:office"' . "\n";
+    echo '  xmlns:x="urn:schemas-microsoft-com:office:excel"' . "\n";
+    echo '  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"' . "\n";
+    echo '  xmlns:html="http://www.w3.org/TR/REC-html40">' . "\n";
+    echo '<Styles>' . "\n";
+    echo '<Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Bottom"/><Font ss:FontName="Calibri" ss:Size="11"/></Style>' . "\n";
+    echo '<Style ss:ID="s1"><Font ss:FontName="Calibri" ss:Size="13" ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#003366" ss:Pattern="Solid"/><Alignment ss:Horizontal="Left" ss:Vertical="Center"/></Style>' . "\n";
+    echo '<Style ss:ID="s2"><Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#003366"/><Interior ss:Color="#DBEAFE" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#B0BEC5"/></Borders></Style>' . "\n";
+    echo '<Style ss:ID="s3"><Font ss:FontName="Calibri" ss:Size="11"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/></Borders></Style>' . "\n";
+    echo '<Style ss:ID="s_act"><Font ss:FontName="Calibri" ss:Size="11" ss:Color="#15803d"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/></Borders></Style>' . "\n";
+    echo '<Style ss:ID="s_can"><Font ss:FontName="Calibri" ss:Size="11" ss:Color="#dc2626"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/></Borders></Style>' . "\n";
+    echo '</Styles>' . "\n";
+    echo '<Worksheet ss:Name="Сухой паёк">' . "\n";
+    echo '<Table>' . "\n";
+    foreach ($widths as $w) echo '<Column ss:Width="' . $w . '"/>' . "\n";
+    echo '<Row ss:Height="28"><Cell ss:StyleID="s1" ss:MergeAcross="' . (count($headers)-1) . '"><Data ss:Type="String">' . ec($title) . '</Data></Cell></Row>' . "\n";
+    echo '<Row ss:Height="24">' . "\n";
+    foreach ($headers as $h) echo '<Cell ss:StyleID="s2"><Data ss:Type="String">' . ec($h) . '</Data></Cell>' . "\n";
+    echo '</Row>' . "\n";
+    foreach ($dryLogs as $dr) {
+        $typeLabel   = $dr['ration_type'] === 'dry_ration' ? 'Сухой паёк' : 'Выездное питание';
+        $statusLabel = $dr['status'] === 'active' ? 'Активен' : 'Аннулирован';
+        $statusStyle = $dr['status'] === 'active' ? 's_act' : 's_can';
+        echo '<Row ss:Height="18">' . "\n";
+        echo '<Cell ss:StyleID="s3"><Data ss:Type="String">' . ec(date('d.m.Y', strtotime($dr['ration_date']))) . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s3"><Data ss:Type="String">' . ec($dr['full_name'])       . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s3"><Data ss:Type="String">' . ec($dr['organization'])    . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s3"><Data ss:Type="String">' . ec($dr['department'] ?? '') . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s3"><Data ss:Type="String">' . ec($dr['vjg_type'] ?? '')  . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s3"><Data ss:Type="String">' . ec($typeLabel)             . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="' . $statusStyle . '"><Data ss:Type="String">' . ec($statusLabel) . '</Data></Cell>' . "\n";
+        echo '<Cell ss:StyleID="s3"><Data ss:Type="String">' . ec($dr['created_by_name'] ?? '') . '</Data></Cell>' . "\n";
+        echo '</Row>' . "\n";
+    }
+    echo '</Table>' . "\n";
+    echo '<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><FreezePanes/><FrozenNoSplit/><SplitHorizontal>2</SplitHorizontal><TopRowBottomPane>2</TopRowBottomPane><ActivePane>2</ActivePane></WorksheetOptions>' . "\n";
+    echo '</Worksheet>' . "\n";
+    echo '</Workbook>';
+    $content = ob_get_clean();
+    while (ob_get_level() > 0) ob_end_clean();
+    $fname = 'sukhpay_' . $start_date . '_' . $end_date . '.xls';
+    header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="' . rawurlencode($fname) . '"');
+    header('Content-Length: ' . strlen($content));
+    header('Cache-Control: max-age=0, no-store');
+    echo $content;
+    exit;
+}
+
+// Данные (режим столовая)
 $sql = "SELECT ml.scanned_at, e.full_name, e.organization, e.department,
                e.vjg_type, e.price, ml.meal_type,
                ml.operator_name, ml.meal_point_name
