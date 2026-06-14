@@ -157,6 +157,12 @@ arsort($by_point); arsort($by_org);
 .by-bar-wrap { flex: 2; height: 14px; background: var(--bg-deep); border-radius: 4px; overflow: hidden; }
 .by-bar { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--blue-700), var(--blue-400)); min-width: 2px; }
 .by-cnt { font-size: 13px; font-weight: 700; color: var(--blue-700); width: 36px; text-align: right; }
+th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
+th.sortable:hover { background:#c7d9f0; }
+th.sortable .sort-icon { display:inline-block; margin-left:4px; opacity:.4; font-size:10px; }
+th.sortable.asc  .sort-icon::after { content:'▲'; opacity:1; }
+th.sortable.desc .sort-icon::after { content:'▼'; opacity:1; }
+th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
 </style>
 </head>
 <body style="background:var(--bg)">
@@ -269,14 +275,14 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
         <table class="report-table">
             <thead>
                 <tr>
-                    <th>Дата</th>
-                    <th>ФИО</th>
-                    <th>Организация</th>
-                    <th>Отдел</th>
-                    <th>Вахтовый жилой городок</th>
-                    <th>Тип</th>
-                    <th>Статус</th>
-                    <th>Создал</th>
+                    <th class="sortable">Дата<span class="sort-icon"></span></th>
+                    <th class="sortable">ФИО<span class="sort-icon"></span></th>
+                    <th class="sortable">Организация<span class="sort-icon"></span></th>
+                    <th class="sortable">Отдел<span class="sort-icon"></span></th>
+                    <th class="sortable">Вахтовый жилой городок<span class="sort-icon"></span></th>
+                    <th class="sortable">Тип<span class="sort-icon"></span></th>
+                    <th class="sortable">Статус<span class="sort-icon"></span></th>
+                    <th class="sortable">Создал<span class="sort-icon"></span></th>
                 </tr>
             </thead>
             <tbody>
@@ -388,14 +394,14 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
         <table class="report-table">
             <thead>
                 <tr>
-                    <th>Дата / Время</th>
-                    <th>ФИО</th>
-                    <th>Организация</th>
-                    <th>Отдел</th>
-                    <th>Вахтовый жилой городок</th>
-                    <th>Тип питания</th>
-                    <th>Точка</th>
-                    <th>Оператор</th>
+                    <th class="sortable">Дата / Время<span class="sort-icon"></span></th>
+                    <th class="sortable">ФИО<span class="sort-icon"></span></th>
+                    <th class="sortable">Организация<span class="sort-icon"></span></th>
+                    <th class="sortable">Отдел<span class="sort-icon"></span></th>
+                    <th class="sortable">Вахтовый жилой городок<span class="sort-icon"></span></th>
+                    <th class="sortable">Тип питания<span class="sort-icon"></span></th>
+                    <th class="sortable">Точка<span class="sort-icon"></span></th>
+                    <th class="sortable">Оператор<span class="sort-icon"></span></th>
                 </tr>
             </thead>
             <tbody>
@@ -451,10 +457,10 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
                 <thead>
                     <tr>
                         <th style="width:40px">#</th>
-                        <th>ФИО</th>
-                        <th>Подразделение</th>
-                        <th style="text-align:center">Приёмов пищи</th>
-                        <th style="text-align:center">Дней в столовой</th>
+                        <th class="sortable">ФИО<span class="sort-icon"></span></th>
+                        <th class="sortable">Подразделение<span class="sort-icon"></span></th>
+                        <th class="sortable" style="text-align:center">Приёмов пищи<span class="sort-icon"></span></th>
+                        <th class="sortable" style="text-align:center">Дней в столовой<span class="sort-icon"></span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -487,5 +493,29 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
 </div><!-- /page -->
 
 <script src="assets/js/app.js" defer></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const tbody = th.closest('table').querySelector('tbody');
+            if (!tbody) return;
+            const col = Array.from(th.parentElement.children).indexOf(th);
+            const asc = !th.classList.contains('asc');
+            // Reset siblings
+            th.closest('tr').querySelectorAll('th.sortable').forEach(t => t.classList.remove('asc','desc'));
+            th.classList.add(asc ? 'asc' : 'desc');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            rows.sort((a, b) => {
+                const ca = a.children[col]?.textContent.trim() ?? '';
+                const cb = b.children[col]?.textContent.trim() ?? '';
+                const na = parseFloat(ca.replace(/\s/g,'')), nb = parseFloat(cb.replace(/\s/g,''));
+                const cmp = (!isNaN(na) && !isNaN(nb)) ? na - nb : ca.localeCompare(cb, 'ru');
+                return asc ? cmp : -cmp;
+            });
+            rows.forEach(r => tbody.appendChild(r));
+        });
+    });
+});
+</script>
 </body>
 </html>
