@@ -19,7 +19,7 @@ if (is_dir($dir)) {
 $hasFile   = $latest !== null;
 $fileName  = $hasFile ? basename($latest) : null;
 $fileSize  = $hasFile ? round(filesize($latest) / 1024 / 1024, 1) . ' МБ' : null;
-$fileDate  = $hasFile ? date('d.m.Y', $latestTime) : null;
+$fileDate  = $hasFile ? date('d.m.Y', filemtime($latest)) : null;
 // Extract version from filename like SeverFoods-Setup-1.3.0.exe
 $version   = '';
 if ($fileName && preg_match('/(\d+\.\d+\.\d+)/', $fileName, $m)) $version = 'v' . $m[1];
