@@ -539,7 +539,7 @@ function insertSystemMsg(PDO $pdo, int $roomId, string $text): void
 
 function doAddMember(): void
 {
-    global $pdo, $uid, $uname;
+    global $pdo, $uid, $uname, $isAdmin;
     Csrf::guard();
 
     $b      = jsonBody();
