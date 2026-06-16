@@ -80,14 +80,35 @@ if (session_status() === PHP_SESSION_NONE) {
         || (int)($_SERVER['SERVER_PORT'] ?? 80) === 443
         || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
 
+    $sessionLifetime = 86400 * 30; // 30 дней — максимально удерживаем сессию
+
+    // session.gc_maxlifetime по умолчанию ~24 мин — без этого сервер удалит
+    // файл сессии задолго до истечения куки, и пользователь всё равно
+    // окажется разлогинен. Синхронизируем оба значения.
+    ini_set('session.gc_maxlifetime', (string)$sessionLifetime);
+    ini_set('session.cookie_lifetime', (string)$sessionLifetime);
+
     session_set_cookie_params([
-        'lifetime' => 86400 * 7,   // 7 дней
+        'lifetime' => $sessionLifetime,
         'path'     => '/',
         'secure'   => $isHttps,    // только HTTPS при продакшне
         'httponly' => true,        // недоступно JS
         'samesite' => 'Lax',
     ]);
     session_start();
+
+    // Продлеваем срок действия куки при каждом запросе ("скользящая" сессия) —
+    // активный пользователь не будет разлогинен, даже если открыл вкладку
+    // позже истечения исходных 30 дней с момента входа.
+    if (isset($_COOKIE[session_name()])) {
+        setcookie(session_name(), session_id(), [
+            'expires'  => time() + $sessionLifetime,
+            'path'     => '/',
+            'secure'   => $isHttps,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    }
 }
 
 // ─── Хелперы авторизации ─────────────────────────────
