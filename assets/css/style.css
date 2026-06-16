@@ -86,7 +86,8 @@ body.flash-error   { animation: flashError   .5s ease; }
 .header {
     background: var(--blue-800);
     color: white;
-    height: var(--header-h);
+    height: calc(var(--header-h) + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
     position: sticky; top: 0; z-index: 200;
     box-shadow: 0 2px 16px rgba(0,0,0,.25);
 }
