@@ -188,13 +188,19 @@ function doPush(): void
         }
 
         // Нормализуем время: в БД всегда храним чистый UTC.
-        // Клиент шлёт либо UNIX-мс (уже честный UTC-эпох), либо ISO-строку
-        // с явным офсетом — strtotime() корректно учитывает офсет при парсинге.
+        // Клиент шлёт либо UNIX-мс (уже честный UTC-эпох), либо строку времени.
+        // Офлайн-приложение формирует scanned_at через toISOString() и обрезает 'Z' —
+        // это ГОЛАЯ UTC-строка без офсета, поэтому strtotime() нельзя доверять "как есть":
+        // без явного офсета он трактует её в серверном часовом поясе PHP (Europe/Moscow),
+        // что даёт сдвиг на 3 часа. Явный офсет/Z в строке — уважаем и парсим как есть.
         if (is_numeric($scannedAt)) {
             $ts = (int)($scannedAt / 1000);
-        } else {
-            $ts = $scannedAt ? strtotime($scannedAt) : false;
+        } elseif ($scannedAt) {
+            $hasOffset = (bool)preg_match('/[Zz]$|[+\-]\d{2}:?\d{2}$/', trim($scannedAt));
+            $ts = strtotime($hasOffset ? $scannedAt : $scannedAt . ' UTC');
             if ($ts === false) $ts = time();
+        } else {
+            $ts = time();
         }
         $scannedAt = gmdate('Y-m-d H:i:s', $ts);
 
