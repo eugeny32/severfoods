@@ -3,6 +3,10 @@
 // ── State ──────────────────────────────────────────────────
 let currentUser     = null;
 let currentPage     = 'scanner';
+// Часовой пояс точки (UTC-офсет вида "+07:00"). scanned_at в БД хранится в UTC,
+// поэтому для подсчёта "сегодня" и отображения местного времени офсет нужен явно —
+// полагаться на часовой пояс ОС нельзя. Загружается из /api/config при старте.
+let TZ_OFFSET = '+03:00';
 let currentMealType = 'breakfast';
 let allEmployees    = [];
 
@@ -115,6 +119,11 @@ function closeCamModal() {
 
 // ── Init ──────────────────────────────────────────────────
 (async function boot() {
+    try {
+        const d = await fetch('/api/config').then(r => r.json());
+        if (d.tz_offset) TZ_OFFSET = d.tz_offset;
+    } catch (_) {}
+
     await loadLoginPoints();
 
     try {
@@ -617,6 +626,61 @@ function renderScanLog() {
         </div>`).join('');
 }
 
+// ── Часовой пояс: местные сутки + отображение времени ──────
+function tzOffsetMinutes(tz) {
+    const m = /^([+-])(\d{2}):(\d{2})$/.exec(tz || '');
+    if (!m) return 0;
+    return (m[1] === '-' ? -1 : 1) * (parseInt(m[2], 10) * 60 + parseInt(m[3], 10));
+}
+
+/** Начало текущих местных суток в UTC ('YYYY-MM-DD HH:MM:SS', под формат SQLite). */
+function localTodayStartUtc() {
+    const offMin = tzOffsetMinutes(TZ_OFFSET);
+    const localDate = new Date(Date.now() + offMin * 60000).toISOString().slice(0, 10);
+    const localMidnightUtcMs = Date.parse(localDate + 'T00:00:00Z') - offMin * 60000;
+    return new Date(localMidnightUtcMs).toISOString().replace('T', ' ').slice(0, 19);
+}
+
+/** scanned_at хранится как "голая" UTC-строка — форматируем в местное время явно по офсету. */
+function fmtLocalTime(scannedAtStr) {
+    const d = _localDateFromUtcStr(scannedAtStr);
+    if (!d) return '—';
+    const p2 = n => String(n).padStart(2, '0');
+    return `${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}:${p2(d.getUTCSeconds())}`;
+}
+
+function fmtLocalDateTime(scannedAtStr) {
+    const d = _localDateFromUtcStr(scannedAtStr);
+    if (!d) return '—';
+    const p2 = n => String(n).padStart(2, '0');
+    return `${p2(d.getUTCDate())}.${p2(d.getUTCMonth()+1)}.${d.getUTCFullYear()} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
+}
+
+function _localDateFromUtcStr(scannedAtStr) {
+    if (!scannedAtStr) return null;
+    const utcMs = Date.parse(scannedAtStr.replace(' ', 'T') + 'Z');
+    if (isNaN(utcMs)) return null;
+    return new Date(utcMs + tzOffsetMinutes(TZ_OFFSET) * 60000);
+}
+
+async function saveTzOffset() {
+    const tz  = document.getElementById('cfgTzOffset')?.value;
+    const res = await fetch('/api/config', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ tz_offset: tz }),
+    });
+    const data = await res.json();
+    const msg  = document.getElementById('tzSaveMsg');
+    if (data.ok) {
+        TZ_OFFSET = tz;
+        loadTodayStats();
+        if (msg) { msg.style.display = ''; setTimeout(() => { msg.style.display = 'none'; }, 3000); }
+    } else {
+        alert(data.error || 'Ошибка сохранения');
+    }
+}
+
 // ── Today stats + scan log from DB ────────────────────────
 const _todayStats = { breakfast:0, lunch:0, dinner:0, night:0 };
 
@@ -634,9 +698,8 @@ function updateScanStats(type, delta) {
 
 async function loadTodayStats() {
     try {
-        const today = new Date().toISOString().slice(0, 10);
         const ptId  = currentUser?.selected_point_id || currentUser?.assigned_point_id || null;
-        const since = `${today} 00:00:00`; // space-separated to match SQLite storage format
+        const since = localTodayStartUtc(); // местная полночь, переведённая в UTC
         const url   = ptId
             ? `/api/meal_logs?limit=2000&since=${encodeURIComponent(since)}&point_id=${ptId}`
             : `/api/meal_logs?limit=2000&since=${encodeURIComponent(since)}`;
@@ -648,10 +711,7 @@ async function loadTodayStats() {
         (data.logs || []).forEach(l => {
             if (l.meal_type in _todayStats) _todayStats[l.meal_type]++;
             // Populate scan log from DB (access_granted only, today)
-            const time = l.scanned_at
-                ? new Date(l.scanned_at.replace(' ', 'T'))
-                    .toLocaleTimeString('ru', { hour:'2-digit', minute:'2-digit', second:'2-digit' })
-                : '—';
+            const time = fmtLocalTime(l.scanned_at);
             scanLogEntries.push({ name: l.employee_name || '—', type: 'ok', time });
         });
 
@@ -912,7 +972,7 @@ async function loadLogs() {
     ).join('');
 
     document.getElementById('logsBody').innerHTML = logs.map(l => {
-        const dt = new Date(l.scanned_at).toLocaleString('ru-RU');
+        const dt = fmtLocalDateTime(l.scanned_at);
         const s  = l.synced ? '<span class="badge badge-sync">Синхр.</span>' : '<span class="badge badge-unsync">Офлайн</span>';
         return `<tr>
             <td>${dt}</td>
@@ -1021,6 +1081,30 @@ function renderSettings() {
         <div id="setPtSchedules"></div>
     `);
 
+    // 3b. Часовой пояс — влияет на подсчёт "сегодня" и отображаемое время.
+    // В БД время хранится в UTC, а показывать нужно местное — офсет ОС ненадёжен,
+    // поэтому его нужно задать явно (совпадает с настройкой точки на сайте).
+    const tzOptions = Array.from({ length: 27 }, (_, i) => i - 12)
+        .map(h => `%${h >= 0 ? '+' : '-'}${String(Math.abs(h)).padStart(2,'0')}:00`.replace('%',''))
+        .map(v => `<option value="${v}">UTC${v}</option>`).join('');
+    if (isAdmin) {
+        grid.innerHTML += card('Часовой пояс', 'globe', `
+            <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:5px">
+                <label>Часовой пояс точки (UTC)</label>
+                <select id="cfgTzOffset" class="setting-input">${tzOptions}</select>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn-primary" onclick="saveTzOffset()"><i class="fas fa-save"></i> Сохранить</button>
+                <span class="settings-save-msg" id="tzSaveMsg">✅ Сохранено</span>
+            </div>
+            <p class="setting-note">Определяет границу "сегодня" в статистике и отображаемое местное время. Должен совпадать с часовым поясом, заданным для этой точки на сайте.</p>
+        `);
+    } else {
+        grid.innerHTML += card('Часовой пояс', 'globe', `
+            <div class="setting-row"><label>Часовой пояс точки</label><span id="tzReadonly">—</span></div>
+        `);
+    }
+
     // 4. DB info (admin+)
     if (isAdmin) {
         grid.innerHTML += card('База данных', 'database', `
@@ -1099,11 +1183,15 @@ function renderSettings() {
             if (el('setServerUrl')) el('setServerUrl').textContent = d.sync_url || '—';
             if (el('setEnvPath'))   el('setEnvPath').textContent   = d.env_path || '—';
             if (el('setVersion'))   el('setVersion').textContent   = d.version  || '—';
+            if (el('cfgTzOffset'))  el('cfgTzOffset').value        = d.tz_offset || '+03:00';
+        } else {
+            if (el('tzReadonly'))   el('tzReadonly').textContent   = 'UTC' + (d.tz_offset || '+03:00');
         }
         if (isSA) {
             if (el('cfgSyncUrl'))   el('cfgSyncUrl').value   = d.sync_url   || '';
             if (el('cfgSyncToken')) el('cfgSyncToken').value = d.sync_token || '';
         }
+        if (d.tz_offset) { TZ_OFFSET = d.tz_offset; loadTodayStats(); }
     }).catch(()=>{});
 
     // Schedule for current point (all users see their own point)

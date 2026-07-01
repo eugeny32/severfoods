@@ -30,11 +30,20 @@ function notifyStatus() {
     } catch (_) {}
 }
 
+// Приложение работает офлайн, синхронизация зачастую идёт по медленному
+// каналу — короткий таймаут (было 15с) давал ложные ошибки на слабом интернете.
+// ping — короткий (быстро понять, что сети нет), остальное — с большим запасом.
+const TIMEOUT_PING    = 15000;
+const TIMEOUT_DEFAULT = 45000;
+const TIMEOUT_PUSH    = 120000; // отправка накопленных офлайн-записей — самый тяжёлый запрос
+
 async function api(action, opts = {}) {
     const url    = `${BASE_URL}?action=${action}`;
     const method = opts.method || 'GET';
     const body   = opts.body ? JSON.stringify(opts.body) : undefined;
     const since  = opts.since ? `&since=${encodeURIComponent(opts.since)}` : '';
+    const timeout = opts.timeout
+        || (action === 'ping' ? TIMEOUT_PING : action === 'push' ? TIMEOUT_PUSH : TIMEOUT_DEFAULT);
 
     const res = await fetch(url + since, {
         method,
@@ -43,7 +52,7 @@ async function api(action, opts = {}) {
             'Content-Type':  'application/json',
         },
         body,
-        timeout: 15000,
+        timeout,
     });
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -77,17 +86,25 @@ async function pullMealPoints() {
     return data.meal_points.length;
 }
 
+const PUSH_BATCH_SIZE = 200; // на слабом канале большой единый запрос чаще падает по таймауту
+
 async function pushLogs() {
     const logs = db.getUnsyncedLogs();
     if (!logs.length) return { inserted: 0, skipped: 0, errors: 0 };
 
-    const data = await api('push', {
-        method: 'POST',
-        body: { records: logs },
-    });
-
-    db.markLogsSynced(data.results || []);
-    return { inserted: data.inserted, skipped: data.skipped, errors: data.errors };
+    const totals = { inserted: 0, skipped: 0, errors: 0 };
+    for (let i = 0; i < logs.length; i += PUSH_BATCH_SIZE) {
+        const batch = logs.slice(i, i + PUSH_BATCH_SIZE);
+        const data  = await api('push', {
+            method: 'POST',
+            body: { records: batch },
+        });
+        db.markLogsSynced(data.results || []);
+        totals.inserted += data.inserted || 0;
+        totals.skipped  += data.skipped  || 0;
+        totals.errors   += data.errors   || 0;
+    }
+    return totals;
 }
 
 async function runSync() {

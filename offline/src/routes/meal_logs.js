@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const db     = require('../db');
+const tz     = require('../tz');
 const crypto = require('crypto');
 
 const VALID_TYPES = ['breakfast', 'lunch', 'dinner', 'night'];
@@ -21,8 +22,8 @@ router.post('/', (req, res) => {
         return res.status(400).json({ ok: false, error: 'invalid_params' });
     }
 
-    // local dedup: same employee + type + today
-    if (db.hasTodayLog(employee_id, meal_type)) {
+    // local dedup: same employee + type + today (местные сутки по настроенному часовому поясу)
+    if (db.hasTodayLog(employee_id, meal_type, tz.todayWindowUtc())) {
         return res.json({ ok: false, error: 'duplicate', message: 'Уже зафиксировано сегодня' });
     }
 

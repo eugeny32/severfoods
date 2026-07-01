@@ -193,11 +193,13 @@ function markLogsSynced(results) {
     _save();
 }
 
-function hasTodayLog(employeeId, mealType) {
-    const today = new Date().toISOString().slice(0, 10);
+function hasTodayLog(employeeId, mealType, window) {
+    // window = { start, end } — местные сутки в UTC (см. tz.js todayWindowUtc()).
+    // Без явного офсета часовой пояс ОС ненадёжен, поэтому окно передаётся вызывающей стороной.
+    const { start, end } = window || { start: new Date().toISOString().slice(0, 10) + ' 00:00:00', end: '9999-12-31 23:59:59' };
     return !!_get(`SELECT 1 FROM meal_logs
-                   WHERE employee_id=? AND meal_type=? AND DATE(scanned_at)=? AND access_granted=1 LIMIT 1`,
-        [employeeId, mealType, today]);
+                   WHERE employee_id=? AND meal_type=? AND scanned_at BETWEEN ? AND ? AND access_granted=1 LIMIT 1`,
+        [employeeId, mealType, start, end]);
 }
 
 // ── sync_meta ─────────────────────────────────────────────

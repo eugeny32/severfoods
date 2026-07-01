@@ -3,6 +3,7 @@ const fs      = require('fs');
 const path    = require('path');
 const { execSync } = require('child_process');
 const db      = require('../db');
+const tz      = require('../tz');
 
 const ENV_PATH = path.join(require('electron').app.getPath('userData'), '../../../.env');
 // Fallback for dev: look next to main.js
@@ -52,6 +53,7 @@ router.get('/', (req, res) => {
         ok: true,
         sync_url:   env.OFFLINE_SYNC_URL   || 'https://www.severfoods.ru/api/offline_sync.php',
         sync_token: env.OFFLINE_SYNC_TOKEN || '',
+        tz_offset:  tz.getTzOffset(),
         version:    process.env.npm_package_version || '1.0.0',
         commit_date: (() => { try { return execSync('git log -1 --format=%cd --date=format:%d.%m.%Y', { cwd: path.join(__dirname, '../..'), stdio: ['pipe','pipe','pipe'] }).toString().trim(); } catch(_){ return '—'; } })(),
         db_path:    db.getDbPath ? db.getDbPath() : '—',
@@ -59,12 +61,17 @@ router.get('/', (req, res) => {
     });
 });
 
-// POST /api/config — update sync_url and/or sync_token
+// POST /api/config — update sync_url and/or sync_token and/or tz_offset
 router.post('/', (req, res) => {
-    const { sync_url, sync_token } = req.body || {};
+    const { sync_url, sync_token, tz_offset } = req.body || {};
     if (sync_url  !== undefined) writeEnvKey('OFFLINE_SYNC_URL',   sync_url);
     if (sync_token !== undefined) writeEnvKey('OFFLINE_SYNC_TOKEN', sync_token);
-    res.json({ ok: true, message: 'Сохранено. Перезапустите приложение для применения.' });
+    if (tz_offset !== undefined) {
+        if (!tz.setTzOffset(tz_offset)) {
+            return res.status(400).json({ ok: false, error: 'Некорректный часовой пояс (пример: +07:00)' });
+        }
+    }
+    res.json({ ok: true, message: 'Сохранено.' });
 });
 
 // GET /api/config/schedules — all points with schedules
