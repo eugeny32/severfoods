@@ -20,19 +20,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $city  = trim($_POST['city'] ?? '');
         $addr  = trim($_POST['address'] ?? '');
         $sort  = intval($_POST['sort_order'] ?? 0);
+        $tz    = trim($_POST['tz_offset'] ?? '');
+        $tz    = preg_match('/^[+-]\d{2}:\d{2}$/', $tz) ? $tz : null;
 
         if (!$name || !$code) { $error = 'Название и код обязательны'; }
         else {
             try {
+                $pdo->exec("ALTER TABLE meal_points ADD COLUMN tz_offset VARCHAR(6) DEFAULT NULL");
+            } catch (PDOException $e) {}
+            try {
                 $pdo->prepare(
-                    "INSERT INTO meal_points (point_name, point_code, city, address, sort_order, is_active)
-                     VALUES (?, ?, ?, ?, ?, 1)"
-                )->execute([$name, $code, $city, $addr, $sort]);
+                    "INSERT INTO meal_points (point_name, point_code, city, address, sort_order, tz_offset, is_active)
+                     VALUES (?, ?, ?, ?, ?, ?, 1)"
+                )->execute([$name, $code, $city, $addr, $sort, $tz]);
                 logAction('add_point', "Добавлена точка: {$name} ({$code})");
                 $msg = "Точка «{$name}» добавлена";
             } catch (PDOException $e) {
                 $error = 'Ошибка: точка с таким кодом уже существует';
             }
+        }
+    } elseif ($action === 'set_tz') {
+        $pid = intval($_POST['id']);
+        $tz  = trim($_POST['tz_offset'] ?? '');
+        if ($tz !== '' && !preg_match('/^[+-]\d{2}:\d{2}$/', $tz)) {
+            $error = 'Некорректный формат часового пояса (пример: +07:00)';
+        } else {
+            $pdo->prepare("UPDATE meal_points SET tz_offset=? WHERE id=?")->execute([$tz === '' ? null : $tz, $pid]);
+            logAction('set_point_tz', "Точка ID:{$pid} → часовой пояс " . ($tz !== '' ? $tz : 'по умолчанию'));
+            $msg = "Часовой пояс точки обновлён";
         }
     } elseif ($action === 'toggle') {
         $pid   = intval($_POST['id']);
@@ -128,6 +143,16 @@ $points = getMealPoints($pdo, false); // все, включая неактивн
                 <label>Порядок сортировки</label>
                 <input type="number" name="sort_order" value="0" min="0">
             </div>
+            <div class="form-group">
+                <label>Часовой пояс точки (UTC)</label>
+                <select name="tz_offset">
+                    <option value="">— по умолчанию (как в браузере)</option>
+                    <?php for ($h = -12; $h <= 14; $h++):
+                        $val = sprintf('%s%02d:00', $h >= 0 ? '+' : '-', abs($h)); ?>
+                    <option value="<?= $val ?>">UTC<?= $val ?></option>
+                    <?php endfor; ?>
+                </select>
+            </div>
         </div>
         <div style="margin-top:16px">
             <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Добавить точку</button>
@@ -151,6 +176,7 @@ $points = getMealPoints($pdo, false); // все, включая неактивн
                     <th>Код</th>
                     <th>Город</th>
                     <th>Адрес</th>
+                    <th>Часовой пояс</th>
                     <th>Статус</th>
                     <th>Действия</th>
                 </tr>
@@ -162,6 +188,20 @@ $points = getMealPoints($pdo, false); // все, включая неактивн
                     <td><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:12px"><?= htmlspecialchars($pt['point_code']) ?></code></td>
                     <td><?= htmlspecialchars($pt['city'] ?? '—') ?></td>
                     <td style="color:var(--text-3);font-size:13px"><?= htmlspecialchars($pt['address'] ?? '—') ?></td>
+                    <td>
+                        <form method="POST" style="display:flex;gap:6px;align-items:center">
+                            <?= Csrf::field() ?>
+                            <input type="hidden" name="action" value="set_tz">
+                            <input type="hidden" name="id" value="<?= $pt['id'] ?>">
+                            <select name="tz_offset" onchange="this.form.submit()" style="font-size:12px;padding:4px 6px">
+                                <option value="">по умолчанию</option>
+                                <?php for ($h = -12; $h <= 14; $h++):
+                                    $val = sprintf('%s%02d:00', $h >= 0 ? '+' : '-', abs($h)); ?>
+                                <option value="<?= $val ?>" <?= ($pt['tz_offset'] ?? '') === $val ? 'selected' : '' ?>>UTC<?= $val ?></option>
+                                <?php endfor; ?>
+                            </select>
+                        </form>
+                    </td>
                     <td>
                         <span>
                             <span class="active-dot <?= $pt['is_active']?'':'inactive-dot' ?>"></span>

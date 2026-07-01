@@ -140,14 +140,15 @@ function processAccess(PDO $pdo, string $qr_code, ?string $ip = null): array
                 'employee' => $employee, 'code' => 'NO_MEAL_TIME'];
     }
 
-    $today = localToday();
+    $pointTz = getPointTz($pdo, $meal_point_id);
+    $today   = gmdate('Y-m-d', time() + offsetToMinutes($pointTz) * 60);
     $stmt = $pdo->prepare(
         "SELECT scanned_at FROM meal_logs
-         WHERE employee_id = ? AND meal_type = ? AND DATE(" . tzExpr('scanned_at') . ") = ?
+         WHERE employee_id = ? AND meal_type = ? AND DATE(CONVERT_TZ(scanned_at, '+00:00', ?)) = ?
            AND access_granted = 1
          ORDER BY scanned_at DESC LIMIT 1"
     );
-    $stmt->execute([$employee['id'], $meal_type, $today]);
+    $stmt->execute([$employee['id'], $meal_type, $pointTz, $today]);
     $last_scan = $stmt->fetch();
 
     if ($last_scan) {
@@ -179,7 +180,7 @@ function processAccess(PDO $pdo, string $qr_code, ?string $ip = null): array
     try {
         $pdo->prepare(
             "UPDATE dry_rations SET status='cancelled', cancelled_at=NOW() WHERE employee_id=? AND ration_date=? AND ration_type='field' AND status='active'"
-        )->execute([$employee['id'], localToday()]);
+        )->execute([$employee['id'], $today]);
     } catch (PDOException $e) {}
 
     $price_msg = ($employee['price'] > 0)
@@ -196,20 +197,42 @@ function processAccess(PDO $pdo, string $qr_code, ?string $ip = null): array
 
 function getTodayStats(PDO $pdo): array
 {
-    $today = localToday();
     $stats = ['total' => 0, 'breakfast' => 0, 'lunch' => 0, 'dinner' => 0, 'night' => 0];
     try {
-        $stmt = $pdo->prepare(
-            "SELECT meal_type,
-                    COUNT(DISTINCT CONCAT(employee_id,'_',meal_type)) AS cnt
-             FROM meal_logs
-             WHERE DATE(" . tzExpr('scanned_at') . ") = ? AND access_granted = 1
-             GROUP BY meal_type"
-        );
-        $stmt->execute([$today]);
-        foreach ($stmt->fetchAll() as $row) {
-            $stats[$row['meal_type']] = (int)$row['cnt'];
-            $stats['total']           += (int)$row['cnt'];
+        // Каждая точка считает "сегодня" по своему часовому поясу — точки
+        // группируем по офсету, чтобы не делать запрос на каждую точку отдельно.
+        $points  = $pdo->query("SELECT id, tz_offset FROM meal_points WHERE is_active = 1")->fetchAll();
+        $byOffset = [];
+        foreach ($points as $p) {
+            $tz = (!empty($p['tz_offset']) && preg_match('/^[+-]\d{2}:\d{2}$/', $p['tz_offset'])) ? $p['tz_offset'] : APP_TZ_OFFSET;
+            $byOffset[$tz][] = (int)$p['id'];
+        }
+        if (!$byOffset) $byOffset[APP_TZ_OFFSET] = [];
+
+        foreach ($byOffset as $tz => $pointIds) {
+            [$start, $end] = pointTodayWindow($tz);
+            if ($pointIds) {
+                $ph  = implode(',', array_fill(0, count($pointIds), '?'));
+                $sql = "SELECT meal_type, COUNT(DISTINCT CONCAT(employee_id,'_',meal_type)) AS cnt
+                        FROM meal_logs
+                        WHERE meal_point_id IN ($ph) AND scanned_at BETWEEN ? AND ? AND access_granted = 1
+                        GROUP BY meal_type";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([...$pointIds, $start, $end]);
+            } else {
+                // Записи без активной точки питания — по глобальному часовому поясу
+                $stmt = $pdo->prepare(
+                    "SELECT meal_type, COUNT(DISTINCT CONCAT(employee_id,'_',meal_type)) AS cnt
+                     FROM meal_logs
+                     WHERE meal_point_id IS NULL AND scanned_at BETWEEN ? AND ? AND access_granted = 1
+                     GROUP BY meal_type"
+                );
+                $stmt->execute([$start, $end]);
+            }
+            foreach ($stmt->fetchAll() as $row) {
+                $stats[$row['meal_type']] = ($stats[$row['meal_type']] ?? 0) + (int)$row['cnt'];
+                $stats['total']           += (int)$row['cnt'];
+            }
         }
     } catch (PDOException $e) {}
     return $stats;
@@ -217,18 +240,18 @@ function getTodayStats(PDO $pdo): array
 
 function getPointTodayStats(PDO $pdo, $meal_point_id): array
 {
-    $today = localToday();
     $stats = ['total' => 0, 'breakfast' => 0, 'lunch' => 0, 'dinner' => 0, 'night' => 0];
     if (!$meal_point_id) return $stats;
     try {
+        [$start, $end] = pointTodayWindow(getPointTz($pdo, $meal_point_id));
         $stmt = $pdo->prepare(
             "SELECT meal_type,
                     COUNT(DISTINCT CONCAT(employee_id,'_',meal_type)) AS cnt
              FROM meal_logs
-             WHERE meal_point_id = ? AND DATE(" . tzExpr('scanned_at') . ") = ? AND access_granted = 1
+             WHERE meal_point_id = ? AND scanned_at BETWEEN ? AND ? AND access_granted = 1
              GROUP BY meal_type"
         );
-        $stmt->execute([$meal_point_id, $today]);
+        $stmt->execute([$meal_point_id, $start, $end]);
         foreach ($stmt->fetchAll() as $row) {
             $stats[$row['meal_type']] = (int)$row['cnt'];
             $stats['total']           += (int)$row['cnt'];
@@ -239,20 +262,23 @@ function getPointTodayStats(PDO $pdo, $meal_point_id): array
 
 function getAllPointsStats(PDO $pdo): array
 {
-    $today = localToday();
     try {
-        $stmt = $pdo->prepare(
-            "SELECT mp.id, mp.point_name, mp.point_code, mp.city,
-                    COALESCE(SUM(CASE WHEN ml.access_granted=1 THEN 1 ELSE 0 END),0) AS today_count
-             FROM meal_points mp
-             LEFT JOIN meal_logs ml
-               ON ml.meal_point_id = mp.id AND DATE(" . tzExpr('ml.scanned_at') . ") = ?
-             WHERE mp.is_active = 1
-             GROUP BY mp.id
-             ORDER BY mp.point_name"
-        );
-        $stmt->execute([$today]);
-        return $stmt->fetchAll();
+        $points = $pdo->query(
+            "SELECT id, point_name, point_code, city, tz_offset
+             FROM meal_points WHERE is_active = 1 ORDER BY point_name"
+        )->fetchAll();
+        foreach ($points as &$p) {
+            $tz = (!empty($p['tz_offset']) && preg_match('/^[+-]\d{2}:\d{2}$/', $p['tz_offset'])) ? $p['tz_offset'] : APP_TZ_OFFSET;
+            [$start, $end] = pointTodayWindow($tz);
+            $stmt = $pdo->prepare(
+                "SELECT COUNT(*) FROM meal_logs
+                 WHERE meal_point_id = ? AND access_granted = 1 AND scanned_at BETWEEN ? AND ?"
+            );
+            $stmt->execute([$p['id'], $start, $end]);
+            $p['today_count'] = (int)$stmt->fetchColumn();
+        }
+        unset($p);
+        return $points;
     } catch (PDOException $e) { return []; }
 }
 
@@ -411,6 +437,7 @@ function logAction(string $action, ?string $details = null): void
 
 function getMealPoints(PDO $pdo, bool $onlyActive = true): array
 {
+    try { $pdo->exec("ALTER TABLE meal_points ADD COLUMN tz_offset VARCHAR(6) DEFAULT NULL"); } catch (PDOException $e) {}
     $sql = "SELECT * FROM meal_points";
     $sql .= $onlyActive ? " WHERE is_active = 1" : '';
     $sql .= " ORDER BY sort_order, point_name";
@@ -421,7 +448,24 @@ function getMealPoints(PDO $pdo, bool $onlyActive = true): array
 
 function getMealPointById(PDO $pdo, int $id): ?array
 {
+    try { $pdo->exec("ALTER TABLE meal_points ADD COLUMN tz_offset VARCHAR(6) DEFAULT NULL"); } catch (PDOException $e) {}
     $stmt = $pdo->prepare("SELECT * FROM meal_points WHERE id = ?");
     $stmt->execute([$id]);
     return $stmt->fetch() ?: null;
+}
+
+/** Часовой пояс точки питания ("+07:00") — свой, если задан, иначе глобальный по умолчанию. */
+function getPointTz(PDO $pdo, $meal_point_id): string
+{
+    static $cache = [];
+    if (!$meal_point_id) return APP_TZ_OFFSET;
+    if (isset($cache[$meal_point_id])) return $cache[$meal_point_id];
+    $tz = APP_TZ_OFFSET;
+    try {
+        $stmt = $pdo->prepare("SELECT tz_offset FROM meal_points WHERE id = ?");
+        $stmt->execute([$meal_point_id]);
+        $v = $stmt->fetchColumn();
+        if ($v && preg_match('/^[+-]\d{2}:\d{2}$/', $v)) $tz = $v;
+    } catch (PDOException $e) {}
+    return $cache[$meal_point_id] = $tz;
 }

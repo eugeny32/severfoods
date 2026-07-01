@@ -18,12 +18,13 @@ $is_super     = ($user_role === 'super_admin');
 $assigned_pid = $_SESSION['assigned_point_id'] ?? null;
 if (!$is_super && $assigned_pid) $point_id = $assigned_pid;
 
-$scannedLocal = tzExpr('ml.scanned_at');
+$scannedLocal = "CONVERT_TZ(ml.scanned_at, '+00:00', COALESCE(mpt.tz_offset, '" . APP_TZ_OFFSET . "'))";
 $sql = "SELECT e.id, e.full_name, e.organization, e.department,
                COUNT(*) as meals,
                COUNT(DISTINCT DATE($scannedLocal)) as days
         FROM meal_logs ml
         JOIN employees e ON ml.employee_id = e.id
+        LEFT JOIN meal_points mpt ON mpt.id = ml.meal_point_id
         WHERE DATE($scannedLocal) BETWEEN :s AND :e
           AND ml.access_granted = 1";
 $params = [':s' => $start_date, ':e' => $end_date];

@@ -27,12 +27,14 @@ if (!$employee_id || !in_array($meal_type, ['breakfast','lunch','dinner','night'
 $emp = getEmployeeById($pdo, $employee_id);
 if (!$emp) { echo json_encode(['success' => false, 'message' => 'Сотрудник не найден']); exit; }
 
-$today = localToday();
+$meal_point_id   = $_SESSION['meal_point_id']   ?? null;
+$pointTz = getPointTz($pdo, $meal_point_id);
+$today   = gmdate('Y-m-d', time() + offsetToMinutes($pointTz) * 60);
 $stmt  = $pdo->prepare(
     "SELECT COUNT(*) FROM meal_logs
-     WHERE employee_id=? AND meal_type=? AND DATE(" . tzExpr('scanned_at') . ")=? AND access_granted=1"
+     WHERE employee_id=? AND meal_type=? AND DATE(CONVERT_TZ(scanned_at, '+00:00', ?))=? AND access_granted=1"
 );
-$stmt->execute([$employee_id, $meal_type, $today]);
+$stmt->execute([$employee_id, $meal_type, $pointTz, $today]);
 if ($stmt->fetchColumn() > 0) {
     echo json_encode(['success' => false,
         'message' => "{$emp['full_name']} уже питался(ась) сегодня — " . getMealTypeName($meal_type)]);
@@ -41,7 +43,6 @@ if ($stmt->fetchColumn() > 0) {
 
 $operator_id     = $_SESSION['user_id'];
 $operator_name   = $_SESSION['user_name'];
-$meal_point_id   = $_SESSION['meal_point_id']   ?? null;
 $meal_point_name = $_SESSION['meal_point_name'] ?? null;
 
 try {
@@ -59,7 +60,7 @@ try {
     // Аннулировать выездное питание на сегодня (отметить красным, не удалять)
     try {
         $pdo->prepare("UPDATE dry_rations SET status='cancelled', cancelled_at=NOW() WHERE employee_id=? AND ration_date=? AND ration_type='field' AND status='active'")
-            ->execute([$employee_id, localToday()]);
+            ->execute([$employee_id, $today]);
     } catch (PDOException $e) {}
 
     echo json_encode(['success' => true,

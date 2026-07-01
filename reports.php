@@ -33,12 +33,15 @@ if ($is_super_admin) {
 }
 
 // Запрос
-$scannedLocal = tzExpr('ml.scanned_at');
+// Местное время считаем по часовому поясу КОНКРЕТНОЙ точки питания (meal_points.tz_offset),
+// если он настроен; иначе — по глобальному часовому поясу браузера (APP_TZ_OFFSET).
+$scannedLocal = "CONVERT_TZ(ml.scanned_at, '+00:00', COALESCE(mpt.tz_offset, '" . APP_TZ_OFFSET . "'))";
 $sql = "SELECT ml.id, ml.scanned_at, $scannedLocal AS scanned_local, e.full_name, e.organization, e.department,
                e.vjg_type, e.price, ml.meal_type, ml.scanner_ip,
                ml.operator_name, ml.meal_point_name
         FROM meal_logs ml
         JOIN employees e ON ml.employee_id = e.id
+        LEFT JOIN meal_points mpt ON mpt.id = ml.meal_point_id
         WHERE DATE($scannedLocal) BETWEEN :start AND :end
           AND ml.access_granted = 1";
 $params = [':start' => $start_date, ':end' => $end_date];
@@ -58,6 +61,7 @@ $sqlEmp = "SELECT e.id, e.full_name, e.organization, e.department,
                   COUNT(DISTINCT DATE($scannedLocal)) as days
            FROM meal_logs ml
            JOIN employees e ON ml.employee_id = e.id
+           LEFT JOIN meal_points mpt ON mpt.id = ml.meal_point_id
            WHERE DATE($scannedLocal) BETWEEN :start AND :end
              AND ml.access_granted = 1";
 $paramsEmp = [':start' => $start_date, ':end' => $end_date];

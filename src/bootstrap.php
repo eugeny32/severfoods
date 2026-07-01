@@ -91,14 +91,17 @@ function appTzOffset(): string
 }
 define('APP_TZ_OFFSET', appTzOffset());
 
+/** Переводит офсет вида "+07:00"/"-05:00" в минуты. Некорректный формат → 0. */
+function offsetToMinutes(string $tz): int
+{
+    if (!preg_match('/^([+-])(\d{2}):(\d{2})$/', $tz, $m)) return 0;
+    return ($m[1] === '-' ? -1 : 1) * ((int)$m[2] * 60 + (int)$m[3]);
+}
+
 /** Смещение APP_TZ_OFFSET в минутах (может быть отрицательным). */
 function tzOffsetMinutes(): int
 {
-    $tz   = APP_TZ_OFFSET;
-    $sign = $tz[0] === '-' ? -1 : 1;
-    $h    = (int)substr($tz, 1, 2);
-    $m    = (int)substr($tz, 4, 2);
-    return $sign * ($h * 60 + $m);
+    return offsetToMinutes(APP_TZ_OFFSET);
 }
 
 /** Текущая дата (Y-m-d) в местном часовом поясе пользователя. */
@@ -127,6 +130,25 @@ function localWeekday(): string
 function tzExpr(string $col): string
 {
     return "CONVERT_TZ($col, '+00:00', '" . APP_TZ_OFFSET . "')";
+}
+
+/**
+ * Границы "сегодня" (UTC) для заданного офсета точки питания, с запасом
+ * в 2 часа с хвоста предыдущих местных суток — проходы, случившиеся в конце
+ * предыдущего календарного дня по UTC (например ночная смена/ранний завтрак
+ * на точках с большим положительным офсетом), не выпадают из "сегодняшней"
+ * статистики. Временные метки записей при этом НЕ меняются — расширяется
+ * только окно выборки.
+ * @return array{0:string,1:string} [start_utc, end_utc] в формате 'Y-m-d H:i:s'
+ */
+function pointTodayWindow(string $tz): array
+{
+    $offMin           = offsetToMinutes($tz);
+    $localDate        = gmdate('Y-m-d', time() + $offMin * 60);
+    $localMidnightUtc = strtotime($localDate . ' 00:00:00 UTC') - $offMin * 60;
+    $start            = $localMidnightUtc - 2 * 3600;
+    $end              = $localMidnightUtc + 24 * 3600;
+    return [gmdate('Y-m-d H:i:s', $start), gmdate('Y-m-d H:i:s', $end)];
 }
 
 // ─── Сессия ──────────────────────────────────────────

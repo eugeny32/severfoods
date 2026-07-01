@@ -13,13 +13,14 @@ if (!$id) { echo json_encode(['error'=>'No id']); exit; }
 $emp = getEmployeeById($pdo, $id);
 if (!$emp) { echo json_encode(['error'=>'Not found']); exit; }
 
-$scannedLocal = tzExpr('scanned_at');
+$scannedLocal = "CONVERT_TZ(ml.scanned_at, '+00:00', COALESCE(mpt.tz_offset, '" . APP_TZ_OFFSET . "'))";
 $stmt = $pdo->prepare("
-    SELECT meal_type, COUNT(*) as cnt
-    FROM meal_logs
-    WHERE employee_id = ? AND DATE($scannedLocal) BETWEEN ? AND ?
-    GROUP BY meal_type
-    ORDER BY MIN(scanned_at)
+    SELECT ml.meal_type, COUNT(*) as cnt
+    FROM meal_logs ml
+    LEFT JOIN meal_points mpt ON mpt.id = ml.meal_point_id
+    WHERE ml.employee_id = ? AND DATE($scannedLocal) BETWEEN ? AND ?
+    GROUP BY ml.meal_type
+    ORDER BY MIN(ml.scanned_at)
 ");
 $stmt->execute([$id, $from, $to]);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -34,8 +35,9 @@ foreach ($rows as $r) {
 // Count unique days served (any number of meals in a day = 1 day)
 $stmtDays = $pdo->prepare("
     SELECT COUNT(DISTINCT DATE($scannedLocal)) as days
-    FROM meal_logs
-    WHERE employee_id = ? AND DATE($scannedLocal) BETWEEN ? AND ?
+    FROM meal_logs ml
+    LEFT JOIN meal_points mpt ON mpt.id = ml.meal_point_id
+    WHERE ml.employee_id = ? AND DATE($scannedLocal) BETWEEN ? AND ?
 ");
 $stmtDays->execute([$id, $from, $to]);
 $days = (int)$stmtDays->fetchColumn();

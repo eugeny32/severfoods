@@ -94,12 +94,13 @@ if ($report_type === 'dry_rations') {
 }
 
 // Данные (режим столовая)
-$scannedLocal = tzExpr('ml.scanned_at');
+$scannedLocal = "CONVERT_TZ(ml.scanned_at, '+00:00', COALESCE(mpt.tz_offset, '" . APP_TZ_OFFSET . "'))";
 $sql = "SELECT ml.scanned_at, $scannedLocal AS scanned_local, e.full_name, e.organization, e.department,
                e.vjg_type, e.price, ml.meal_type,
                ml.operator_name, ml.meal_point_name
         FROM meal_logs ml
         JOIN employees e ON ml.employee_id = e.id
+        LEFT JOIN meal_points mpt ON mpt.id = ml.meal_point_id
         WHERE DATE($scannedLocal) BETWEEN :s AND :e
           AND ml.access_granted = 1";
 $params = [':s' => $start_date, ':e' => $end_date];
