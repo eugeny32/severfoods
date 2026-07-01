@@ -133,12 +133,11 @@ function tzExpr(string $col): string
 }
 
 /**
- * Границы "сегодня" (UTC) для заданного офсета точки питания, с запасом
- * в 2 часа с хвоста предыдущих местных суток — проходы, случившиеся в конце
- * предыдущего календарного дня по UTC (например ночная смена/ранний завтрак
- * на точках с большим положительным офсетом), не выпадают из "сегодняшней"
- * статистики. Временные метки записей при этом НЕ меняются — расширяется
- * только окно выборки.
+ * Точные границы "сегодня" (UTC) для заданного офсета точки питания —
+ * от местной полуночи до следующей местной полуночи. При корректно
+ * настроенном tz_offset точки это уже точная граница местных суток,
+ * без искусственного запаса — иначе события конца предыдущих суток
+ * задваивались бы между "вчера" (в отчётах) и "сегодня" (в быстрой статистике).
  * @return array{0:string,1:string} [start_utc, end_utc] в формате 'Y-m-d H:i:s'
  */
 function pointTodayWindow(string $tz): array
@@ -146,9 +145,8 @@ function pointTodayWindow(string $tz): array
     $offMin           = offsetToMinutes($tz);
     $localDate        = gmdate('Y-m-d', time() + $offMin * 60);
     $localMidnightUtc = strtotime($localDate . ' 00:00:00 UTC') - $offMin * 60;
-    $start            = $localMidnightUtc - 2 * 3600;
     $end              = $localMidnightUtc + 24 * 3600;
-    return [gmdate('Y-m-d H:i:s', $start), gmdate('Y-m-d H:i:s', $end)];
+    return [gmdate('Y-m-d H:i:s', $localMidnightUtc), gmdate('Y-m-d H:i:s', $end)];
 }
 
 // ─── Сессия ──────────────────────────────────────────
