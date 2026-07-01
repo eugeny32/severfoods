@@ -12,8 +12,8 @@ $user_name      = $_SESSION['user_name']        ?? 'Пользователь';
 $is_super_admin = $user_role === 'super_admin';
 $assigned_pid   = $_SESSION['assigned_point_id'] ?? null;
 
-$start_date  = preg_replace('/[^0-9\-]/', '', $_GET['start_date'] ?? date('Y-m-d', strtotime('-30 days')));
-$end_date    = preg_replace('/[^0-9\-]/', '', $_GET['end_date']   ?? date('Y-m-d'));
+$start_date  = preg_replace('/[^0-9\-]/', '', $_GET['start_date'] ?? date('Y-m-d', strtotime(localToday() . ' -30 days')));
+$end_date    = preg_replace('/[^0-9\-]/', '', $_GET['end_date']   ?? localToday());
 $meal_type   = in_array($_GET['meal_type'] ?? '', ['breakfast','lunch','dinner','night','all']) ? $_GET['meal_type'] : 'all';
 $report_type = in_array($_GET['report_type'] ?? '', ['meals','dry_rations']) ? $_GET['report_type'] : 'meals';
 $export      = $_GET['export']      ?? null;
@@ -33,12 +33,13 @@ if ($is_super_admin) {
 }
 
 // Запрос
-$sql = "SELECT ml.id, ml.scanned_at, e.full_name, e.organization, e.department,
+$scannedLocal = tzExpr('ml.scanned_at');
+$sql = "SELECT ml.id, ml.scanned_at, $scannedLocal AS scanned_local, e.full_name, e.organization, e.department,
                e.vjg_type, e.price, ml.meal_type, ml.scanner_ip,
                ml.operator_name, ml.meal_point_name
         FROM meal_logs ml
         JOIN employees e ON ml.employee_id = e.id
-        WHERE DATE(ml.scanned_at) BETWEEN :start AND :end
+        WHERE DATE($scannedLocal) BETWEEN :start AND :end
           AND ml.access_granted = 1";
 $params = [':start' => $start_date, ':end' => $end_date];
 
@@ -54,10 +55,10 @@ $logs = $stmt->fetchAll();
 // Сводный отчёт по сотрудникам: кол-во приёмов + уникальных дней, сгруппировано по организациям
 $sqlEmp = "SELECT e.id, e.full_name, e.organization, e.department,
                   COUNT(*) as meals,
-                  COUNT(DISTINCT DATE(ml.scanned_at)) as days
+                  COUNT(DISTINCT DATE($scannedLocal)) as days
            FROM meal_logs ml
            JOIN employees e ON ml.employee_id = e.id
-           WHERE DATE(ml.scanned_at) BETWEEN :start AND :end
+           WHERE DATE($scannedLocal) BETWEEN :start AND :end
              AND ml.access_granted = 1";
 $paramsEmp = [':start' => $start_date, ':end' => $end_date];
 if ($meal_type !== 'all')  { $sqlEmp .= " AND ml.meal_type = :mt";        $paramsEmp[':mt']  = $meal_type; }
@@ -105,7 +106,7 @@ foreach ($logs as $log) {
     $by_point[$pt] = ($by_point[$pt] ?? 0) + 1;
     $org = $log['organization'];
     $by_org[$org] = ($by_org[$org] ?? 0) + 1;
-    $d = date('d.m', strtotime($log['scanned_at']));
+    $d = date('d.m', strtotime($log['scanned_local']));
     $by_date[$d] = ($by_date[$d] ?? 0) + 1;
 }
 arsort($by_point); arsort($by_org);
@@ -113,6 +114,7 @@ arsort($by_point); arsort($by_org);
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+<script src="assets/js/tz-detect.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Отчёты — <?= htmlspecialchars(APP_NAME) ?></title>
@@ -408,8 +410,8 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
                 <?php foreach ($logs as $log): ?>
                 <tr>
                     <td style="white-space:nowrap;font-variant-numeric:tabular-nums">
-                        <?= date('d.m.Y', strtotime($log['scanned_at'])) ?><br>
-                        <span style="color:var(--text-3);font-size:11px"><?= date('H:i:s', strtotime($log['scanned_at'])) ?></span>
+                        <?= date('d.m.Y', strtotime($log['scanned_local'])) ?><br>
+                        <span style="color:var(--text-3);font-size:11px"><?= date('H:i:s', strtotime($log['scanned_local'])) ?></span>
                     </td>
                     <td style="font-weight:600"><?= htmlspecialchars($log['full_name']) ?></td>
                     <td><?= htmlspecialchars($log['organization']) ?></td>

@@ -27,10 +27,10 @@ if (!$employee_id || !in_array($meal_type, ['breakfast','lunch','dinner','night'
 $emp = getEmployeeById($pdo, $employee_id);
 if (!$emp) { echo json_encode(['success' => false, 'message' => 'Сотрудник не найден']); exit; }
 
-$today = date('Y-m-d');
+$today = localToday();
 $stmt  = $pdo->prepare(
     "SELECT COUNT(*) FROM meal_logs
-     WHERE employee_id=? AND meal_type=? AND DATE(scanned_at)=? AND access_granted=1"
+     WHERE employee_id=? AND meal_type=? AND DATE(" . tzExpr('scanned_at') . ")=? AND access_granted=1"
 );
 $stmt->execute([$employee_id, $meal_type, $today]);
 if ($stmt->fetchColumn() > 0) {
@@ -59,7 +59,7 @@ try {
     // Аннулировать выездное питание на сегодня (отметить красным, не удалять)
     try {
         $pdo->prepare("UPDATE dry_rations SET status='cancelled', cancelled_at=NOW() WHERE employee_id=? AND ration_date=? AND ration_type='field' AND status='active'")
-            ->execute([$employee_id, date('Y-m-d')]);
+            ->execute([$employee_id, localToday()]);
     } catch (PDOException $e) {}
 
     echo json_encode(['success' => true,

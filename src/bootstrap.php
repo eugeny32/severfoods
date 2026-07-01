@@ -73,6 +73,62 @@ try {
     die($msg);
 }
 
+// Все временные метки в БД храним и читаем строго в UTC+0 — независимо от
+// часового пояса самого MySQL-сервера. "Местное" время для отображения
+// и границ отчётных суток вычисляется отдельно, через APP_TZ_OFFSET ниже.
+$pdo->exec("SET time_zone = '+00:00'");
+
+// ─── Часовой пояс отображения (не хранения!) ──────────────────────
+// В БД всегда UTC+0. Для показа "сегодняшней" статистики и построения
+// отчётов по местным суткам пользователя используется офсет, который
+// браузер передаёт в cookie app_tz (см. assets/js/tz-detect.js).
+// По умолчанию — Москва (UTC+3), пока JS не проставит cookie.
+function appTzOffset(): string
+{
+    $tz = $_COOKIE['app_tz'] ?? null;
+    if ($tz && preg_match('/^[+-]\d{2}:\d{2}$/', $tz)) return $tz;
+    return '+03:00';
+}
+define('APP_TZ_OFFSET', appTzOffset());
+
+/** Смещение APP_TZ_OFFSET в минутах (может быть отрицательным). */
+function tzOffsetMinutes(): int
+{
+    $tz   = APP_TZ_OFFSET;
+    $sign = $tz[0] === '-' ? -1 : 1;
+    $h    = (int)substr($tz, 1, 2);
+    $m    = (int)substr($tz, 4, 2);
+    return $sign * ($h * 60 + $m);
+}
+
+/** Текущая дата (Y-m-d) в местном часовом поясе пользователя. */
+function localToday(): string
+{
+    return gmdate('Y-m-d', time() + tzOffsetMinutes() * 60);
+}
+
+/** Текущее время (H:i:s) в местном часовом поясе пользователя. */
+function appLocalTime(): string
+{
+    return gmdate('H:i:s', time() + tzOffsetMinutes() * 60);
+}
+
+/** Текущий день недели (1=Пн … 7=Вс) в местном часовом поясе. */
+function localWeekday(): string
+{
+    return gmdate('N', time() + tzOffsetMinutes() * 60);
+}
+
+/**
+ * SQL-выражение, конвертирующее хранимый в UTC столбец $col в местное
+ * время пользователя (APP_TZ_OFFSET). Значение офсета проверено регуляркой
+ * при вычислении константы, поэтому безопасно для прямой подстановки в SQL.
+ */
+function tzExpr(string $col): string
+{
+    return "CONVERT_TZ($col, '+00:00', '" . APP_TZ_OFFSET . "')";
+}
+
 // ─── Сессия ──────────────────────────────────────────
 if (session_status() === PHP_SESSION_NONE) {
     // Автоопределение HTTPS

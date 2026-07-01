@@ -5,18 +5,19 @@ require_once __DIR__ . '/../functions.php';
 if (!isset($_SESSION['user_id'])) { http_response_code(401); die(json_encode(['error'=>'Unauthorized'])); }
 
 $id   = (int)($_GET['id'] ?? 0);
-$from = $_GET['from'] ?? date('Y-m-d', strtotime('-30 days'));
-$to   = $_GET['to']   ?? date('Y-m-d');
+$from = $_GET['from'] ?? date('Y-m-d', strtotime(localToday() . ' -30 days'));
+$to   = $_GET['to']   ?? localToday();
 
 if (!$id) { echo json_encode(['error'=>'No id']); exit; }
 
 $emp = getEmployeeById($pdo, $id);
 if (!$emp) { echo json_encode(['error'=>'Not found']); exit; }
 
+$scannedLocal = tzExpr('scanned_at');
 $stmt = $pdo->prepare("
     SELECT meal_type, COUNT(*) as cnt
     FROM meal_logs
-    WHERE employee_id = ? AND DATE(scanned_at) BETWEEN ? AND ?
+    WHERE employee_id = ? AND DATE($scannedLocal) BETWEEN ? AND ?
     GROUP BY meal_type
     ORDER BY MIN(scanned_at)
 ");
@@ -32,9 +33,9 @@ foreach ($rows as $r) {
 
 // Count unique days served (any number of meals in a day = 1 day)
 $stmtDays = $pdo->prepare("
-    SELECT COUNT(DISTINCT DATE(scanned_at)) as days
+    SELECT COUNT(DISTINCT DATE($scannedLocal)) as days
     FROM meal_logs
-    WHERE employee_id = ? AND DATE(scanned_at) BETWEEN ? AND ?
+    WHERE employee_id = ? AND DATE($scannedLocal) BETWEEN ? AND ?
 ");
 $stmtDays->execute([$id, $from, $to]);
 $days = (int)$stmtDays->fetchColumn();

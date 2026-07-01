@@ -6,8 +6,8 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['is_admin'])) {
     header('Location: index.php'); exit;
 }
 
-$start_date = preg_replace('/[^0-9\-]/', '', $_GET['start_date'] ?? date('Y-m-d', strtotime('-30 days')));
-$end_date   = preg_replace('/[^0-9\-]/', '', $_GET['end_date']   ?? date('Y-m-d'));
+$start_date = preg_replace('/[^0-9\-]/', '', $_GET['start_date'] ?? date('Y-m-d', strtotime(localToday() . ' -30 days')));
+$end_date   = preg_replace('/[^0-9\-]/', '', $_GET['end_date']   ?? localToday());
 $meal_type  = in_array($_GET['meal_type'] ?? '', ['breakfast','lunch','dinner','night'])
               ? $_GET['meal_type'] : 'all';
 $point_id   = (isset($_GET['point_id']) && ctype_digit((string)$_GET['point_id']))
@@ -18,12 +18,13 @@ $is_super     = ($user_role === 'super_admin');
 $assigned_pid = $_SESSION['assigned_point_id'] ?? null;
 if (!$is_super && $assigned_pid) $point_id = $assigned_pid;
 
+$scannedLocal = tzExpr('ml.scanned_at');
 $sql = "SELECT e.id, e.full_name, e.organization, e.department,
                COUNT(*) as meals,
-               COUNT(DISTINCT DATE(ml.scanned_at)) as days
+               COUNT(DISTINCT DATE($scannedLocal)) as days
         FROM meal_logs ml
         JOIN employees e ON ml.employee_id = e.id
-        WHERE DATE(ml.scanned_at) BETWEEN :s AND :e
+        WHERE DATE($scannedLocal) BETWEEN :s AND :e
           AND ml.access_granted = 1";
 $params = [':s' => $start_date, ':e' => $end_date];
 if ($meal_type !== 'all') { $sql .= " AND ml.meal_type = :mt";      $params[':mt']  = $meal_type; }

@@ -187,18 +187,22 @@ function doPush(): void
             continue;
         }
 
-        // Нормализуем время
+        // Нормализуем время: в БД всегда храним чистый UTC.
+        // Клиент шлёт либо UNIX-мс (уже честный UTC-эпох), либо ISO-строку
+        // с явным офсетом — strtotime() корректно учитывает офсет при парсинге.
         if (is_numeric($scannedAt)) {
-            // UNIX milliseconds → SQL datetime
-            $scannedAt = date('Y-m-d H:i:s', (int)($scannedAt / 1000));
+            $ts = (int)($scannedAt / 1000);
+        } else {
+            $ts = $scannedAt ? strtotime($scannedAt) : false;
+            if ($ts === false) $ts = time();
         }
-        if (!$scannedAt) $scannedAt = date('Y-m-d H:i:s');
+        $scannedAt = gmdate('Y-m-d H:i:s', $ts);
 
-        // Дедупликация: тот же сотрудник + тип + тот же день → пропуск
-        $day  = substr($scannedAt, 0, 10);
+        // Дедупликация: тот же сотрудник + тип + тот же МЕСТНЫЙ день → пропуск
+        $day  = gmdate('Y-m-d', $ts + tzOffsetMinutes() * 60);
         $dup  = $pdo->prepare(
             "SELECT id FROM meal_logs
-             WHERE employee_id=? AND meal_type=? AND DATE(scanned_at)=? AND access_granted=1
+             WHERE employee_id=? AND meal_type=? AND DATE(" . tzExpr('scanned_at') . ")=? AND access_granted=1
              LIMIT 1"
         );
         $dup->execute([$empId, $mealType, $day]);

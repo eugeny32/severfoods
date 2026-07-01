@@ -29,8 +29,8 @@ $method = $_SERVER['REQUEST_METHOD'];
 // GET — list for employee in date range (all statuses)
 if ($method === 'GET') {
     $empId = (int)($_GET['employee_id'] ?? 0);
-    $from  = $_GET['from'] ?? date('Y-m-d', strtotime('-30 days'));
-    $to    = $_GET['to']   ?? date('Y-m-d', strtotime('+90 days'));
+    $from  = $_GET['from'] ?? date('Y-m-d', strtotime(localToday() . ' -30 days'));
+    $to    = $_GET['to']   ?? date('Y-m-d', strtotime(localToday() . ' +90 days'));
     if (!$empId) { echo json_encode(['ok'=>false,'error'=>'No employee_id']); exit; }
 
     $stmt = $pdo->prepare("SELECT id, ration_date, ration_type, status FROM dry_rations WHERE employee_id=? AND ration_date BETWEEN ? AND ? ORDER BY ration_date");
@@ -48,8 +48,8 @@ if ($method === 'POST') {
     $dateFrom = preg_replace('/[^0-9\-]/', '', $data['ration_date_from'] ?? ($data['ration_date'] ?? ''));
     $dateTo   = preg_replace('/[^0-9\-]/', '', $data['ration_date_to']   ?? $dateFrom);
     $type     = ($data['ration_type'] ?? 'field') === 'dry_ration' ? 'dry_ration' : 'field';
-    $statsFrom = $data['from'] ?? date('Y-m-d', strtotime('-30 days'));
-    $statsTo   = $data['to']   ?? date('Y-m-d', strtotime('+30 days'));
+    $statsFrom = $data['from'] ?? date('Y-m-d', strtotime(localToday() . ' -30 days'));
+    $statsTo   = $data['to']   ?? date('Y-m-d', strtotime(localToday() . ' +30 days'));
 
     if (!$empId || !$dateFrom) { echo json_encode(['ok'=>false,'error'=>'Нет данных']); exit; }
     if ($dateTo < $dateFrom)   { echo json_encode(['ok'=>false,'error'=>'Дата «по» раньше «с»']); exit; }

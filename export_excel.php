@@ -10,8 +10,8 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['is_admin'])) {
     header('Location: index.php'); exit;
 }
 
-$start_date  = preg_replace('/[^0-9\-]/', '', $_GET['start_date'] ?? date('Y-m-d', strtotime('-30 days')));
-$end_date    = preg_replace('/[^0-9\-]/', '', $_GET['end_date']   ?? date('Y-m-d'));
+$start_date  = preg_replace('/[^0-9\-]/', '', $_GET['start_date'] ?? date('Y-m-d', strtotime(localToday() . ' -30 days')));
+$end_date    = preg_replace('/[^0-9\-]/', '', $_GET['end_date']   ?? localToday());
 $meal_type   = in_array($_GET['meal_type'] ?? '', ['breakfast','lunch','dinner','night'])
                ? $_GET['meal_type'] : 'all';
 $report_type = ($_GET['report_type'] ?? 'meals') === 'dry_rations' ? 'dry_rations' : 'meals';
@@ -94,12 +94,13 @@ if ($report_type === 'dry_rations') {
 }
 
 // Данные (режим столовая)
-$sql = "SELECT ml.scanned_at, e.full_name, e.organization, e.department,
+$scannedLocal = tzExpr('ml.scanned_at');
+$sql = "SELECT ml.scanned_at, $scannedLocal AS scanned_local, e.full_name, e.organization, e.department,
                e.vjg_type, e.price, ml.meal_type,
                ml.operator_name, ml.meal_point_name
         FROM meal_logs ml
         JOIN employees e ON ml.employee_id = e.id
-        WHERE DATE(ml.scanned_at) BETWEEN :s AND :e
+        WHERE DATE($scannedLocal) BETWEEN :s AND :e
           AND ml.access_granted = 1";
 $params = [':s' => $start_date, ':e' => $end_date];
 if ($meal_type !== 'all') { $sql .= " AND ml.meal_type = :mt";  $params[':mt']  = $meal_type; }
@@ -175,7 +176,7 @@ echo '</Row>' . "\n";
 
 // Данные
 foreach ($logs as $log) {
-    $ts = strtotime($log['scanned_at'] ?? 'now');
+    $ts = strtotime($log['scanned_local'] ?? 'now');
     echo '<Row ss:Height="18">' . "\n";
     echo '<Cell ss:StyleID="s3"><Data ss:Type="String">' . ec(date('d.m.Y', $ts))                       . '</Data></Cell>' . "\n";
     echo '<Cell ss:StyleID="s3"><Data ss:Type="String">' . ec(date('H:i:s', $ts))                       . '</Data></Cell>' . "\n";

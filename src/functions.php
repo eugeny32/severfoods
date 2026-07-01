@@ -33,8 +33,8 @@ function getMealTypeIcon(string $type): string
 
 function getCurrentMealType(?PDO $pdo = null, $meal_point_id = null): string
 {
-    $current_time = date('H:i:s');
-    $current_day  = date('N'); // 1=Пн … 7=Вс
+    $current_time = appLocalTime();
+    $current_day  = localWeekday(); // 1=Пн … 7=Вс
 
     if (!$pdo || !$meal_point_id) {
         if ($current_time >= '07:00:00' && $current_time < '11:00:00') return 'breakfast';
@@ -68,8 +68,8 @@ function getCurrentMealType(?PDO $pdo = null, $meal_point_id = null): string
 function getNextMealInfo(PDO $pdo, $meal_point_id): array
 {
     if (!$meal_point_id) return [];
-    $current_time = date('H:i:s');
-    $current_day  = date('N');
+    $current_time = appLocalTime();
+    $current_day  = localWeekday();
 
     $stmt = $pdo->prepare(
         "SELECT * FROM meal_point_schedules
@@ -95,7 +95,7 @@ function getNextMealInfo(PDO $pdo, $meal_point_id): array
 
 function getPointScheduleInfo(PDO $pdo, $meal_point_id): array
 {
-    $current_day = date('N');
+    $current_day = localWeekday();
     $stmt = $pdo->prepare(
         "SELECT * FROM meal_point_schedules
          WHERE meal_point_id = ? AND is_active = 1
@@ -122,7 +122,7 @@ function processAccess(PDO $pdo, string $qr_code, ?string $ip = null): array
         return ['success' => false, 'message' => 'QR-код заблокирован',
                 'employee' => $employee, 'code' => 'BLOCKED'];
     }
-    if (!empty($employee['qr_expires_at']) && $employee['qr_expires_at'] < date('Y-m-d')) {
+    if (!empty($employee['qr_expires_at']) && $employee['qr_expires_at'] < localToday()) {
         return ['success' => false, 'message' => 'Срок действия QR-кода истёк',
                 'employee' => $employee, 'code' => 'EXPIRED'];
     }
@@ -140,10 +140,10 @@ function processAccess(PDO $pdo, string $qr_code, ?string $ip = null): array
                 'employee' => $employee, 'code' => 'NO_MEAL_TIME'];
     }
 
-    $today = date('Y-m-d');
+    $today = localToday();
     $stmt = $pdo->prepare(
         "SELECT scanned_at FROM meal_logs
-         WHERE employee_id = ? AND meal_type = ? AND DATE(scanned_at) = ?
+         WHERE employee_id = ? AND meal_type = ? AND DATE(" . tzExpr('scanned_at') . ") = ?
            AND access_granted = 1
          ORDER BY scanned_at DESC LIMIT 1"
     );
@@ -152,7 +152,7 @@ function processAccess(PDO $pdo, string $qr_code, ?string $ip = null): array
 
     if ($last_scan) {
         // Повторное сканирование в течение 30 сек — не ошибка
-        if ((time() - strtotime($last_scan['scanned_at'])) <= 30) {
+        if ((time() - strtotime($last_scan['scanned_at'] . ' UTC')) <= 30) {
             return ['success' => true,
                     'message'   => "ДОСТУП РАЗРЕШЁН (повтор): {$employee['full_name']}",
                     'employee'  => $employee, 'meal_type' => $meal_type, 'code' => 'REPEAT_SCAN'];
@@ -179,7 +179,7 @@ function processAccess(PDO $pdo, string $qr_code, ?string $ip = null): array
     try {
         $pdo->prepare(
             "UPDATE dry_rations SET status='cancelled', cancelled_at=NOW() WHERE employee_id=? AND ration_date=? AND ration_type='field' AND status='active'"
-        )->execute([$employee['id'], date('Y-m-d')]);
+        )->execute([$employee['id'], localToday()]);
     } catch (PDOException $e) {}
 
     $price_msg = ($employee['price'] > 0)
@@ -196,14 +196,14 @@ function processAccess(PDO $pdo, string $qr_code, ?string $ip = null): array
 
 function getTodayStats(PDO $pdo): array
 {
-    $today = date('Y-m-d');
+    $today = localToday();
     $stats = ['total' => 0, 'breakfast' => 0, 'lunch' => 0, 'dinner' => 0, 'night' => 0];
     try {
         $stmt = $pdo->prepare(
             "SELECT meal_type,
                     COUNT(DISTINCT CONCAT(employee_id,'_',meal_type)) AS cnt
              FROM meal_logs
-             WHERE DATE(scanned_at) = ? AND access_granted = 1
+             WHERE DATE(" . tzExpr('scanned_at') . ") = ? AND access_granted = 1
              GROUP BY meal_type"
         );
         $stmt->execute([$today]);
@@ -217,7 +217,7 @@ function getTodayStats(PDO $pdo): array
 
 function getPointTodayStats(PDO $pdo, $meal_point_id): array
 {
-    $today = date('Y-m-d');
+    $today = localToday();
     $stats = ['total' => 0, 'breakfast' => 0, 'lunch' => 0, 'dinner' => 0, 'night' => 0];
     if (!$meal_point_id) return $stats;
     try {
@@ -225,7 +225,7 @@ function getPointTodayStats(PDO $pdo, $meal_point_id): array
             "SELECT meal_type,
                     COUNT(DISTINCT CONCAT(employee_id,'_',meal_type)) AS cnt
              FROM meal_logs
-             WHERE meal_point_id = ? AND DATE(scanned_at) = ? AND access_granted = 1
+             WHERE meal_point_id = ? AND DATE(" . tzExpr('scanned_at') . ") = ? AND access_granted = 1
              GROUP BY meal_type"
         );
         $stmt->execute([$meal_point_id, $today]);
@@ -239,14 +239,14 @@ function getPointTodayStats(PDO $pdo, $meal_point_id): array
 
 function getAllPointsStats(PDO $pdo): array
 {
-    $today = date('Y-m-d');
+    $today = localToday();
     try {
         $stmt = $pdo->prepare(
             "SELECT mp.id, mp.point_name, mp.point_code, mp.city,
                     COALESCE(SUM(CASE WHEN ml.access_granted=1 THEN 1 ELSE 0 END),0) AS today_count
              FROM meal_points mp
              LEFT JOIN meal_logs ml
-               ON ml.meal_point_id = mp.id AND DATE(ml.scanned_at) = ?
+               ON ml.meal_point_id = mp.id AND DATE(" . tzExpr('ml.scanned_at') . ") = ?
              WHERE mp.is_active = 1
              GROUP BY mp.id
              ORDER BY mp.point_name"
@@ -262,25 +262,28 @@ function getWeeklyStats(PDO $pdo, $meal_point_id = null): array
     $stats   = array_fill_keys($days, 0);
     $weekMap = [2=>'Пн',3=>'Вт',4=>'Ср',5=>'Чт',6=>'Пт',7=>'Сб',1=>'Вс'];
     try {
+        $weekAgo = gmdate('Y-m-d', strtotime(localToday() . ' -7 days'));
+        $tzCol   = tzExpr('scanned_at');
         if ($meal_point_id) {
             $stmt = $pdo->prepare(
-                "SELECT DAYOFWEEK(scanned_at) AS dow,
-                        COUNT(DISTINCT CONCAT(employee_id,'_',DATE(scanned_at),'_',meal_type)) AS cnt
+                "SELECT DAYOFWEEK($tzCol) AS dow,
+                        COUNT(DISTINCT CONCAT(employee_id,'_',DATE($tzCol),'_',meal_type)) AS cnt
                  FROM meal_logs
-                 WHERE DATE(scanned_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                 WHERE DATE($tzCol) >= ?
                    AND access_granted = 1 AND meal_point_id = ?
-                 GROUP BY DAYOFWEEK(scanned_at)"
+                 GROUP BY DAYOFWEEK($tzCol)"
             );
-            $stmt->execute([$meal_point_id]);
+            $stmt->execute([$weekAgo, $meal_point_id]);
         } else {
-            $stmt = $pdo->query(
-                "SELECT DAYOFWEEK(scanned_at) AS dow,
-                        COUNT(DISTINCT CONCAT(employee_id,'_',DATE(scanned_at),'_',meal_type)) AS cnt
+            $stmt = $pdo->prepare(
+                "SELECT DAYOFWEEK($tzCol) AS dow,
+                        COUNT(DISTINCT CONCAT(employee_id,'_',DATE($tzCol),'_',meal_type)) AS cnt
                  FROM meal_logs
-                 WHERE DATE(scanned_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                 WHERE DATE($tzCol) >= ?
                    AND access_granted = 1
-                 GROUP BY DAYOFWEEK(scanned_at)"
+                 GROUP BY DAYOFWEEK($tzCol)"
             );
+            $stmt->execute([$weekAgo]);
         }
         foreach ($stmt->fetchAll() as $row) {
             $key = $weekMap[$row['dow']] ?? null;
@@ -293,26 +296,28 @@ function getWeeklyStats(PDO $pdo, $meal_point_id = null): array
 function getTopEmployees(PDO $pdo, int $limit = 10, $meal_point_id = null): array
 {
     try {
+        $monthAgo = gmdate('Y-m-d', strtotime(localToday() . ' -30 days'));
+        $tzCol    = tzExpr('ml.scanned_at');
         if ($meal_point_id) {
             $stmt = $pdo->prepare(
                 "SELECT e.full_name, e.organization,
-                        COUNT(DISTINCT CONCAT(ml.employee_id,'_',DATE(ml.scanned_at),'_',ml.meal_type)) AS meals_count
+                        COUNT(DISTINCT CONCAT(ml.employee_id,'_',DATE($tzCol),'_',ml.meal_type)) AS meals_count
                  FROM meal_logs ml JOIN employees e ON ml.employee_id = e.id
-                 WHERE DATE(ml.scanned_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                 WHERE DATE($tzCol) >= ?
                    AND ml.access_granted = 1 AND ml.meal_point_id = ?
                  GROUP BY e.id ORDER BY meals_count DESC LIMIT ?"
             );
-            $stmt->execute([$meal_point_id, $limit]);
+            $stmt->execute([$monthAgo, $meal_point_id, $limit]);
         } else {
             $stmt = $pdo->prepare(
                 "SELECT e.full_name, e.organization,
-                        COUNT(DISTINCT CONCAT(ml.employee_id,'_',DATE(ml.scanned_at),'_',ml.meal_type)) AS meals_count
+                        COUNT(DISTINCT CONCAT(ml.employee_id,'_',DATE($tzCol),'_',ml.meal_type)) AS meals_count
                  FROM meal_logs ml JOIN employees e ON ml.employee_id = e.id
-                 WHERE DATE(ml.scanned_at) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+                 WHERE DATE($tzCol) >= ?
                    AND ml.access_granted = 1
                  GROUP BY e.id ORDER BY meals_count DESC LIMIT ?"
             );
-            $stmt->execute([$limit]);
+            $stmt->execute([$monthAgo, $limit]);
         }
         return $stmt->fetchAll();
     } catch (PDOException $e) { return []; }
@@ -326,10 +331,10 @@ function getExpiringEmployees(PDO $pdo, int $days = 7): array
             "SELECT id, full_name, organization, qr_expires_at
              FROM employees
              WHERE is_active = 1 AND qr_expires_at IS NOT NULL
-               AND qr_expires_at <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+               AND qr_expires_at <= DATE_ADD(?, INTERVAL ? DAY)
              ORDER BY qr_expires_at ASC"
         );
-        $stmt->execute([$days]);
+        $stmt->execute([localToday(), $days]);
         return $stmt->fetchAll();
     } catch (PDOException $e) { return []; }
 }
@@ -358,7 +363,7 @@ function getEmployeeById(PDO $pdo, int $id): ?array
 function isQrCodeValid(array $employee): bool
 {
     if ($employee['qr_status'] !== 'active') return false;
-    if (!empty($employee['qr_expires_at']) && $employee['qr_expires_at'] < date('Y-m-d')) return false;
+    if (!empty($employee['qr_expires_at']) && $employee['qr_expires_at'] < localToday()) return false;
     if ($employee['is_active'] != 1) return false;
     return true;
 }

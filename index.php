@@ -102,13 +102,14 @@ if ($is_admin) {
 }
 
 // JSON для JS
-$allEmployeesJson = array_map(function($e) {
-    $today = date('Y-m-d');
+$todayLocal = localToday();
+$allEmployeesJson = array_map(function($e) use ($todayLocal) {
+    $today = $todayLocal;
     $expires = $e['qr_expires_at'];
     $expStatus = 'valid';
     if ($expires) {
         if ($expires < $today) $expStatus = 'expired';
-        elseif ($expires < date('Y-m-d', strtotime('+7 days'))) $expStatus = 'warning';
+        elseif ($expires < date('Y-m-d', strtotime($today . ' +7 days'))) $expStatus = 'warning';
     }
     return [
         'id'           => (int)$e['id'],
@@ -128,6 +129,7 @@ $allEmployeesJson = array_map(function($e) {
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+<script src="assets/js/tz-detect.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#002756">
@@ -308,7 +310,7 @@ $allEmployeesJson = array_map(function($e) {
                 <div class="expiring-list">
                     <?php foreach ($expiringEmps as $emp):
                         $exp = date('d.m.Y', strtotime($emp['qr_expires_at']));
-                        $isExp = $emp['qr_expires_at'] < date('Y-m-d');
+                        $isExp = $emp['qr_expires_at'] < localToday();
                     ?>
                     <div class="expiring-row <?= $isExp ? 'expired' : '' ?>">
                         <span class="expiring-name"><?= htmlspecialchars($emp['full_name']) ?></span>
@@ -379,11 +381,11 @@ $allEmployeesJson = array_map(function($e) {
             <form method="GET" action="reports.php" target="_blank" class="report-form">
                 <div class="form-group">
                     <label><i class="fas fa-calendar-alt"></i> Дата от</label>
-                    <input type="date" name="start_date" value="<?= date('Y-m-d', strtotime('-7 days')) ?>">
+                    <input type="date" name="start_date" value="<?= date('Y-m-d', strtotime(localToday() . ' -7 days')) ?>">
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-calendar-alt"></i> Дата до</label>
-                    <input type="date" name="end_date" value="<?= date('Y-m-d') ?>">
+                    <input type="date" name="end_date" value="<?= localToday() ?>">
                 </div>
                 <div class="form-group">
                     <label><i class="fas fa-utensils"></i> Тип питания</label>

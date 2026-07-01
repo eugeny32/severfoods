@@ -13,11 +13,11 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$today = date('Y-m-d');
+$today = localToday();
 $stmt  = $pdo->prepare(
     "SELECT employee_id, meal_type, scanned_at, meal_point_id
      FROM meal_logs
-     WHERE DATE(scanned_at) = ? AND access_granted = 1
+     WHERE DATE(" . tzExpr('scanned_at') . ") = ? AND access_granted = 1
      ORDER BY scanned_at DESC"
 );
 $stmt->execute([$today]);
