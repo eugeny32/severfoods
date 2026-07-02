@@ -1,4 +1,4 @@
-SeverFoods Offline
+﻿SeverFoods Offline
 
 Copyright (c) 2026 OOO Sever / Palchenkov E.I.
 
