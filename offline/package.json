@@ -58,7 +58,8 @@
       ],
       "icon": "public/assets/img/icon.ico",
       "requestedExecutionLevel": "asInvoker",
-      "signAndEditExecutable": false
+      "signAndEditExecutable": false,
+      "artifactName": "SeverFoods-Setup-${version}.${ext}"
     },
     "mac": {
       "target": "dmg",
@@ -75,7 +76,6 @@
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "public/assets/img/icon.ico",
       "uninstallerIcon": "public/assets/img/icon.ico",
-      "installerHeader": "public/assets/img/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "СеверФудс",

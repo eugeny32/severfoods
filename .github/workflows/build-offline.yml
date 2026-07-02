@@ -1,0 +1,60 @@
+name: Build offline Windows installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_installer:
+        description: 'Закоммитить готовый .exe в offline/dist/'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: offline
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Windows installer
+        run: npm run build
+
+      - name: Read version
+        id: pkg
+        shell: bash
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SeverFoods-Setup-${{ steps.pkg.outputs.version }}
+          path: offline/dist/*.exe
+          if-no-files-found: error
+
+      - name: Commit installer into offline/dist
+        if: ${{ inputs.commit_installer }}
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B "${{ github.ref_name }}"
+          git add dist/*.exe
+          if git diff --cached --quiet; then
+            echo "Нет изменений в dist/ — пропускаем коммит"
+          else
+            git commit -m "Собрать оффлайн-установщик v${{ steps.pkg.outputs.version }} [skip ci]"
+            git push origin "HEAD:${{ github.ref_name }}"
+          fi
