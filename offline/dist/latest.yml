@@ -1,8 +1,8 @@
-version: 1.5.0
+version: 1.5.1
 files:
-  - url: SeverFoods-Setup-1.5.0.exe
-    sha512: HrtpgM5zPUc8zYPyQ4D++pk1C4YYPEn6K5YkZwZ/Q6BxGsL/1WEVT8LH8E1ADFaOsfaHa5P3LE6GNCJwJ+ZyDA==
-    size: 81041931
-path: SeverFoods-Setup-1.5.0.exe
-sha512: HrtpgM5zPUc8zYPyQ4D++pk1C4YYPEn6K5YkZwZ/Q6BxGsL/1WEVT8LH8E1ADFaOsfaHa5P3LE6GNCJwJ+ZyDA==
-releaseDate: '2026-07-02T01:04:15.668Z'
+  - url: SeverFoods-Setup-1.5.1.exe
+    sha512: yKBDmBwo25BaLS70UtkwzwuGbeB3uBipOf2BzT2AXRkgg7HGuD7mpyIL2p5U8lpiS0vjtmzKGdg5cqF0exXEIg==
+    size: 81041860
+path: SeverFoods-Setup-1.5.1.exe
+sha512: yKBDmBwo25BaLS70UtkwzwuGbeB3uBipOf2BzT2AXRkgg7HGuD7mpyIL2p5U8lpiS0vjtmzKGdg5cqF0exXEIg==
+releaseDate: '2026-07-02T01:39:00.221Z'
