@@ -1074,6 +1074,17 @@ function renderSettings() {
         <button class="btn-primary" onclick="syncNow()"><i class="fas fa-sync-alt"></i> Синхронизировать</button>
     `);
 
+    // 2b. Auto-update status
+    grid.innerHTML += card('Обновления', 'cloud-download-alt', `
+        <div class="setting-row"><label>Текущая версия</label><span id="updCurVer">—</span></div>
+        <div class="setting-row"><label>Статус</label><span id="updStatus">—</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-primary" onclick="checkUpdateNow()"><i class="fas fa-search"></i> Проверить сейчас</button>
+            <button class="btn-primary" id="updInstallBtn" style="display:none" onclick="installUpdateNow()"><i class="fas fa-bolt"></i> Установить сейчас</button>
+        </div>
+        <p class="setting-note">Обновление скачивается автоматически в фоне при наличии интернета и устанавливается само, когда компьютер простаивает 5+ минут (чтобы не прервать сканирование). Кнопка «Установить сейчас» перезапускает приложение немедленно.</p>
+    `);
+
     // 3. Meal point info (all roles)
     const ptName = currentUser?.selected_point_name || currentUser?.assigned_point_name || '—';
     grid.innerHTML += card('Точка питания', 'map-marker-alt', `
@@ -1194,6 +1205,8 @@ function renderSettings() {
         if (d.tz_offset) { TZ_OFFSET = d.tz_offset; loadTodayStats(); }
     }).catch(()=>{});
 
+    refreshUpdateStatus();
+
     // Schedule for current point (all users see their own point)
     const ptId = currentUser?.selected_point_id || currentUser?.assigned_point_id;
     fetch('/api/config/schedules').then(r => r.json()).then(d => {
@@ -1276,6 +1289,45 @@ async function saveSyncConfig() {
     const msg  = document.getElementById('cfgSaveMsg');
     if (msg) { msg.style.display = ''; setTimeout(() => { msg.style.display = 'none'; }, 3000); }
     if (!data.ok) alert(data.error || 'Ошибка сохранения');
+}
+
+// ── Автообновление ──────────────────────────────────────────
+const UPD_LABELS = {
+    checking:   'Проверка…',
+    available:  'Загружается…',
+    downloaded: 'Готово к установке',
+    idle:       'Обновлений нет',
+    error:      'Ошибка проверки',
+};
+
+function updStatusLabel(s) {
+    if (s.error)      return `${UPD_LABELS.error}: ${esc(s.error)}`;
+    if (s.downloaded) return `${UPD_LABELS.downloaded} (v${s.version})`;
+    if (s.available)  return `${UPD_LABELS.available} (v${s.version})`;
+    if (s.checking)    return UPD_LABELS.checking;
+    return UPD_LABELS.idle;
+}
+
+async function refreshUpdateStatus() {
+    try {
+        const d = await fetch('/api/update/status').then(r => r.json());
+        const s = d.status || {};
+        if (id('updCurVer')) id('updCurVer').textContent = s.currentVersion || '—';
+        if (id('updStatus')) id('updStatus').textContent = updStatusLabel(s);
+        const btn = id('updInstallBtn');
+        if (btn) btn.style.display = s.downloaded ? '' : 'none';
+    } catch (_) {}
+}
+
+async function checkUpdateNow() {
+    if (id('updStatus')) id('updStatus').textContent = UPD_LABELS.checking;
+    await fetch('/api/update/check', { method: 'POST' });
+    setTimeout(refreshUpdateStatus, 1500);
+}
+
+async function installUpdateNow() {
+    if (!confirm('Приложение перезапустится для установки обновления. Продолжить?')) return;
+    await fetch('/api/update/install', { method: 'POST' });
 }
 
 function id(x) { return document.getElementById(x); }

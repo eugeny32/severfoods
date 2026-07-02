@@ -1,6 +1,6 @@
 {
   "name": "severfoods-offline",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Система учёта питания — СеверФудс",
   "main": "main.js",
   "author": "Palchenkov E.I. / OOO Sever",
@@ -12,6 +12,7 @@
     "build:linux": "electron-builder --linux"
   },
   "dependencies": {
+    "electron-updater": "^6.3.9",
     "express": "^4.18.3",
     "jsqr": "^1.4.0",
     "node-fetch": "^2.7.0",
@@ -45,6 +46,13 @@
       {
         "from": ".env.example",
         "to": ".env.example"
+      }
+    ],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://www.severfoods.ru/offline/dist/",
+        "channel": "latest"
       }
     ],
     "win": {

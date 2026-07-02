@@ -7,6 +7,7 @@ const mealLogsRouter   = require('./routes/meal_logs');
 const mealPointsRouter = require('./routes/meal_points');
 const syncRouter       = require('./routes/sync');
 const configRouter     = require('./routes/config');
+const updateRouter     = require('./routes/update');
 
 const app = express();
 app.use(express.json());
@@ -18,6 +19,7 @@ app.use('/api/meal_logs',   mealLogsRouter);
 app.use('/api/meal_points', mealPointsRouter);
 app.use('/api/sync',        syncRouter);
 app.use('/api/config',      configRouter);
+app.use('/api/update',      updateRouter);
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, '../public/index.html')));
 

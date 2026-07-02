@@ -41,7 +41,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SeverFoods-Setup-${{ steps.pkg.outputs.version }}
-          path: offline/dist/*.exe
+          path: |
+            offline/dist/*.exe
+            offline/dist/*.yml
+            offline/dist/*.blockmap
           if-no-files-found: error
 
       - name: Commit installer into offline/dist
@@ -51,7 +54,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -B "${{ github.ref_name }}"
-          git add dist/*.exe
+          # latest.yml/*.blockmap нужны electron-updater для автообновления —
+          # без них старые клиенты не узнают о новой версии.
+          git add dist/*.exe dist/*.yml dist/*.blockmap
           if git diff --cached --quiet; then
             echo "Нет изменений в dist/ — пропускаем коммит"
           else

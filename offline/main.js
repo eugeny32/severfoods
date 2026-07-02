@@ -19,9 +19,10 @@ function loadEnv(dir) {
 if (!loadEnv(exeDir)) loadEnv(__dirname);
 
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
-const db     = require('./src/db');
-const server = require('./src/server');
-const sync   = require('./src/sync');
+const db      = require('./src/db');
+const server  = require('./src/server');
+const sync    = require('./src/sync');
+const updater = require('./src/updater');
 
 const PORT = 3847;
 
@@ -120,11 +121,12 @@ function createTray() {
     tray.setToolTip('SeverFoods Offline');
     tray.on('click', () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } });
     tray.setContextMenu(Menu.buildFromTemplate([
-        { label: 'Открыть',          click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
-        { label: 'Синхронизировать', click: () => sync.runSync() },
-        { label: 'Настройки',        click: () => openSettings() },
+        { label: 'Открыть',              click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
+        { label: 'Синхронизировать',     click: () => sync.runSync() },
+        { label: 'Проверить обновления', click: () => updater.checkNow() },
+        { label: 'Настройки',            click: () => openSettings() },
         { type: 'separator' },
-        { label: 'Выход',            click: () => { tray = null; app.quit(); } },
+        { label: 'Выход',                click: () => { tray = null; app.quit(); } },
     ]));
 }
 
@@ -138,6 +140,10 @@ function openSettings() {
 ipcMain.handle('sync-now',    async () => { await sync.runSync(); return sync.getStatus(); });
 ipcMain.handle('sync-status', ()      => sync.getStatus());
 ipcMain.handle('open-settings', ()    => { openSettings(); });
+
+ipcMain.handle('update-status',    ()      => updater.getStatus());
+ipcMain.handle('update-check-now', async () => { await updater.checkNow(); return updater.getStatus(); });
+ipcMain.handle('update-install-now', ()    => { updater.installNow(); });
 
 // Setup window handlers
 ipcMain.handle('setup-save', async (_, { token, serverUrl }) => {
@@ -162,6 +168,7 @@ ipcMain.handle('setup-finish', async () => {
         await db.init();
         await server.start(PORT);
         sync.init();
+        updater.init();
         createWindow();
         createTray();
     } else {
@@ -186,6 +193,7 @@ app.whenReady().then(async () => {
         await db.init();
         await server.start(PORT);
         sync.init();
+        updater.init();
         createWindow();
         createTray();
     }
