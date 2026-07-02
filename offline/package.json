@@ -1,6 +1,6 @@
 {
   "name": "severfoods-offline",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Система учёта питания — СеверФудс",
   "main": "main.js",
   "author": "Palchenkov E.I. / OOO Sever",
@@ -82,6 +82,7 @@
     "nsis": {
       "oneClick": false,
       "perMachine": false,
+      "include": "build-res/installer.nsh",
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "public/assets/img/icon.ico",
       "uninstallerIcon": "public/assets/img/icon.ico",
