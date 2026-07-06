@@ -129,8 +129,17 @@ function processAccess(PDO $pdo, string $qr_code, ?string $ip = null): array
 
     $operator_id     = $_SESSION['user_id']        ?? null;
     $operator_name   = $_SESSION['user_name']       ?? 'Система';
-    $meal_point_id   = $_SESSION['meal_point_id']   ?? null;
+    // Администратор при входе не выбирает точку явно (в отличие от оператора) —
+    // meal_point_id в сессии не появляется. Без этого расписание точки (например,
+    // завтрак с 6:20) игнорируется, и подстановка "по умолчанию" в getCurrentMealType
+    // (07:00–11:00) ошибочно блокирует более ранние приёмы пищи. Используем
+    // назначенную администратору точку как запасной вариант.
+    $meal_point_id   = $_SESSION['meal_point_id']   ?? ($_SESSION['assigned_point_id'] ?? null);
     $meal_point_name = $_SESSION['meal_point_name'] ?? null;
+    if (!$meal_point_name && $meal_point_id) {
+        $mp = getMealPointById($pdo, $meal_point_id);
+        $meal_point_name = $mp['point_name'] ?? null;
+    }
 
     $meal_type = getCurrentMealType($pdo, $meal_point_id);
 

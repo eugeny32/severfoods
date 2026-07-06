@@ -38,9 +38,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data']) && isAjax(
 }
 
 // ─ Сбор данных для страницы ─
-$current_meal      = getCurrentMealType($pdo, $meal_point_id);
+// У администратора (в отличие от оператора) meal_point_id в сессии может быть не задан —
+// используем его назначенную точку как запасной вариант, иначе расписание точки
+// игнорируется и подставляется дефолт 07:00–11:00 (см. processAccess()).
+$effective_point_id = $meal_point_id ?: $assigned_point_id;
+$current_meal      = getCurrentMealType($pdo, $effective_point_id);
 $current_meal_name = getMealTypeName($current_meal);
-$schedule_today    = $meal_point_id ? getPointScheduleInfo($pdo, $meal_point_id) : [];
+$schedule_today    = $effective_point_id ? getPointScheduleInfo($pdo, $effective_point_id) : [];
 
 // Статистика
 if ($is_super_admin) {
