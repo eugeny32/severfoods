@@ -467,6 +467,10 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                     <button type="button" class="btn btn-secondary" onclick="bpSelectAll(false)">Снять выбор</button>
                     <span style="font-size:13px;color:var(--text-3)">Выбрано: <strong id="bpSelectedCount">0</strong></span>
                 </div>
+                <div id="bpSelectedWrap" style="display:none;margin-bottom:14px">
+                    <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Выбранные сотрудники</div>
+                    <div id="bpSelectedList" style="display:flex;flex-wrap:wrap;gap:6px;padding:10px;background:var(--bg);border-radius:10px;border:1px solid var(--border)"></div>
+                </div>
                 <div id="bpResultsList" style="max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;margin-bottom:14px">
                     <div style="padding:20px;text-align:center;color:var(--text-3);font-size:13px">Введите фамилию для поиска</div>
                 </div>

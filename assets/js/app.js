@@ -522,6 +522,7 @@ function renderEmployeeTable(list) {
 
 // ── Массовая проводка ─────────────────────────────────
 let bpSelectedIds = new Set();
+let bpSelectedNames = new Map(); // id → ФИО, чтобы показывать выбранных вне текущего поиска
 
 function bpSearchEmployees(q) {
     const wrap = document.getElementById('bpResultsList');
@@ -551,21 +552,59 @@ function bpSearchEmployees(q) {
 }
 
 function bpToggle(cb) {
-    if (cb.checked) bpSelectedIds.add(cb.value); else bpSelectedIds.delete(cb.value);
+    if (cb.checked) {
+        bpSelectedIds.add(cb.value);
+        bpSelectedNames.set(cb.value, cb.dataset.name || cb.value);
+    } else {
+        bpSelectedIds.delete(cb.value);
+        bpSelectedNames.delete(cb.value);
+    }
     bpUpdateCount();
 }
 
 function bpSelectAll(select) {
     document.querySelectorAll('.bp-check').forEach(cb => {
         cb.checked = select;
-        if (select) bpSelectedIds.add(cb.value); else bpSelectedIds.delete(cb.value);
+        if (select) {
+            bpSelectedIds.add(cb.value);
+            bpSelectedNames.set(cb.value, cb.dataset.name || cb.value);
+        } else {
+            bpSelectedIds.delete(cb.value);
+            bpSelectedNames.delete(cb.value);
+        }
     });
     bpUpdateCount();
 }
 
+function bpRemoveSelected(id) {
+    bpSelectedIds.delete(id);
+    bpSelectedNames.delete(id);
+    const cb = document.querySelector(`.bp-check[value="${id}"]`);
+    if (cb) cb.checked = false;
+    bpUpdateCount();
+}
+
 function bpUpdateCount() {
-    const el = document.getElementById('bpSelectedCount');
-    if (el) el.textContent = bpSelectedIds.size;
+    const countEl = document.getElementById('bpSelectedCount');
+    if (countEl) countEl.textContent = bpSelectedIds.size;
+
+    const wrap = document.getElementById('bpSelectedWrap');
+    const list = document.getElementById('bpSelectedList');
+    if (!wrap || !list) return;
+
+    if (!bpSelectedIds.size) {
+        wrap.style.display = 'none';
+        list.innerHTML = '';
+        return;
+    }
+    wrap.style.display = 'block';
+    list.innerHTML = Array.from(bpSelectedIds).map(id => `
+        <span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:4px 6px 4px 12px;font-size:12px">
+            ${escHtml(bpSelectedNames.get(id) || id)}
+            <button type="button" onclick="bpRemoveSelected('${id}')" title="Убрать из выбора"
+                style="border:none;background:var(--bg-deep);color:var(--text-3);width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+        </span>
+    `).join('');
 }
 
 async function bpSubmit() {
@@ -606,6 +645,7 @@ async function bpSubmit() {
 
         // Сброс выбора после успешного проведения
         bpSelectedIds.clear();
+        bpSelectedNames.clear();
         bpUpdateCount();
         document.querySelectorAll('.bp-check').forEach(cb => { cb.checked = false; });
     } catch (e) {
