@@ -12,7 +12,368 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
 <body>
-<!-- see full file in severfoods_offline repo -->
+
+<!-- ══════════════════════════════════════════
+     ЭКРАН ВХОДА
+══════════════════════════════════════════ -->
+<div id="loginScreen" class="login-screen">
+    <div class="login-wrap">
+
+        <div class="brand">
+            <img src="assets/img/logo.png" alt="SeverFoods" class="brand-logo-img">
+            <p>Система контроля питания — Офлайн</p>
+        </div>
+
+        <div class="role-tabs">
+            <button class="role-tab active" id="tabOperator" onclick="switchLoginTab('operator')">
+                <i class="fas fa-user"></i> Оператор
+            </button>
+            <button class="role-tab" id="tabAdmin" onclick="switchLoginTab('admin')">
+                <i class="fas fa-crown"></i> Администратор
+            </button>
+        </div>
+
+        <div class="card">
+            <div id="loginError" class="alert" style="display:none">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span id="loginErrorText"></span>
+            </div>
+
+            <!-- Форма оператора -->
+            <div class="login-form active" id="formOperator">
+                <div class="field">
+                    <label><i class="fas fa-map-marker-alt"></i> Точка питания</label>
+                    <select id="opPointSelect">
+                        <option value="">— Выберите точку —</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label><i class="fas fa-qrcode"></i> QR-код сотрудника</label>
+                    <div class="qr-input-row">
+                        <input id="opQrInput" type="text" placeholder="Отсканируйте или введите QR-код" autocomplete="off">
+                        <button class="btn-cam" id="opCamBtn" onclick="toggleLoginCam('operator')" title="Сканировать камерой">
+                            <i class="fas fa-camera"></i>
+                        </button>
+                    </div>
+                    <div class="qr-hint"><i class="fas fa-search"></i> Используйте сканер или введите код вручную</div>
+                </div>
+                <div class="cam-preview" id="camPreviewOperator" style="display:none">
+                    <video id="loginVideoOp" playsinline></video>
+                    <canvas id="loginCanvasOp" style="display:none"></canvas>
+                    <div class="cam-frame-overlay"><div class="cam-frame"></div></div>
+                    <button class="cam-stop" onclick="stopLoginCam()"><i class="fas fa-times"></i> Закрыть</button>
+                </div>
+                <button class="btn-login" onclick="doLogin('operator')">
+                    <i class="fas fa-unlock"></i> Войти как оператор
+                </button>
+                <div class="hint-row">Оператор авторизуется по QR-коду сотрудника</div>
+            </div>
+
+            <!-- Форма администратора -->
+            <div class="login-form" id="formAdmin">
+                <div class="field">
+                    <label><i class="fas fa-user-shield"></i> QR-код администратора</label>
+                    <div class="qr-input-row">
+                        <input id="adQrInput" type="text" placeholder="Отсканируйте QR-код" autocomplete="off">
+                        <button class="btn-cam" id="adCamBtn" onclick="toggleLoginCam('admin')" title="Сканировать камерой">
+                            <i class="fas fa-camera"></i>
+                        </button>
+                    </div>
+                    <div class="qr-hint"><i class="fas fa-key"></i> QR-код сотрудника с ролью администратора</div>
+                </div>
+                <div class="cam-preview" id="camPreviewAdmin" style="display:none">
+                    <video id="loginVideoAd" playsinline></video>
+                    <canvas id="loginCanvasAd" style="display:none"></canvas>
+                    <div class="cam-frame-overlay"><div class="cam-frame"></div></div>
+                    <button class="cam-stop" onclick="stopLoginCam()"><i class="fas fa-times"></i> Закрыть</button>
+                </div>
+                <button class="btn-login" onclick="doLogin('admin')">
+                    <i class="fas fa-crown"></i> Войти как администратор
+                </button>
+                <div class="hint-row">Администратор авторизуется по QR-коду</div>
+            </div>
+        </div>
+
+        <div class="login-version">SeverFoods Offline v1.3.3</div>
+        <div id="loginOfflineNote" class="login-offline-note" style="display:none">
+            <i class="fas fa-wifi-slash"></i> Офлайн-режим: используется локальная база данных
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ОСНОВНОЕ ПРИЛОЖЕНИЕ
+══════════════════════════════════════════ -->
+<div id="mainApp" class="main-app" style="display:none">
+
+    <aside class="sidebar">
+        <div class="logo">
+            <img src="assets/img/logo.png" alt="SeverFoods" class="sidebar-logo-img">
+            <div class="logo-sub" id="logoPointName">Offline</div>
+        </div>
+
+        <nav class="nav" id="mainNav">
+            <button class="nav-btn active" data-page="scanner" data-roles="all">
+                <i class="fas fa-qrcode"></i> Сканер
+            </button>
+            <button class="nav-btn" data-page="employees" data-roles="all">
+                <i class="fas fa-users"></i> Сотрудники
+            </button>
+            <button class="nav-btn" data-page="chat" data-roles="operator,admin,super_admin">
+                <i class="fas fa-comments"></i> Чат
+            </button>
+            <button class="nav-btn" data-page="logs" data-roles="operator,admin,super_admin">
+                <i class="fas fa-list-alt"></i> Журнал
+            </button>
+            <button class="nav-btn" data-page="settings" data-roles="all">
+                <i class="fas fa-cog"></i> Настройки
+            </button>
+        </nav>
+
+        <div class="user-panel">
+            <div class="user-info">
+                <div class="user-avatar" id="userAvatar">?</div>
+                <div class="user-details">
+                    <div class="user-name" id="userName">—</div>
+                    <div class="user-role" id="userRole">—</div>
+                </div>
+            </div>
+            <button class="btn-logout" onclick="doLogout()" title="Выйти">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+        </div>
+
+        <div class="sync-panel">
+            <div class="sync-status">
+                <span class="sync-dot" id="syncDot"></span>
+                <span id="syncLabel">Нет связи</span>
+            </div>
+            <button class="btn-sync" id="btnSync" onclick="syncNow()">
+                <i class="fas fa-sync-alt"></i> Синхронизировать
+            </button>
+            <div class="sync-time" id="syncTime"></div>
+        </div>
+    </aside>
+
+    <main class="content">
+
+        <!-- ── Сканер ── -->
+        <section class="page active" id="page-scanner">
+            <div class="page-header">
+                <h1>Сканер QR-пропусков</h1>
+                <div class="meal-type-auto" id="mealTypeAuto">
+                    <span class="mt-auto-icon" id="mealTypeIcon"></span>
+                    <span class="mt-auto-label" id="mealTypeLabel">Определяется…</span>
+                </div>
+            </div>
+
+            <!-- QR input — web-style -->
+            <div class="qr-field-wrap">
+                <div class="qr-label-row">
+                    <span class="qr-label-text"><i class="fas fa-qrcode"></i> QR-код</span>
+                    <span class="mode-badge" id="modeBadge"><i class="fas fa-crosshairs"></i> Режим сканирования</span>
+                    <span class="qr-pill" id="qsfLayout" style="display:none">RU→EN</span>
+                    <span class="qr-pill qr-pill-idle" id="qsfIdle" style="display:none">Фокус через <b id="qsfIdleSec">5</b>с</span>
+                </div>
+                <div class="qr-input-row">
+                    <input type="text" id="qrUsbInput" class="qr-input scanner-active"
+                           autocomplete="off" autocorrect="off" spellcheck="false"
+                           placeholder="Наведите сканер на QR-код…">
+                    <button class="btn-qr-action" id="manualCheckBtn" onclick="doManualCheck()">
+                        <i class="fas fa-search"></i> Проверить
+                    </button>
+                    <button class="btn-qr-action btn-qr-cam" onclick="openCamModal()">
+                        <i class="fas fa-camera"></i> Камера
+                    </button>
+                </div>
+            </div>
+
+            <!-- Today stats (above camera+log) -->
+            <div class="stats-row" id="scannerStats">
+                <div class="stat-tile">
+                    <div class="stat-icon-row"><i class="fas fa-cloud-sun"></i></div>
+                    <div class="stat-num" id="stat_breakfast">0</div>
+                    <div class="stat-lbl">Завтрак</div>
+                </div>
+                <div class="stat-tile">
+                    <div class="stat-icon-row"><i class="fas fa-sun"></i></div>
+                    <div class="stat-num" id="stat_lunch">0</div>
+                    <div class="stat-lbl">Обед</div>
+                </div>
+                <div class="stat-tile">
+                    <div class="stat-icon-row"><i class="fas fa-moon"></i></div>
+                    <div class="stat-num" id="stat_dinner">0</div>
+                    <div class="stat-lbl">Ужин</div>
+                </div>
+                <div class="stat-tile">
+                    <div class="stat-icon-row"><i class="fas fa-star"></i></div>
+                    <div class="stat-num" id="stat_night">0</div>
+                    <div class="stat-lbl">Ночное</div>
+                </div>
+            </div>
+
+            <!-- Scanner area: scan log only (camera is in modal) -->
+            <div class="scanner-area-log">
+                <div class="scan-log-panel">
+                    <div class="scan-log-header" id="scanLogHeader">
+                        <span>Пройдено сегодня</span>
+                        <span class="scan-log-count" id="scanLogCount">0</span>
+                    </div>
+                    <div class="scan-log-list" id="scanLogList"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Сотрудники ── -->
+        <section class="page" id="page-employees">
+            <div class="page-header">
+                <h1>Сотрудники <span id="empTotalBadge" class="total-badge"></span></h1>
+                <input class="search-input" id="empSearch" placeholder="Поиск по ФИО, организации…" oninput="searchEmployees()">
+            </div>
+            <div class="org-grid" id="orgChips"></div>
+            <div id="empSearchResults" style="display:none">
+                <div class="emp-table-wrap">
+                    <table class="emp-table">
+                        <thead><tr><th>Сотрудник</th><th>QR-статус</th><th>Действия</th></tr></thead>
+                        <tbody id="empSearchBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Чат ── -->
+        <section class="page page-chat" id="page-chat">
+            <div class="chat-frame-wrap">
+                <div id="chatOffline" class="chat-offline">
+                    <i class="fas fa-wifi-slash" style="font-size:48px;color:#cbd5e1"></i>
+                    <p>Чат доступен только при подключении к интернету</p>
+                </div>
+                <webview id="chatView" src="about:blank" style="width:100%;height:100%;border:none;display:none;flex:1"></webview>
+            </div>
+        </section>
+
+        <!-- ── Журнал ── -->
+        <section class="page" id="page-logs">
+            <div class="page-header">
+                <h1>Журнал питания</h1>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <select id="logsMealFilter" class="filter-select" onchange="loadLogs()">
+                        <option value="">Все типы</option>
+                        <option value="breakfast">Завтрак</option>
+                        <option value="lunch">Обед</option>
+                        <option value="dinner">Ужин</option>
+                        <option value="night">Ночной</option>
+                    </select>
+                    <button class="btn-secondary" onclick="loadLogs()"><i class="fas fa-sync-alt"></i> Обновить</button>
+                </div>
+            </div>
+            <div class="logs-stats" id="logsStats"></div>
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead><tr>
+                        <th>Время</th><th>Сотрудник</th><th>Организация</th>
+                        <th>Тип</th><th>Точка</th><th>Статус</th>
+                    </tr></thead>
+                    <tbody id="logsBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ── Настройки ── -->
+        <section class="page" id="page-settings">
+            <div class="page-header"><h1>Настройки</h1></div>
+            <div id="settingsContent" class="settings-scroll"></div>
+        </section>
+
+    </main>
+
+    <!-- ── Модальное окно: список сотрудников организации ── -->
+    <div class="modal-overlay" id="orgModal" onclick="closeModal('orgModal')">
+        <div class="modal-box" style="max-width:700px" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="orgModalTitle"><i class="fas fa-users"></i> Сотрудники</div>
+                <button class="modal-close" onclick="closeModal('orgModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="orgModalBody" style="overflow-y:auto;max-height:60vh"></div>
+        </div>
+    </div>
+
+    <!-- ── Модальное окно: камера ── -->
+    <div class="modal-overlay" id="camModal" onclick="closeCamModal()">
+        <div class="modal-box" style="max-width:480px" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-camera"></i> Сканирование камерой</div>
+                <button class="modal-close" onclick="closeCamModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="padding:16px">
+                <div class="scanner-box" id="camModalBox">
+                    <video id="scannerVideo" playsinline></video>
+                    <canvas id="scannerCanvas" style="display:none"></canvas>
+                    <div class="scanner-overlay">
+                        <div id="scanActiveUi" style="width:100%;height:100%;flex-direction:column;align-items:center;justify-content:center;gap:12px;display:flex">
+                            <div class="scan-frame"></div>
+                            <p class="scan-hint" id="scanHint">Наведите камеру на QR-код</p>
+                            <button class="scan-stop-btn" onclick="closeCamModal()"><i class="fas fa-stop"></i> Закрыть</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Модальное окно: карточка сотрудника ── -->
+    <div class="modal-overlay" id="empCardModal" onclick="closeModal('empCardModal')">
+        <div class="modal-box" style="max-width:520px" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-user"></i> Сотрудник</div>
+                <button class="modal-close" onclick="closeModal('empCardModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="empCardBody"></div>
+        </div>
+    </div>
+
+    <!-- ── Модальное окно: ручной пропуск ── -->
+    <div class="modal-overlay" id="manualModal" onclick="closeModal('manualModal')">
+        <div class="modal-box" style="max-width:420px" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-sign-out-alt"></i> Ручной пропуск</div>
+                <button class="modal-close" onclick="closeModal('manualModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="manualModalBody" style="padding:20px">
+                <div class="manual-emp-name" id="manualEmpName"></div>
+                <div id="manualMealInfo" style="margin:10px 0 4px;font-size:13px;color:#64748b"></div>
+                <div id="manualResult" style="margin-top:12px"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Всплывающий результат сканирования ── -->
+    <div class="scan-result-popup" id="scanResultPopup">
+        <div class="srp-icon"  id="srpIcon"></div>
+        <div class="srp-name"  id="srpName"></div>
+        <div class="srp-org"   id="srpOrg"></div>
+        <div class="srp-msg"   id="srpMsg"></div>
+        <div class="srp-queue" id="srpQueue" style="display:none"></div>
+        <div class="srp-progress"><div class="srp-progress-bar" id="srpBar"></div></div>
+    </div>
+
+    <!-- ── Модальное окно: QR-код сотрудника ── -->
+    <div class="modal-overlay" id="qrModal" onclick="closeModal('qrModal')">
+        <div class="modal-box" style="max-width:360px;text-align:center" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title"><i class="fas fa-qrcode"></i> QR-пропуск</div>
+                <button class="modal-close" onclick="closeModal('qrModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="padding:20px">
+                <div id="qrModalName" style="font-size:15px;font-weight:700;margin-bottom:14px;color:var(--text-main)"></div>
+                <canvas id="qrCanvas" style="border-radius:8px;border:1px solid var(--border);max-width:100%"></canvas>
+                <div id="qrModalCode" style="font-size:10px;color:var(--text-sub);margin-top:8px;font-family:monospace;word-break:break-all"></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script src="assets/app.js"></script>
 </body>
