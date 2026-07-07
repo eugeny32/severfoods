@@ -1261,6 +1261,18 @@ function saveScheduleTab() {
 
 
 // ── Excel Export ──────────────────────────────────────
+function copySyncToken(btn) {
+    const field = document.getElementById('syncTokenField');
+    if (!field) return;
+    navigator.clipboard.writeText(field.value).then(() => {
+        const icon = btn.querySelector('i');
+        const prevClass = icon.className;
+        icon.className = 'fas fa-check';
+        btn.style.borderColor = 'var(--success, #16a34a)';
+        setTimeout(() => { icon.className = prevClass; btn.style.borderColor = ''; }, 1500);
+    }).catch(() => { field.select(); document.execCommand('copy'); });
+}
+
 function openExcelExport(e) {
     e.preventDefault();
     const start = document.querySelector('[name=start_date]')?.value || '';

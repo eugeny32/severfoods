@@ -660,9 +660,45 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                     </a>
                     <?php endif; ?>
                     <div style="font-size:11px;color:var(--text-3)">
-                        Токен синхронизации — в разделе «Точки питания». Обновление: запустите новый установщик, поле токена оставьте пустым.
+                        Токен синхронизации — см. карточку ниже. Обновление: запустите новый установщик, поле токена оставьте пустым.
                     </div>
                 </div>
+
+                <?php if ($is_super_admin): ?>
+                <!-- Sync token card -->
+                <div style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:12px">
+                    <div style="display:flex;align-items:center;gap:12px">
+                        <div style="width:44px;height:44px;background:#7c2d12;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        </div>
+                        <div>
+                            <div style="font-size:15px;font-weight:700;color:var(--text-main)">Токен синхронизации</div>
+                            <div style="font-size:12px;color:var(--text-3)">Один общий токен для всех точек (.env на сервере)</div>
+                        </div>
+                    </div>
+                    <?php $syncTokenVal = env('OFFLINE_SYNC_TOKEN', ''); ?>
+                    <?php if ($syncTokenVal): ?>
+                    <div style="display:flex;gap:6px;align-items:center">
+                        <input type="text" readonly value="<?= htmlspecialchars($syncTokenVal) ?>" id="syncTokenField"
+                            style="flex:1;min-width:0;font-family:monospace;font-size:12px;padding:9px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-input);color:var(--text-main)">
+                        <button type="button" onclick="copySyncToken(this)"
+                            title="Скопировать" style="flex-shrink:0;border:1.5px solid var(--border);background:var(--bg-input);border-radius:8px;width:36px;height:36px;cursor:pointer">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <div style="font-size:11px;color:var(--text-3)">
+                        Вводите это значение в поле «Токен синхронизации» при первой установке оффлайн-приложения на новой точке.
+                    </div>
+                    <?php else: ?>
+                    <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e">
+                        Токен не задан. Добавьте строку <code>OFFLINE_SYNC_TOKEN=&lt;случайная строка&gt;</code> в файл <code>.env</code> в корне сайта на сервере (рядом с <code>config.php</code>) и перезагрузите страницу.
+                    </div>
+                    <?php endif; ?>
+                    <div style="font-size:11px;color:var(--text-3)">
+                        Меняется только вручную в <code>.env</code> на сервере (по FTP) — если скомпрометирован, замените значение и обновите его на всех точках.
+                    </div>
+                </div>
+                <?php endif; ?>
 
                 <!-- Manual card -->
                 <div style="background:var(--bg-card);border:1.5px solid var(--border);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:12px">
