@@ -252,7 +252,7 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
 <?php if ($is_super_admin): ?>
 <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <span style="font-size:13px;color:#92400e"><i class="fas fa-tools"></i> Обслуживание базы: привести старые «ночные» записи к завтраку/ужину по местному времени точки.</span>
-    <button type="button" class="btn btn-sm" onclick="normalizeNightRecords()" style="background:#f59e0b;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer">
+    <button type="button" class="btn" onclick="normalizeNightRecords()" style="background:#f59e0b;color:#fff">
         <i class="fas fa-broom"></i> Нормализовать ночные записи
     </button>
     <span id="normalizeResult" style="font-size:13px;color:#92400e"></span>
@@ -413,12 +413,13 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
         <?php endif; ?>
     </div>
 
+    <?php $assignablePoints = $is_super_admin ? getMealPoints($pdo) : $points; ?>
     <?php if ($is_admin && !empty($logs)): ?>
     <div id="assignPanel" style="display:none;background:#eff6ff;border-bottom:1.5px solid #dbeafe;padding:12px 16px;align-items:center;gap:10px;flex-wrap:wrap">
         <span style="font-size:13px;color:#1e40af;font-weight:600">Выбрано: <span id="assignCount">0</span></span>
         <select id="assignPointId" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;font-size:13px">
             <option value="">— выберите точку —</option>
-            <?php foreach (($is_super_admin ? getMealPoints($pdo) : $points) as $pt): ?>
+            <?php foreach ($assignablePoints as $pt): ?>
             <option value="<?= $pt['id'] ?>"><?= htmlspecialchars($pt['point_name']) ?></option>
             <?php endforeach; ?>
         </select>
@@ -428,7 +429,7 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
             <option value="lunch">Обед</option>
             <option value="dinner">Ужин</option>
         </select>
-        <button type="button" class="btn btn-sm btn-primary" onclick="assignSelectedToPoint()">
+        <button type="button" class="btn btn-primary" onclick="assignSelectedToPoint()">
             <i class="fas fa-map-marker-alt"></i> Назначить выбранным
         </button>
         <span id="assignResult" style="font-size:13px"></span>
@@ -476,7 +477,18 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
                     <td><span class="meal-badge <?= $log['meal_type'] ?>"><?= getMealTypeName($log['meal_type']) ?></span></td>
                     <td style="font-size:12px">
                         <?php if (empty($log['meal_point_id'])): ?>
-                        <span style="color:#b45309;font-weight:600"><i class="fas fa-triangle-exclamation"></i> Не привязано</span>
+                        <div style="display:flex;align-items:center;gap:4px">
+                            <select class="row-point-select" data-id="<?= $log['id'] ?>" style="padding:4px 6px;border-radius:6px;border:1px solid #fed7aa;font-size:12px;background:#fff7ed;color:#92400e">
+                                <option value="">Не привязано…</option>
+                                <?php foreach ($assignablePoints as $pt): ?>
+                                <option value="<?= $pt['id'] ?>"><?= htmlspecialchars($pt['point_name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <button type="button" title="Назначить" onclick="assignSingleRow(<?= $log['id'] ?>, this)"
+                                style="border:none;background:var(--blue-800);color:#fff;border-radius:6px;width:24px;height:24px;cursor:pointer;flex-shrink:0">
+                                <i class="fas fa-check" style="font-size:11px"></i>
+                            </button>
+                        </div>
                         <?php else: ?>
                         <?= htmlspecialchars($log['meal_point_name'] ?? '—') ?>
                         <?php endif; ?>
@@ -625,6 +637,36 @@ async function assignSelectedToPoint() {
     } catch (e) {
         resultEl.style.color = '#dc2626';
         resultEl.textContent = 'Ошибка сети';
+    }
+}
+
+// Быстрое назначение точки прямо из строки таблицы
+async function assignSingleRow(id, btnEl) {
+    const select  = btnEl.closest('td').querySelector('.row-point-select');
+    const pointId = select.value;
+    if (!pointId) { alert('Выберите точку в списке'); return; }
+
+    btnEl.disabled = true;
+    select.disabled = true;
+    try {
+        const res = await fetch('api/assign_meal_point.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ ids: [id], point_id: pointId, meal_type: null }),
+        });
+        const data = await res.json();
+        if (data.success && data.updated > 0) {
+            const cell = btnEl.closest('td');
+            cell.textContent = select.options[select.selectedIndex].textContent;
+        } else {
+            alert(data.message || 'Не удалось назначить точку');
+            btnEl.disabled = false;
+            select.disabled = false;
+        }
+    } catch (e) {
+        alert('Ошибка сети');
+        btnEl.disabled = false;
+        select.disabled = false;
     }
 }
 
