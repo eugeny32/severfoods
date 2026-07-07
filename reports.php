@@ -440,7 +440,7 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
     <div class="empty"><div class="empty-icon"><i class="fas fa-clipboard-list"></i></div>Нет данных за выбранный период</div>
     <?php else: ?>
     <div class="report-table-wrap">
-        <table class="report-table">
+        <table class="report-table report-table-wide">
             <thead>
                 <tr>
                     <?php if ($is_admin): ?>
