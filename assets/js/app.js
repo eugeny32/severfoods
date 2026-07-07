@@ -621,7 +621,7 @@ async function bpSubmit() {
     try {
         const res = await fetch('api/bulk_pass.php', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
             body: JSON.stringify({ date, meal_type: mealType, employee_ids: ids, point_id: pointId }),
         });
         const data = await res.json();

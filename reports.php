@@ -623,7 +623,7 @@ async function assignSelectedToPoint() {
     try {
         const res = await fetch('api/assign_meal_point.php', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
             body: JSON.stringify({ ids, point_id: pointId, meal_type: mealType || null }),
         });
         const data = await res.json();
@@ -652,7 +652,7 @@ async function assignSingleRow(id, btnEl) {
     try {
         const res = await fetch('api/assign_meal_point.php', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
             body: JSON.stringify({ ids: [id], point_id: pointId, meal_type: null }),
         });
         const data = await res.json();
