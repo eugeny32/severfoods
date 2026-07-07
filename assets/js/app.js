@@ -520,6 +520,98 @@ function renderEmployeeTable(list) {
     }).join('');
 }
 
+// ── Массовая проводка ─────────────────────────────────
+let bpSelectedIds = new Set();
+
+function bpSearchEmployees(q) {
+    const wrap = document.getElementById('bpResultsList');
+    if (!wrap) return;
+    const lq = q.trim().toLowerCase();
+    if (!lq) {
+        wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-3);font-size:13px">Введите фамилию для поиска</div>';
+        bpUpdateCount();
+        return;
+    }
+    const list = (window.allEmployeesData || []).filter(e => e.full_name.toLowerCase().includes(lq));
+    if (!list.length) {
+        wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-3);font-size:13px">Никого не найдено</div>';
+        bpUpdateCount();
+        return;
+    }
+    wrap.innerHTML = list.map(e => `
+        <label style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);cursor:pointer">
+            <input type="checkbox" class="bp-check" value="${e.id}" data-name="${escHtml(e.full_name)}"
+                ${bpSelectedIds.has(String(e.id)) ? 'checked' : ''} onchange="bpToggle(this)">
+            <div>
+                <div style="font-weight:600;font-size:13px">${escHtml(e.full_name)}</div>
+                <div style="font-size:11px;color:var(--text-3)">${escHtml(e.organization || '')}${e.department ? ' · '+escHtml(e.department) : ''}</div>
+            </div>
+        </label>
+    `).join('');
+}
+
+function bpToggle(cb) {
+    if (cb.checked) bpSelectedIds.add(cb.value); else bpSelectedIds.delete(cb.value);
+    bpUpdateCount();
+}
+
+function bpSelectAll(select) {
+    document.querySelectorAll('.bp-check').forEach(cb => {
+        cb.checked = select;
+        if (select) bpSelectedIds.add(cb.value); else bpSelectedIds.delete(cb.value);
+    });
+    bpUpdateCount();
+}
+
+function bpUpdateCount() {
+    const el = document.getElementById('bpSelectedCount');
+    if (el) el.textContent = bpSelectedIds.size;
+}
+
+async function bpSubmit() {
+    const date     = document.getElementById('bpDate').value;
+    const mealType = document.getElementById('bpMealType').value;
+    const msgEl    = document.getElementById('bpResultMsg');
+    const ids      = Array.from(bpSelectedIds).map(Number);
+
+    if (!date) { alert('Укажите дату'); return; }
+    if (!ids.length) { alert('Выберите хотя бы одного сотрудника'); return; }
+
+    msgEl.innerHTML = '<span style="color:var(--text-3)">Выполняется…</span>';
+    try {
+        const res = await fetch('api/bulk_pass.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ date, meal_type: mealType, employee_ids: ids }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+            msgEl.innerHTML = `<div class="notif error"><div class="notif-inner"><div class="notif-icon">❌</div><div class="notif-body"><div class="notif-title">${escHtml(data.message || 'Ошибка')}</div></div></div></div>`;
+            return;
+        }
+        let html = `<div class="notif success"><div class="notif-inner"><div class="notif-icon">✅</div><div class="notif-body">`
+                 + `<div class="notif-title">Проведено: ${data.inserted.length}</div>`;
+        if (data.inserted.length) {
+            html += `<div style="font-size:12px;margin-top:4px">${data.inserted.map(e => escHtml(e.name)).join(', ')}</div>`;
+        }
+        html += `</div></div></div>`;
+        if (data.already.length) {
+            html += `<div class="notif" style="background:#fff7ed;border-color:#fed7aa;margin-top:8px"><div class="notif-inner"><div class="notif-icon">ℹ️</div><div class="notif-body">`
+                  + `<div class="notif-title">Уже отмечены ранее на эту дату: ${data.already.length}</div>`
+                  + `<div style="font-size:12px;margin-top:4px">${data.already.map(e => escHtml(e.name)).join(', ')}</div>`
+                  + `</div></div></div>`;
+        }
+        msgEl.innerHTML = html;
+
+        // Сброс выбора после успешного проведения
+        bpSelectedIds.clear();
+        bpUpdateCount();
+        document.querySelectorAll('.bp-check').forEach(cb => { cb.checked = false; });
+    } catch (e) {
+        msgEl.innerHTML = '<div class="notif error"><div class="notif-inner"><div class="notif-icon">❌</div><div class="notif-body"><div class="notif-title">Ошибка сети</div></div></div></div>';
+    }
+}
+
 // ── Manual Pass из org-модала (сначала закрываем orgModal) ──────
 function openManualFromOrg(id, name) {
     closeModal('orgModal');

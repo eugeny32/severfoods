@@ -20,7 +20,7 @@ $employee_id = intval($data['employee_id'] ?? 0);
 $meal_type   = $data['meal_type'] ?? '';
 $reason      = trim($data['reason'] ?? '');
 
-if (!$employee_id || !in_array($meal_type, ['breakfast','lunch','dinner','night'], true)) {
+if (!$employee_id || !in_array($meal_type, ['breakfast','lunch','dinner'], true)) {
     echo json_encode(['success' => false, 'message' => 'Некорректные данные']); exit;
 }
 

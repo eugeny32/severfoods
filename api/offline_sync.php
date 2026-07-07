@@ -18,6 +18,7 @@
  */
 
 require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__) . '/functions.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -204,14 +205,20 @@ function doPush(): void
         }
         $scannedAt = gmdate('Y-m-d H:i:s', $ts);
 
+        // 'night' в базе не хранится — переклассифицируем по местному времени точки
+        // (до полудня — завтрак, после — ужин), см. normalizeMealType().
+        $pointTzForType = $pointId ? getPointTz($pdo, $pointId) : APP_TZ_OFFSET;
+        $localTimeAtScan = gmdate('H:i:s', $ts + offsetToMinutes($pointTzForType) * 60);
+        $mealType = normalizeMealType($mealType, $localTimeAtScan);
+
         // Дедупликация: тот же сотрудник + тип + тот же МЕСТНЫЙ день → пропуск
-        $day  = gmdate('Y-m-d', $ts + tzOffsetMinutes() * 60);
+        $day  = gmdate('Y-m-d', $ts + offsetToMinutes($pointTzForType) * 60);
         $dup  = $pdo->prepare(
             "SELECT id FROM meal_logs
-             WHERE employee_id=? AND meal_type=? AND DATE(" . tzExpr('scanned_at') . ")=? AND access_granted=1
+             WHERE employee_id=? AND meal_type=? AND DATE(CONVERT_TZ(scanned_at,'+00:00',?))=? AND access_granted=1
              LIMIT 1"
         );
-        $dup->execute([$empId, $mealType, $day]);
+        $dup->execute([$empId, $mealType, $pointTzForType, $day]);
         if ($dup->fetchColumn()) {
             $results[] = ['offline_id' => $offlineId, 'status' => 'duplicate'];
             $skipped++;

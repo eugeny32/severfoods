@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['is_admin'])) {
 
 $user_role      = $_SESSION['role']             ?? 'admin';
 $user_name      = $_SESSION['user_name']        ?? 'Пользователь';
+$is_admin       = true; // доступ на страницу уже проверен выше
 $is_super_admin = $user_role === 'super_admin';
 $assigned_pid   = $_SESSION['assigned_point_id'] ?? null;
 
@@ -18,6 +19,7 @@ $meal_type   = in_array($_GET['meal_type'] ?? '', ['breakfast','lunch','dinner',
 $report_type = in_array($_GET['report_type'] ?? '', ['meals','dry_rations']) ? $_GET['report_type'] : 'meals';
 $export      = $_GET['export']      ?? null;
 $point_id    = isset($_GET['point_id']) && $_GET['point_id'] !== '' ? (int)$_GET['point_id'] : null;
+$unassigned_only = !empty($_GET['unassigned_only']);
 
 // Доступные точки
 $points = [];
@@ -37,7 +39,7 @@ if ($is_super_admin) {
 // если он настроен; иначе — по глобальному часовому поясу браузера (APP_TZ_OFFSET).
 $scannedLocal = "CONVERT_TZ(ml.scanned_at, '+00:00', COALESCE(mpt.tz_offset, '" . APP_TZ_OFFSET . "'))";
 $sql = "SELECT ml.id, ml.scanned_at, $scannedLocal AS scanned_local, e.full_name, e.organization, e.department,
-               e.vjg_type, e.price, ml.meal_type, ml.scanner_ip,
+               e.vjg_type, e.price, ml.meal_type, ml.scanner_ip, ml.meal_point_id,
                ml.operator_name, ml.meal_point_name
         FROM meal_logs ml
         JOIN employees e ON ml.employee_id = e.id
@@ -48,6 +50,7 @@ $params = [':start' => $start_date, ':end' => $end_date];
 
 if ($meal_type !== 'all') { $sql .= " AND ml.meal_type = :mt"; $params[':mt'] = $meal_type; }
 if ($filter_point_id)     { $sql .= " AND ml.meal_point_id = :pid"; $params[':pid'] = $filter_point_id; }
+if ($unassigned_only)     { $sql .= " AND ml.meal_point_id IS NULL"; }
 $sql .= " ORDER BY ml.scanned_at DESC";
 
 $stmt = $pdo->prepare($sql); $stmt->execute($params);
@@ -119,6 +122,7 @@ arsort($by_point); arsort($by_org);
 <html lang="ru">
 <head>
 <script src="assets/js/tz-detect.js"></script>
+<?= Csrf::meta() ?>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Отчёты — <?= htmlspecialchars(APP_NAME) ?></title>
@@ -225,6 +229,12 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
     <?php elseif ($assigned_pid): ?>
     <input type="hidden" name="point_id" value="<?= $assigned_pid ?>">
     <?php endif; ?>
+    <?php if ($report_type === 'meals'): ?>
+    <div class="form-group" style="min-width:auto;flex-direction:row;align-items:center;gap:6px;padding-top:20px">
+        <input type="checkbox" id="unassignedOnly" name="unassigned_only" value="1" <?= $unassigned_only?'checked':'' ?> onchange="this.form.submit()">
+        <label for="unassignedOnly" style="margin:0;white-space:nowrap">Только не привязанные к точке</label>
+    </div>
+    <?php endif; ?>
     <div class="form-group" style="min-width:auto">
         <label>&nbsp;</label>
         <div style="display:flex;gap:8px">
@@ -238,6 +248,16 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
         </div>
     </div>
 </form>
+
+<?php if ($is_super_admin): ?>
+<div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-size:13px;color:#92400e"><i class="fas fa-tools"></i> Обслуживание базы: привести старые «ночные» записи к завтраку/ужину по местному времени точки.</span>
+    <button type="button" class="btn btn-sm" onclick="normalizeNightRecords()" style="background:#f59e0b;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:13px;cursor:pointer">
+        <i class="fas fa-broom"></i> Нормализовать ночные записи
+    </button>
+    <span id="normalizeResult" style="font-size:13px;color:#92400e"></span>
+</div>
+<?php endif; ?>
 
 <?php if ($report_type === 'dry_rations'): ?>
 <!-- Dry rations report -->
@@ -393,6 +413,28 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
         <?php endif; ?>
     </div>
 
+    <?php if ($is_admin && !empty($logs)): ?>
+    <div id="assignPanel" style="display:none;background:#eff6ff;border-bottom:1.5px solid #dbeafe;padding:12px 16px;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:13px;color:#1e40af;font-weight:600">Выбрано: <span id="assignCount">0</span></span>
+        <select id="assignPointId" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;font-size:13px">
+            <option value="">— выберите точку —</option>
+            <?php foreach (($is_super_admin ? getMealPoints($pdo) : $points) as $pt): ?>
+            <option value="<?= $pt['id'] ?>"><?= htmlspecialchars($pt['point_name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <select id="assignMealType" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;font-size:13px">
+            <option value="">— не менять тип —</option>
+            <option value="breakfast">Завтрак</option>
+            <option value="lunch">Обед</option>
+            <option value="dinner">Ужин</option>
+        </select>
+        <button type="button" class="btn btn-sm btn-primary" onclick="assignSelectedToPoint()">
+            <i class="fas fa-map-marker-alt"></i> Назначить выбранным
+        </button>
+        <span id="assignResult" style="font-size:13px"></span>
+    </div>
+    <?php endif; ?>
+
     <?php if (empty($logs)): ?>
     <div class="empty"><div class="empty-icon"><i class="fas fa-clipboard-list"></i></div>Нет данных за выбранный период</div>
     <?php else: ?>
@@ -400,6 +442,9 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
         <table class="report-table">
             <thead>
                 <tr>
+                    <?php if ($is_admin): ?>
+                    <th style="width:30px"><input type="checkbox" id="checkAll" onchange="toggleAllRows(this)"></th>
+                    <?php endif; ?>
                     <th class="sortable">Дата / Время<span class="sort-icon"></span></th>
                     <th class="sortable">ФИО<span class="sort-icon"></span></th>
                     <th class="sortable">Организация<span class="sort-icon"></span></th>
@@ -413,6 +458,13 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
             <tbody>
                 <?php foreach ($logs as $log): ?>
                 <tr>
+                    <?php if ($is_admin): ?>
+                    <td>
+                        <?php if (empty($log['meal_point_id'])): ?>
+                        <input type="checkbox" class="row-check" value="<?= $log['id'] ?>" onchange="updateAssignPanel()">
+                        <?php endif; ?>
+                    </td>
+                    <?php endif; ?>
                     <td style="white-space:nowrap;font-variant-numeric:tabular-nums">
                         <?= date('d.m.Y', strtotime($log['scanned_local'])) ?><br>
                         <span style="color:var(--text-3);font-size:11px"><?= date('H:i:s', strtotime($log['scanned_local'])) ?></span>
@@ -422,7 +474,13 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
                     <td style="color:var(--text-3)"><?= htmlspecialchars($log['department'] ?? '—') ?></td>
                     <td><?= htmlspecialchars($log['vjg_type'] ?? '—') ?></td>
                     <td><span class="meal-badge <?= $log['meal_type'] ?>"><?= getMealTypeName($log['meal_type']) ?></span></td>
-                    <td style="font-size:12px"><?= htmlspecialchars($log['meal_point_name'] ?? '—') ?></td>
+                    <td style="font-size:12px">
+                        <?php if (empty($log['meal_point_id'])): ?>
+                        <span style="color:#b45309;font-weight:600"><i class="fas fa-triangle-exclamation"></i> Не привязано</span>
+                        <?php else: ?>
+                        <?= htmlspecialchars($log['meal_point_name'] ?? '—') ?>
+                        <?php endif; ?>
+                    </td>
                     <td style="font-size:12px;color:var(--text-3)"><?= htmlspecialchars($log['operator_name'] ?? '—') ?></td>
                 </tr>
                 <?php endforeach; ?>
@@ -522,6 +580,73 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+// ── Массовое назначение точки/типа для не привязанных записей ──
+function toggleAllRows(checkAll) {
+    document.querySelectorAll('.row-check').forEach(cb => { cb.checked = checkAll.checked; });
+    updateAssignPanel();
+}
+
+function updateAssignPanel() {
+    const checked = document.querySelectorAll('.row-check:checked');
+    const panel = document.getElementById('assignPanel');
+    if (!panel) return;
+    panel.style.display = checked.length ? 'flex' : 'none';
+    const countEl = document.getElementById('assignCount');
+    if (countEl) countEl.textContent = checked.length;
+}
+
+async function assignSelectedToPoint() {
+    const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(cb => parseInt(cb.value, 10));
+    const pointId  = document.getElementById('assignPointId').value;
+    const mealType = document.getElementById('assignMealType').value;
+    const resultEl = document.getElementById('assignResult');
+
+    if (!ids.length) return;
+    if (!pointId) { alert('Выберите точку питания'); return; }
+
+    resultEl.textContent = 'Сохранение…';
+    resultEl.style.color = '#64748b';
+    try {
+        const res = await fetch('api/assign_meal_point.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ ids, point_id: pointId, meal_type: mealType || null }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            resultEl.style.color = '#15803d';
+            resultEl.textContent = `Обновлено записей: ${data.updated}`;
+            setTimeout(() => location.reload(), 900);
+        } else {
+            resultEl.style.color = '#dc2626';
+            resultEl.textContent = data.message || 'Ошибка';
+        }
+    } catch (e) {
+        resultEl.style.color = '#dc2626';
+        resultEl.textContent = 'Ошибка сети';
+    }
+}
+
+async function normalizeNightRecords() {
+    if (!confirm('Переклассифицировать все исторические записи с типом «Ночное» в «Завтрак»/«Ужин» по местному времени точки? Действие необратимо.')) return;
+    const resultEl = document.getElementById('normalizeResult');
+    resultEl.textContent = 'Выполняется…';
+    try {
+        const res = await fetch('api/normalize_night_records.php', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': getCsrfToken() },
+        });
+        const data = await res.json();
+        if (data.success) {
+            resultEl.textContent = `Готово: всего ${data.total}, в завтрак — ${data.to_breakfast}, в ужин — ${data.to_dinner}`;
+        } else {
+            resultEl.textContent = data.message || 'Ошибка';
+        }
+    } catch (e) {
+        resultEl.textContent = 'Ошибка сети';
+    }
+}
 </script>
 </body>
 </html>

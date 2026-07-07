@@ -31,16 +31,33 @@ function getMealTypeIcon(string $type): string
 
 // ─── Расписание и текущий приём пищи ─────────────────
 
+/**
+ * 'night' больше не используется как самостоятельный тип приёма пищи в базе —
+ * ночные проходы переклассифицируются в ближайший осмысленный тип по местному
+ * времени точки (до полудня — завтрак, после — ужин). Единая точка применения
+ * гарантирует, что новые 'night'-записи в meal_logs никогда не появятся,
+ * независимо от того, как настроено расписание точки.
+ */
+function normalizeMealType(string $type, string $localTime): string
+{
+    if ($type !== 'night') return $type;
+    return $localTime < '12:00:00' ? 'breakfast' : 'dinner';
+}
+
 function getCurrentMealType(?PDO $pdo = null, $meal_point_id = null): string
 {
-    $current_time = appLocalTime();
-    $current_day  = localWeekday(); // 1=Пн … 7=Вс
+    // Местное время считаем по часовому поясу КОНКРЕТНОЙ точки (если она известна),
+    // а не по браузерному офсету — иначе расписание точки сверяется с чужим временем.
+    $tz           = ($pdo && $meal_point_id) ? getPointTz($pdo, $meal_point_id) : APP_TZ_OFFSET;
+    $current_time = gmdate('H:i:s', time() + offsetToMinutes($tz) * 60);
+    $current_day  = gmdate('N', time() + offsetToMinutes($tz) * 60); // 1=Пн … 7=Вс
 
     if (!$pdo || !$meal_point_id) {
         if ($current_time >= '07:00:00' && $current_time < '11:00:00') return 'breakfast';
         if ($current_time >= '12:00:00' && $current_time < '15:00:00') return 'lunch';
         if ($current_time >= '18:00:00' && $current_time < '21:00:00') return 'dinner';
-        if ($current_time >= '23:00:00' || $current_time <  '06:00:00') return 'night';
+        if ($current_time >= '23:00:00') return 'dinner';
+        if ($current_time <  '06:00:00') return 'breakfast';
         return 'none';
     }
 
@@ -57,9 +74,9 @@ function getCurrentMealType(?PDO $pdo = null, $meal_point_id = null): string
         $end   = $s['end_time'];
         // Поддержка ночного расписания (переход через полночь)
         if ($end < $start) {
-            if ($current_time >= $start || $current_time < $end) return $s['meal_type'];
+            if ($current_time >= $start || $current_time < $end) return normalizeMealType($s['meal_type'], $current_time);
         } else {
-            if ($current_time >= $start && $current_time < $end) return $s['meal_type'];
+            if ($current_time >= $start && $current_time < $end) return normalizeMealType($s['meal_type'], $current_time);
         }
     }
     return 'none';
@@ -68,8 +85,9 @@ function getCurrentMealType(?PDO $pdo = null, $meal_point_id = null): string
 function getNextMealInfo(PDO $pdo, $meal_point_id): array
 {
     if (!$meal_point_id) return [];
-    $current_time = appLocalTime();
-    $current_day  = localWeekday();
+    $tz           = getPointTz($pdo, $meal_point_id);
+    $current_time = gmdate('H:i:s', time() + offsetToMinutes($tz) * 60);
+    $current_day  = gmdate('N', time() + offsetToMinutes($tz) * 60);
 
     $stmt = $pdo->prepare(
         "SELECT * FROM meal_point_schedules
@@ -95,7 +113,7 @@ function getNextMealInfo(PDO $pdo, $meal_point_id): array
 
 function getPointScheduleInfo(PDO $pdo, $meal_point_id): array
 {
-    $current_day = localWeekday();
+    $current_day = gmdate('N', time() + offsetToMinutes(getPointTz($pdo, $meal_point_id)) * 60);
     $stmt = $pdo->prepare(
         "SELECT * FROM meal_point_schedules
          WHERE meal_point_id = ? AND is_active = 1

@@ -368,6 +368,7 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
     <div class="admin-panel">
         <div class="tab-nav">
             <button class="tab-btn active" data-tab="tabReports"><i class="fas fa-chart-bar"></i> Отчёты</button>
+            <button class="tab-btn" data-tab="tabBulkPass"><i class="fas fa-users-viewfinder"></i> Массовая проводка</button>
             <button class="tab-btn" data-tab="tabPoints"><i class="fas fa-map-marker-alt"></i> Точки</button>
             <button class="tab-btn" data-tab="tabStats"><i class="fas fa-chart-line"></i> Статистика</button>
             <?php if ($is_admin): ?>
@@ -422,6 +423,47 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                     </div>
                 </div>
             </form>
+        </div>
+
+        <!-- BULK PASS -->
+        <div id="tabBulkPass" class="tab-pane">
+            <div class="card" style="margin-bottom:16px">
+                <div class="card-header">
+                    <div class="card-title"><i class="fas fa-users-viewfinder"></i> Массовая проводка сотрудников</div>
+                </div>
+                <p style="font-size:13px;color:var(--text-3);margin-bottom:14px">
+                    Отметить приём пищи сразу нескольким сотрудникам на указанную дату — без сканирования QR.
+                    Записи создаются без привязки к точке питания; назначить точку можно позже в разделе «Отчёты».
+                </p>
+                <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px">
+                    <div class="form-group">
+                        <label><i class="fas fa-calendar-alt"></i> Дата</label>
+                        <input type="date" id="bpDate" value="<?= localToday() ?>" max="<?= localToday() ?>">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-utensils"></i> Тип питания</label>
+                        <select id="bpMealType">
+                            <option value="breakfast">Завтрак</option>
+                            <option value="lunch" selected>Обед</option>
+                            <option value="dinner">Ужин</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:12px">
+                    <label><i class="fas fa-search"></i> Поиск по фамилии</label>
+                    <input type="text" id="bpSearch" placeholder="Начните вводить фамилию…" oninput="bpSearchEmployees(this.value)" autocomplete="off">
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                    <button type="button" class="btn-sm" onclick="bpSelectAll(true)">Выбрать всех найденных</button>
+                    <button type="button" class="btn-sm" onclick="bpSelectAll(false)">Снять выбор</button>
+                    <span style="font-size:13px;color:var(--text-3);align-self:center">Выбрано: <strong id="bpSelectedCount">0</strong></span>
+                </div>
+                <div id="bpResultsList" style="max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;margin-bottom:14px">
+                    <div style="padding:20px;text-align:center;color:var(--text-3);font-size:13px">Введите фамилию для поиска</div>
+                </div>
+                <button type="button" class="btn btn-primary" onclick="bpSubmit()"><i class="fas fa-check-double"></i> Провести выбранных</button>
+                <div id="bpResultMsg" style="margin-top:14px"></div>
+            </div>
         </div>
 
         <!-- POINTS -->
@@ -875,7 +917,6 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                     <option value="breakfast"><i class="fas fa-cloud-sun"></i> Завтрак</option>
                     <option value="lunch" selected><i class="fas fa-sun"></i> Обед</option>
                     <option value="dinner"><i class="fas fa-moon"></i> Ужин</option>
-                    <option value="night"><i class="fas fa-star"></i> Ночное</option>
                 </select>
             </div>
             <div class="form-group">

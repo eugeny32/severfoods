@@ -4,6 +4,7 @@
  * Принимает авторизованную сессию ИЛИ API-токен (QR-код оператора).
  */
 require_once dirname(__DIR__) . '/config.php';
+require_once dirname(__DIR__) . '/functions.php';
 
 header('Content-Type: application/json');
 
@@ -57,6 +58,12 @@ if (!$stmt->fetch()) {
 
 // ─── Запись ───────────────────────────────────────────
 $scannedAt = isset($data['scanned_at']) ? intval($data['scanned_at']) : (time() * 1000);
+
+// 'night' в базе не хранится — переклассифицируем по местному времени точки.
+$pointIdForType  = isset($data['meal_point_id']) ? intval($data['meal_point_id']) : null;
+$pointTzForType  = $pointIdForType ? getPointTz($pdo, $pointIdForType) : APP_TZ_OFFSET;
+$localTimeAtScan = gmdate('H:i:s', intdiv($scannedAt, 1000) + offsetToMinutes($pointTzForType) * 60);
+$meal_type       = normalizeMealType($meal_type, $localTimeAtScan);
 
 $pdo->prepare(
     "INSERT INTO meal_logs

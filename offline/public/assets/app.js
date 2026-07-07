@@ -386,11 +386,14 @@ function getMealTypeBySchedule() {
 }
 
 function guessMealTypeByTime() {
+    // 'night' как отдельный тип не используется — сервер при синхронизации всё
+    // равно переклассифицирует его в завтрак/ужин по местному времени точки,
+    // поэтому здесь сразу выбираем ближайший осмысленный тип.
     const h = new Date().getHours();
     if (h >= 6  && h < 11) return 'breakfast';
     if (h >= 11 && h < 16) return 'lunch';
-    if (h >= 16 && h < 22) return 'dinner';
-    return 'night';
+    if (h < 6) return 'breakfast';
+    return 'dinner';
 }
 
 function updateMealTypeAuto() {
