@@ -102,8 +102,8 @@ nsis:
 
     !addincludedir "D:\a\severfoods\severfoods\offline\build-res"
     !include "D:\a\severfoods\severfoods\offline\build-res\installer.nsh"
-    !include "C:\Users\RUNNER~1\AppData\Local\Temp\t-4zjKrT\0-messages.nsh"
-    !include "C:\Users\RUNNER~1\AppData\Local\Temp\t-4zjKrT\1-messages.nsh"
+    !include "C:\Users\RUNNER~1\AppData\Local\Temp\t-sAH2wV\0-messages.nsh"
+    !include "C:\Users\RUNNER~1\AppData\Local\Temp\t-sAH2wV\1-messages.nsh"
     !addplugindir /x86-unicode "C:\Users\runneradmin\AppData\Local\electron-builder\Cache\nsis\nsis-resources-3.4.1\plugins\x86-unicode"
     !macro licensePage
       !insertmacro MUI_PAGE_LICENSE "D:\a\severfoods\severfoods\offline\LICENSE.txt"
