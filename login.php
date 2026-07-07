@@ -360,9 +360,6 @@ body::after {
             </div>
 
             <button type="submit" class="btn-login"><i class="fas fa-crown"></i> Войти как администратор</button>
-            <div class="hint-row">
-                Для первого входа используйте QR-код: <strong>SUPER_ADMIN_QR</strong>
-            </div>
         </form>
     </div>
 
