@@ -305,7 +305,7 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
                     <th class="sortable">ФИО<span class="sort-icon"></span></th>
                     <th class="sortable">Организация<span class="sort-icon"></span></th>
                     <th class="sortable">Отдел<span class="sort-icon"></span></th>
-                    <th class="sortable">Вахтовый жилой городок<span class="sort-icon"></span></th>
+                    <th class="sortable" title="Вахтовый жилой городок">ВЖГ<span class="sort-icon"></span></th>
                     <th class="sortable">Тип<span class="sort-icon"></span></th>
                     <th class="sortable">Статус<span class="sort-icon"></span></th>
                     <th class="sortable">Создал<span class="sort-icon"></span></th>
@@ -450,7 +450,7 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
                     <th class="sortable">ФИО<span class="sort-icon"></span></th>
                     <th class="sortable">Организация<span class="sort-icon"></span></th>
                     <th class="sortable">Отдел<span class="sort-icon"></span></th>
-                    <th class="sortable">Вахтовый жилой городок<span class="sort-icon"></span></th>
+                    <th class="sortable" title="Вахтовый жилой городок">ВЖГ<span class="sort-icon"></span></th>
                     <th class="sortable">Тип питания<span class="sort-icon"></span></th>
                     <th class="sortable">Точка<span class="sort-icon"></span></th>
                     <th class="sortable">Оператор<span class="sort-icon"></span></th>
