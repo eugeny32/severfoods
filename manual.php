@@ -106,6 +106,49 @@ hr{border:none;border-top:1.5px solid #e2e8f0;margin:24px 0}
 <tr><td><strong>Оффлайн</strong> (приложение Windows)</td><td>Автономная точка питания: сканирование QR-карт, локальная БД, синхронизация с сервером</td></tr>
 </table>
 <p><strong>Принцип работы:</strong> администратор регистрирует сотрудников → печатает QR-карты → на точке питания сканируется карта → приложение (сайт или оффлайн-программа) фиксирует приём → данные синхронизируются с сервером → руководитель просматривает отчёты.</p>
+
+<svg viewBox="0 0 720 210" style="width:100%;max-width:720px;height:auto;margin:16px 0;display:block" role="img" aria-label="Схема: сотрудник получает QR-карту, точки питания сканируют её онлайн или оффлайн, данные сходятся на сервере, администратор смотрит отчёты">
+  <defs>
+    <marker id="arr1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <!-- Сотрудник -->
+  <rect x="10" y="80" width="120" height="50" rx="10" fill="#eff6ff" stroke="#1e40af" stroke-width="1.5"/>
+  <text x="70" y="100" text-anchor="middle" font-size="12" font-weight="700" fill="#1e3a5f">Сотрудник</text>
+  <text x="70" y="116" text-anchor="middle" font-size="10" fill="#64748b">QR-карта</text>
+
+  <line x1="130" y1="105" x2="188" y2="105" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr1)"/>
+
+  <!-- Онлайн точка -->
+  <rect x="190" y="30" width="130" height="50" rx="10" fill="#dcfce7" stroke="#15803d" stroke-width="1.5"/>
+  <text x="255" y="50" text-anchor="middle" font-size="12" font-weight="700" fill="#14532d">Точка (сайт)</text>
+  <text x="255" y="66" text-anchor="middle" font-size="10" fill="#166534">сканер в браузере</text>
+
+  <!-- Оффлайн точка -->
+  <rect x="190" y="130" width="130" height="50" rx="10" fill="#fef3c7" stroke="#b45309" stroke-width="1.5"/>
+  <text x="255" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="#78350f">Точка (оффлайн)</text>
+  <text x="255" y="166" text-anchor="middle" font-size="10" fill="#92400e">Windows-приложение</text>
+
+  <line x1="320" y1="55" x2="380" y2="95" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr1)"/>
+  <line x1="320" y1="155" x2="380" y2="115" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr1)"/>
+  <text x="345" y="90" font-size="9" fill="#94a3b8">сразу</text>
+  <text x="345" y="130" font-size="9" fill="#94a3b8">синхронизация</text>
+
+  <!-- Сервер -->
+  <rect x="385" y="75" width="130" height="60" rx="10" fill="#003366"/>
+  <text x="450" y="100" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">Сервер</text>
+  <text x="450" y="116" text-anchor="middle" font-size="10" fill="#bfdbfe">БД в UTC+0</text>
+  <text x="450" y="129" text-anchor="middle" font-size="9" fill="#93c5fd">(единый часовой пояс)</text>
+
+  <line x1="515" y1="105" x2="573" y2="105" stroke="#64748b" stroke-width="1.5" marker-end="url(#arr1)"/>
+
+  <!-- Отчёты -->
+  <rect x="575" y="80" width="135" height="50" rx="10" fill="#f1f5f9" stroke="#334155" stroke-width="1.5"/>
+  <text x="642" y="100" text-anchor="middle" font-size="12" font-weight="700" fill="#1e293b">Отчёты</text>
+  <text x="642" y="116" text-anchor="middle" font-size="10" fill="#64748b">руководитель</text>
+</svg>
+
 <blockquote>Точки питания могут физически находиться в разных часовых поясах (например головной офис в Москве и вахтовый посёлок в Сибири). Чтобы статистика «сегодня» и отчёты считались корректно для каждой точки, обязательно прочитайте раздел <a href="#s3">3. Время и часовые пояса</a>.</blockquote>
 
 <!-- ─────────────────────────────────────────── -->
@@ -136,6 +179,37 @@ hr{border:none;border-top:1.5px solid #e2e8f0;margin:24px 0}
 <tr><td><span class="badge badge-orange">Оранжевый</span></td><td>Повторный приём — сотрудник уже питался сегодня</td></tr>
 <tr><td><span class="badge badge-red">Красный</span></td><td>Отказ — сотрудник не найден, заблокирован или ошибка карты</td></tr>
 </table>
+
+<svg viewBox="0 0 640 130" style="width:100%;max-width:560px;height:auto;margin:14px 0;display:block" role="img" aria-label="Поток сканирования: карта сканируется, система проверяет сотрудника и время, результат зелёный, оранжевый или красный">
+  <defs>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+  <rect x="0" y="35" width="110" height="50" rx="10" fill="#f1f5f9" stroke="#334155" stroke-width="1.5"/>
+  <text x="55" y="55" text-anchor="middle" font-size="11" font-weight="700" fill="#1e293b">Скан QR</text>
+  <text x="55" y="71" text-anchor="middle" font-size="9" fill="#64748b">на точке</text>
+
+  <line x1="110" y1="60" x2="168" y2="60" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+  <rect x="170" y="20" width="140" height="80" rx="10" fill="#eff6ff" stroke="#1e40af" stroke-width="1.5"/>
+  <text x="240" y="45" text-anchor="middle" font-size="11" font-weight="700" fill="#1e3a5f">Проверка</text>
+  <text x="240" y="62" text-anchor="middle" font-size="9" fill="#3730a3">сотрудник, QR,</text>
+  <text x="240" y="75" text-anchor="middle" font-size="9" fill="#3730a3">время точки (§3)</text>
+
+  <line x1="310" y1="35" x2="368" y2="20" stroke="#15803d" stroke-width="1.5" marker-end="url(#arr2)"/>
+  <line x1="310" y1="60" x2="368" y2="60" stroke="#b45309" stroke-width="1.5" marker-end="url(#arr2)"/>
+  <line x1="310" y1="85" x2="368" y2="100" stroke="#dc2626" stroke-width="1.5" marker-end="url(#arr2)"/>
+
+  <rect x="370" y="4" width="150" height="34" rx="8" fill="#dcfce7" stroke="#15803d"/>
+  <text x="445" y="26" text-anchor="middle" font-size="11" font-weight="700" fill="#14532d">✓ Приём зафиксирован</text>
+
+  <rect x="370" y="43" width="150" height="34" rx="8" fill="#fef3c7" stroke="#b45309"/>
+  <text x="445" y="65" text-anchor="middle" font-size="11" font-weight="700" fill="#78350f">↻ Уже питался сегодня</text>
+
+  <rect x="370" y="83" width="150" height="34" rx="8" fill="#fee2e2" stroke="#dc2626"/>
+  <text x="445" y="105" text-anchor="middle" font-size="11" font-weight="700" fill="#7f1d1d">✕ Отказ</text>
+</svg>
 <blockquote>Граница «сегодня» для проверки повторного приёма считается по местному времени <strong>той точки</strong>, на которой ведётся приём (см. раздел 3), а не по времени сервера.</blockquote>
 
 <h3 id="s24">2.4 Сотрудники и поиск</h3>
@@ -194,6 +268,18 @@ hr{border:none;border-top:1.5px solid #e2e8f0;margin:24px 0}
 
 <h4>Записи без точки питания</h4>
 <p>Записи, внесённые через массовую проводку (раздел 2.10) или ручной пропуск без указания точки, помечены в столбце «Точка» жёлтым «Не привязано». Для администратора доступны два способа их разметить:</p>
+
+<svg viewBox="0 0 620 90" style="width:100%;max-width:560px;height:auto;margin:12px 0;display:block" role="img" aria-label="До: строка таблицы с пометкой «Не привязано». После: выбор точки в выпадающем списке и клик по кнопке подтверждения — точка назначена">
+  <text x="0" y="14" font-size="10" font-weight="700" fill="#94a3b8" letter-spacing="1">ДО</text>
+  <rect x="0" y="20" width="270" height="34" rx="8" fill="#fff7ed" stroke="#fed7aa"/>
+  <text x="14" y="41" font-size="11" font-weight="600" fill="#92400e">⚠ Не привязано</text>
+  <path d="M290,37 L330,37" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr2)"/>
+  <text x="310" y="30" text-anchor="middle" font-size="9" fill="#94a3b8">выбрать точку → ✓</text>
+
+  <text x="350" y="14" font-size="10" font-weight="700" fill="#94a3b8" letter-spacing="1">ПОСЛЕ</text>
+  <rect x="350" y="20" width="270" height="34" rx="8" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="364" y="41" font-size="11" font-weight="600" fill="#166534">✓ Столовая №2, вахта</text>
+</svg>
 <ul>
 <li><strong>По одной записи</strong> — прямо в этой ячейке есть выпадающий список точек и кнопка ✓; выбрали точку → нажали ✓ → сохранено без перезагрузки страницы.</li>
 <li><strong>Массово</strong> — включите фильтр «Только не привязанные к точке», отметьте чекбоксами нужные строки слева от таблицы, в появившейся панели выберите точку (и, при необходимости, новый тип питания) → «Назначить выбранным».</li>
@@ -252,6 +338,26 @@ hr{border:none;border-top:1.5px solid #e2e8f0;margin:24px 0}
 <blockquote>
 Точка питания работает по местному времени UTC+7 (например, Красноярск). Завтрак начинается в 06:30 <strong>по местному времени</strong> точки. Если система не знает, что точка в UTC+7, она может посчитать это время как 23:30 <strong>предыдущих</strong> суток — и приём пищи «утечёт» в отчёт за вчерашний день, а на сегодня счётчик покажет меньше, чем было на самом деле.
 </blockquote>
+
+<svg viewBox="0 0 720 170" style="width:100%;max-width:720px;height:auto;margin:16px 0;display:block" role="img" aria-label="Без учёта часового пояса завтрак в 06:30 по местному времени точки в UTC+7 ошибочно попадает в UTC-сутки 23:30 предыдущего дня">
+  <text x="0" y="16" font-size="11" font-weight="700" fill="#64748b">СУТКИ ПО UTC (сервер)</text>
+  <rect x="0" y="24" width="330" height="30" rx="6" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <rect x="330" y="24" width="330" height="30" rx="6" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="165" y="44" text-anchor="middle" font-size="11" fill="#64748b">…30 июня (UTC)</text>
+  <text x="495" y="44" text-anchor="middle" font-size="11" fill="#64748b">1 июля (UTC)…</text>
+  <line x1="330" y1="18" x2="330" y2="60" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3,3"/>
+  <text x="330" y="70" text-anchor="middle" font-size="9" fill="#94a3b8">00:00 UTC</text>
+
+  <!-- Точка события: 23:30 UTC 30 июня = 06:30 местного 1 июля -->
+  <circle cx="300" cy="39" r="5" fill="#dc2626"/>
+  <line x1="300" y1="39" x2="300" y2="95" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="300" y="110" text-anchor="middle" font-size="10" font-weight="700" fill="#dc2626">23:30 UTC</text>
+  <text x="300" y="123" text-anchor="middle" font-size="9" fill="#991b1b">(ещё «30 июня» по UTC)</text>
+
+  <text x="0" y="150" font-size="11" font-weight="700" fill="#15803d">МЕСТНОЕ ВРЕМЯ ТОЧКИ (UTC+7)</text>
+  <rect x="0" y="156" width="720" height="0" fill="none"/>
+  <text x="300" y="166" text-anchor="middle" font-size="11" font-weight="700" fill="#15803d">↑ то же мгновение = 06:30 · 1 июля местного — это ЗАВТРАК СЕГОДНЯ, а не вчера</text>
+</svg>
 <p>Похожая проблема возникает при несовпадении часового пояса между <strong>сайтом</strong> и <strong>оффлайн-приложением</strong> на компьютере точки: если на сайте для точки выставлен часовой пояс +07:00, а в самом оффлайн-приложении на компьютере эта настройка не сделана (используется значение по умолчанию, Москва +03:00) — счётчики «Завтрак / Обед / Ужин сегодня» на сайте и в оффлайн-программе будут расходиться на несколько часов проходов.</p>
 
 <h3 id="s32">3.2 Как время хранится внутри системы</h3>
