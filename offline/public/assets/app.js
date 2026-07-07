@@ -36,18 +36,12 @@ const RU_TO_EN = {
     'Б':'<','Ю':'>',
 };
 
-let _idleTimer = null;
-let _idleCountdown = null;
-const IDLE_MS = 5000;
-
 function initUsbQrInput() {
     const input   = document.getElementById('qrUsbInput');
     const pillLay = document.getElementById('qsfLayout');
-    const pillIdle= document.getElementById('qsfIdle');
-    const pillSec = document.getElementById('qsfIdleSec');
     if (!input) return;
 
-    // RU→EN layout conversion on keydown
+    // RU→EN layout conversion on keydown (когда поле реально в фокусе — ручной ввод)
     input.addEventListener('keydown', e => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -76,33 +70,65 @@ function initUsbQrInput() {
         input.value = input.value.slice(0, s) + converted + input.value.slice(end);
         input.setSelectionRange(s + converted.length, s + converted.length);
     });
+}
 
-    // Idle watcher: auto-focus after IDLE_MS
-    function resetIdle() {
-        clearTimeout(_idleTimer);
-        clearInterval(_idleCountdown);
-        pillIdle.style.display = 'none';
-        _idleTimer = setTimeout(() => {
-            let sec = Math.ceil(IDLE_MS / 1000);
-            pillSec.textContent = sec;
-            pillIdle.style.display = '';
-            _idleCountdown = setInterval(() => {
-                sec--;
-                pillSec.textContent = sec;
-                if (sec <= 0) {
-                    clearInterval(_idleCountdown);
-                    pillIdle.style.display = 'none';
-                    input.focus();
+// ── Сканирование независимо от фокуса ───────────────────────
+// USB/HID-сканер печатает символы гораздо быстрее человека (обычно <20-30мс
+// между символами против >80-100мс при ручном наборе) и завершает посылку Enter.
+// Ловим это на уровне всего документа (capture phase) — курсор может быть где
+// угодно (или нигде), сработает всё равно, пока окно приложения активно.
+// Если нужное поле реально в фокусе — не мешаем ему, там работает обычный ввод
+// (в т.ч. медленный ручной набор кода вручную) без изменений.
+const SCAN_GAP_MS  = 60; // макс. пауза между символами, чтобы считать это одной посылкой сканера
+const SCAN_MIN_LEN = 5;  // минимальная длина посылки, чтобы не сработать на случайный Enter
+let _scanBuffer   = '';
+let _scanLastTime = 0;
+
+function _scanContext() {
+    if (!currentUser) return 'login';                 // экран входа
+    if (currentPage === 'scanner') return 'scanner';   // рабочий экран сканера
+    return null;                                       // остальные страницы — не мешаем обычному вводу
+}
+
+function _scanTargetFieldId(ctx) {
+    if (ctx === 'scanner') return 'qrUsbInput';
+    const adminTabActive = document.getElementById('formAdmin')?.classList.contains('active');
+    return adminTabActive ? 'adQrInput' : 'opQrInput';
+}
+
+function initGlobalScanCapture() {
+    document.addEventListener('keydown', e => {
+        const ctx = _scanContext();
+        if (!ctx) return;
+
+        // Нужное поле реально в фокусе — там уже штатно работает ручной ввод, не вмешиваемся
+        const targetId = _scanTargetFieldId(ctx);
+        if (document.activeElement && document.activeElement.id === targetId) return;
+
+        const now = Date.now();
+        if (now - _scanLastTime > SCAN_GAP_MS) _scanBuffer = ''; // слишком медленно — не сканер, начинаем заново
+        _scanLastTime = now;
+
+        if (e.key === 'Enter') {
+            const code = _scanBuffer;
+            _scanBuffer = '';
+            if (code.length >= SCAN_MIN_LEN) {
+                e.preventDefault();
+                if (ctx === 'scanner') {
+                    handleQrScan(code);
+                } else {
+                    const role = document.getElementById('formAdmin')?.classList.contains('active') ? 'admin' : 'operator';
+                    const field = document.getElementById(targetId);
+                    if (field) field.value = code;
+                    doLogin(role);
                 }
-            }, 1000);
-        }, IDLE_MS);
-    }
+            }
+            return;
+        }
 
-    ['click','keydown','mousemove','touchstart'].forEach(ev =>
-        document.addEventListener(ev, resetIdle, { passive: true })
-    );
-    resetIdle();
-    input.focus();
+        const mapped = RU_TO_EN[e.key] ?? (e.key.length === 1 ? e.key : null);
+        if (mapped) _scanBuffer += mapped;
+    }, true); // capture phase — срабатывает независимо от того, какой элемент в фокусе
 }
 const ROLE_LABELS = { operator:'Оператор', admin:'Администратор', super_admin:'Супер-администратор' };
 const ROLE_COLORS = { operator:'#c2410c', admin:'#9b1c1c', super_admin:'#166534' };
@@ -118,6 +144,8 @@ function closeCamModal() {
 }
 
 // ── Init ──────────────────────────────────────────────────
+initGlobalScanCapture(); // один раз на весь жизненный цикл приложения — работает и на экране входа, и после
+
 (async function boot() {
     try {
         const d = await fetch('/api/config').then(r => r.json());

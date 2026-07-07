@@ -167,18 +167,16 @@
                 </div>
             </div>
 
-            <!-- QR input — web-style -->
+            <!-- QR input — сканирование работает независимо от фокуса, поле нужно только для ручного ввода -->
             <div class="qr-field-wrap">
                 <div class="qr-label-row">
-                    <span class="qr-label-text"><i class="fas fa-qrcode"></i> QR-код</span>
-                    <span class="mode-badge" id="modeBadge"><i class="fas fa-crosshairs"></i> Режим сканирования</span>
+                    <span class="qr-label-text"><i class="fas fa-crosshairs"></i> Сканирование активно — просто поднесите карту, наводить курсор никуда не нужно</span>
                     <span class="qr-pill" id="qsfLayout" style="display:none">RU→EN</span>
-                    <span class="qr-pill qr-pill-idle" id="qsfIdle" style="display:none">Фокус через <b id="qsfIdleSec">5</b>с</span>
                 </div>
                 <div class="qr-input-row">
                     <input type="text" id="qrUsbInput" class="qr-input scanner-active"
                            autocomplete="off" autocorrect="off" spellcheck="false"
-                           placeholder="Наведите сканер на QR-код…">
+                           placeholder="…или введите код вручную">
                     <button class="btn-qr-action" id="manualCheckBtn" onclick="doManualCheck()">
                         <i class="fas fa-search"></i> Проверить
                     </button>
