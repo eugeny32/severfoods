@@ -4,9 +4,9 @@
  * Используется, когда нужно задним числом или пакетно отметить приём пищи
  * группе сотрудников — например, при сбое сканера или для целой бригады.
  *
- * Запись создаётся БЕЗ привязки к точке питания (meal_point_id = NULL) —
- * назначить точку и, при необходимости, поменять тип питания можно позже
- * в разделе «Отчёты» (см. api/assign_meal_point.php).
+ * Точку питания можно указать сразу (необязательно) — если не указана,
+ * запись создаётся без привязки (meal_point_id = NULL), назначить точку
+ * можно позже в разделе «Отчёты» (см. api/assign_meal_point.php).
  *
  * Если на указанную дату для сотрудника уже есть активная запись с этим
  * типом питания — новая запись не создаётся, сотрудник попадает в список
@@ -30,6 +30,7 @@ $data        = json_decode(file_get_contents('php://input'), true) ?? [];
 $date        = preg_replace('/[^0-9\-]/', '', $data['date'] ?? '');
 $mealType    = $data['meal_type'] ?? '';
 $employeeIds = array_values(array_unique(array_filter(array_map('intval', $data['employee_ids'] ?? []))));
+$pointId     = !empty($data['point_id']) ? (int)$data['point_id'] : null;
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
     echo json_encode(['success' => false, 'message' => 'Некорректная дата']);
@@ -46,6 +47,24 @@ if (!$employeeIds) {
 if ($date > localToday()) {
     echo json_encode(['success' => false, 'message' => 'Нельзя проводить будущей датой']);
     exit;
+}
+
+$pointName = null;
+if ($pointId) {
+    // Не-super_admin может проводить только на свою точку
+    $userRole    = $_SESSION['role'] ?? '';
+    $assignedPid = $_SESSION['assigned_point_id'] ?? null;
+    if ($userRole !== 'super_admin' && $pointId !== (int)$assignedPid) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Можно проводить только на свою точку']);
+        exit;
+    }
+    $point = getMealPointById($pdo, $pointId);
+    if (!$point) {
+        echo json_encode(['success' => false, 'message' => 'Точка не найдена']);
+        exit;
+    }
+    $pointName = $point['point_name'];
 }
 
 $operatorId   = $_SESSION['user_id']   ?? null;
@@ -79,17 +98,17 @@ if ($toInsert) {
         "INSERT INTO meal_logs
              (employee_id, meal_type, access_granted, scanner_ip,
               operator_id, operator_name, meal_point_id, meal_point_name, scanned_at)
-         VALUES (?, ?, 1, 'bulk', ?, ?, NULL, NULL, ?)"
+         VALUES (?, ?, 1, 'bulk', ?, ?, ?, ?, ?)"
     );
     foreach ($toInsert as $empId) {
-        $ins->execute([$empId, $mealType, $operatorId, $operatorName, $scannedAt]);
+        $ins->execute([$empId, $mealType, $operatorId, $operatorName, $pointId, $pointName, $scannedAt]);
         $inserted[] = ['id' => $empId, 'name' => $names[$empId] ?? "#{$empId}"];
     }
 }
 
 $alreadyList = array_map(fn($id) => ['id' => $id, 'name' => $names[$id] ?? "#{$id}"], $already);
 
-logAction('bulk_pass', "Массовая проводка ({$mealType}, {$date}): проведено " . count($inserted) . ", уже было " . count($alreadyList));
+logAction('bulk_pass', "Массовая проводка ({$mealType}, {$date}" . ($pointName ? ", точка «{$pointName}»" : '') . "): проведено " . count($inserted) . ", уже было " . count($alreadyList));
 
 echo json_encode([
     'success'  => true,

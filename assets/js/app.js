@@ -571,6 +571,7 @@ function bpUpdateCount() {
 async function bpSubmit() {
     const date     = document.getElementById('bpDate').value;
     const mealType = document.getElementById('bpMealType').value;
+    const pointId  = document.getElementById('bpPointId')?.value || null;
     const msgEl    = document.getElementById('bpResultMsg');
     const ids      = Array.from(bpSelectedIds).map(Number);
 
@@ -582,7 +583,7 @@ async function bpSubmit() {
         const res = await fetch('api/bulk_pass.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-            body: JSON.stringify({ date, meal_type: mealType, employee_ids: ids }),
+            body: JSON.stringify({ date, meal_type: mealType, employee_ids: ids, point_id: pointId }),
         });
         const data = await res.json();
         if (!data.success) {

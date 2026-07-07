@@ -433,7 +433,7 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                 </div>
                 <p style="font-size:13px;color:var(--text-3);margin-bottom:14px">
                     Отметить приём пищи сразу нескольким сотрудникам на указанную дату — без сканирования QR.
-                    Записи создаются без привязки к точке питания; назначить точку можно позже в разделе «Отчёты».
+                    Точку питания можно указать сразу, либо оставить не привязанной и назначить позже в разделе «Отчёты».
                 </p>
                 <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px">
                     <div class="form-group">
@@ -448,15 +448,24 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                             <option value="dinner">Ужин</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-map-marker-alt"></i> Точка питания</label>
+                        <select id="bpPointId">
+                            <option value="">— не привязывать —</option>
+                            <?php foreach ($points as $pt): ?>
+                            <option value="<?= $pt['id'] ?>"><?= htmlspecialchars($pt['point_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group" style="margin-bottom:12px">
                     <label><i class="fas fa-search"></i> Поиск по фамилии</label>
                     <input type="text" id="bpSearch" placeholder="Начните вводить фамилию…" oninput="bpSearchEmployees(this.value)" autocomplete="off">
                 </div>
-                <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-                    <button type="button" class="btn-sm" onclick="bpSelectAll(true)">Выбрать всех найденных</button>
-                    <button type="button" class="btn-sm" onclick="bpSelectAll(false)">Снять выбор</button>
-                    <span style="font-size:13px;color:var(--text-3);align-self:center">Выбрано: <strong id="bpSelectedCount">0</strong></span>
+                <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+                    <button type="button" class="btn btn-secondary" onclick="bpSelectAll(true)">Выбрать всех найденных</button>
+                    <button type="button" class="btn btn-secondary" onclick="bpSelectAll(false)">Снять выбор</button>
+                    <span style="font-size:13px;color:var(--text-3)">Выбрано: <strong id="bpSelectedCount">0</strong></span>
                 </div>
                 <div id="bpResultsList" style="max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;margin-bottom:14px">
                     <div style="padding:20px;text-align:center;color:var(--text-3);font-size:13px">Введите фамилию для поиска</div>
