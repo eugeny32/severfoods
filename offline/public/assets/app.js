@@ -1327,16 +1327,18 @@ const UPD_LABELS = {
     checking:   'Проверка…',
     available:  'Загружается…',
     downloaded: 'Готово к установке',
-    idle:       'Обновлений нет',
-    error:      'Ошибка проверки',
+    idle:       'Последняя версия',
 };
 
+// Технические ошибки проверки (сервер недоступен, файл обновления ещё не залит и т.п.)
+// не показываем оператору как тревожную ошибку — со стороны приложения это неотличимо
+// от "обновлений пока нет", а разбираться в HTTP-стектрейсах должен не оператор точки.
+// Подробности остаются в title (всплывающая подсказка при наведении) на случай отладки.
 function updStatusLabel(s) {
-    if (s.error)      return `${UPD_LABELS.error}: ${esc(s.error)}`;
-    if (s.downloaded) return `${UPD_LABELS.downloaded} (v${s.version})`;
-    if (s.available)  return `${UPD_LABELS.available} (v${s.version})`;
-    if (s.checking)    return UPD_LABELS.checking;
-    return UPD_LABELS.idle;
+    if (s.downloaded) return { text: `✓ ${UPD_LABELS.downloaded} (v${s.version})`, color: '#16a34a' };
+    if (s.available)  return { text: `${UPD_LABELS.available} (v${s.version})`,      color: '#64748b' };
+    if (s.checking)    return { text: UPD_LABELS.checking,                            color: '#64748b' };
+    return { text: `✓ ${UPD_LABELS.idle}`, color: '#16a34a' };
 }
 
 async function refreshUpdateStatus() {
@@ -1344,14 +1346,22 @@ async function refreshUpdateStatus() {
         const d = await fetch('/api/update/status').then(r => r.json());
         const s = d.status || {};
         if (id('updCurVer')) id('updCurVer').textContent = s.currentVersion || '—';
-        if (id('updStatus')) id('updStatus').textContent = updStatusLabel(s);
+        const statusEl = id('updStatus');
+        if (statusEl) {
+            const { text, color } = updStatusLabel(s);
+            statusEl.textContent   = text;
+            statusEl.style.color   = color;
+            statusEl.style.fontWeight = '700';
+            statusEl.title = s.error ? `Не удалось проверить обновление: ${s.error}` : '';
+        }
         const btn = id('updInstallBtn');
         if (btn) btn.style.display = s.downloaded ? '' : 'none';
     } catch (_) {}
 }
 
 async function checkUpdateNow() {
-    if (id('updStatus')) id('updStatus').textContent = UPD_LABELS.checking;
+    const statusEl = id('updStatus');
+    if (statusEl) { statusEl.textContent = UPD_LABELS.checking; statusEl.style.color = '#64748b'; }
     await fetch('/api/update/check', { method: 'POST' });
     setTimeout(refreshUpdateStatus, 1500);
 }
