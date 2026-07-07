@@ -417,7 +417,7 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
     <?php if ($is_admin && !empty($logs)): ?>
     <div id="assignPanel" style="display:none;background:#eff6ff;border-bottom:1.5px solid #dbeafe;padding:12px 16px;align-items:center;gap:10px;flex-wrap:wrap">
         <span style="font-size:13px;color:#1e40af;font-weight:600">Выбрано: <span id="assignCount">0</span></span>
-        <select id="assignPointId" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;font-size:13px">
+        <select id="assignPointId" style="padding:6px 10px;border-radius:6px;border:1px solid #cbd5e1;font-size:13px;max-width:220px">
             <option value="">— выберите точку —</option>
             <?php foreach ($assignablePoints as $pt): ?>
             <option value="<?= $pt['id'] ?>"><?= htmlspecialchars($pt['point_name']) ?></option>
@@ -477,8 +477,9 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
                     <td><span class="meal-badge <?= $log['meal_type'] ?>"><?= getMealTypeName($log['meal_type']) ?></span></td>
                     <td style="font-size:12px">
                         <?php if (empty($log['meal_point_id'])): ?>
-                        <div style="display:flex;align-items:center;gap:4px">
-                            <select class="row-point-select" data-id="<?= $log['id'] ?>" style="padding:4px 6px;border-radius:6px;border:1px solid #fed7aa;font-size:12px;background:#fff7ed;color:#92400e">
+                        <div style="display:flex;align-items:center;gap:4px;min-width:150px">
+                            <select class="row-point-select" data-id="<?= $log['id'] ?>" title="Выберите точку питания"
+                                style="padding:4px 6px;border-radius:6px;border:1px solid #fed7aa;font-size:12px;background:#fff7ed;color:#92400e;max-width:130px;flex:1">
                                 <option value="">Не привязано…</option>
                                 <?php foreach ($assignablePoints as $pt): ?>
                                 <option value="<?= $pt['id'] ?>"><?= htmlspecialchars($pt['point_name']) ?></option>
