@@ -59,28 +59,51 @@ if (!$stmt->fetch()) {
 // ─── Запись ───────────────────────────────────────────
 $scannedAt = isset($data['scanned_at']) ? intval($data['scanned_at']) : (time() * 1000);
 
+// Точку из тела запроса не принимаем вслепую — устаревший/неверный
+// meal_point_id исказил бы расчёт часового пояса и дедупа (см. ту же
+// проверку в api/offline_sync.php).
+$pointIdForType = isset($data['meal_point_id']) ? intval($data['meal_point_id']) : null;
+if ($pointIdForType && !getMealPointById($pdo, $pointIdForType)) {
+    $pointIdForType = null;
+}
+
 // 'night' в базе не хранится — переклассифицируем по местному времени точки.
-$pointIdForType  = isset($data['meal_point_id']) ? intval($data['meal_point_id']) : null;
-$pointTzForType  = $pointIdForType ? getPointTz($pdo, $pointIdForType) : APP_TZ_OFFSET;
-$localTimeAtScan = gmdate('H:i:s', intdiv($scannedAt, 1000) + offsetToMinutes($pointTzForType) * 60);
+// Часовой пояс без точки — фиксированный серверный (SERVER_TZ_OFFSET), не
+// APP_TZ_OFFSET: у этого эндпоинта нет браузера/cookie.
+$pointTzForType  = $pointIdForType ? getPointTz($pdo, $pointIdForType) : SERVER_TZ_OFFSET;
+$scanTs          = intdiv($scannedAt, 1000);
+$localTimeAtScan = gmdate('H:i:s', $scanTs + offsetToMinutes($pointTzForType) * 60);
 $meal_type       = normalizeMealType($meal_type, $localTimeAtScan);
+$localDate       = gmdate('Y-m-d', $scanTs + offsetToMinutes($pointTzForType) * 60);
 
-$pdo->prepare(
-    "INSERT INTO meal_logs
-         (employee_id, meal_type, access_granted, denial_reason,
-          scanner_ip, operator_id, operator_name,
-          meal_point_id, meal_point_name, scanned_at)
-     VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, FROM_UNIXTIME(?/1000))"
-)->execute([
-    $employee_id,
-    $meal_type,
-    $data['denial_reason']   ?? null,
-    $data['scanner_ip']      ?? 'offline',
-    isset($data['operator_id']) ? intval($data['operator_id']) : null,
-    $data['operator_name']   ?? 'Синхронизация',
-    isset($data['meal_point_id']) ? intval($data['meal_point_id']) : null,
-    $data['meal_point_name'] ?? null,
-    $scannedAt,
-]);
+// Лок + единая проверка дублей — этот эндпоинт раньше вставлял записи без
+// какой-либо дедупликации вообще (см. hasExistingMealLog в src/functions.php).
+$locked = acquireMealLock($pdo, $employee_id);
+try {
+    if (hasExistingMealLog($pdo, $employee_id, $meal_type, $pointIdForType, $localDate)) {
+        echo json_encode(['success' => false, 'error' => 'duplicate']);
+        return;
+    }
 
-echo json_encode(['id' => (int)$pdo->lastInsertId(), 'success' => true]);
+    $pdo->prepare(
+        "INSERT INTO meal_logs
+             (employee_id, meal_type, access_granted, denial_reason,
+              scanner_ip, operator_id, operator_name,
+              meal_point_id, meal_point_name, scanned_at)
+         VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, FROM_UNIXTIME(?/1000))"
+    )->execute([
+        $employee_id,
+        $meal_type,
+        $data['denial_reason']   ?? null,
+        $data['scanner_ip']      ?? 'offline',
+        isset($data['operator_id']) ? intval($data['operator_id']) : null,
+        $data['operator_name']   ?? 'Синхронизация',
+        $pointIdForType,
+        $data['meal_point_name'] ?? null,
+        $scannedAt,
+    ]);
+
+    echo json_encode(['id' => (int)$pdo->lastInsertId(), 'success' => true]);
+} finally {
+    if ($locked) releaseMealLock($pdo, $employee_id);
+}
