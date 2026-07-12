@@ -331,6 +331,16 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
     </button>
     <span id="normalizeTimesResult" style="font-size:13px;color:#92400e"></span>
 </div>
+<div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:13px;color:#92400e"><i class="fas fa-clone"></i> Обслуживание базы: найти дубли — один сотрудник, один тип питания, одна местная дата, несколько записей (например, реальный скан + ручная/массовая проводка).</span>
+        <button type="button" class="btn" onclick="findDuplicatePasses()" style="background:#b45309;color:#fff">
+            <i class="fas fa-search"></i> Найти дубликаты
+        </button>
+        <span id="dupFindResult" style="font-size:13px;color:#92400e"></span>
+    </div>
+    <div id="dupList" style="margin-top:12px"></div>
+</div>
 <?php endif; ?>
 
 <?php if ($report_type === 'dry_rations'): ?>
@@ -793,6 +803,89 @@ async function normalizePassTimes() {
         }
     } catch (e) {
         resultEl.textContent = 'Ошибка сети';
+    }
+}
+
+const dupSrcLabels = {
+    bulk: ['Массовая', '#7c2d12', '#fef3c7'],
+    manual: ['Ручной', '#1e3a8a', '#dbeafe'],
+    offline: ['Оффлайн', '#166534', '#dcfce7'],
+};
+function dupSrcBadge(scannerIp) {
+    const src = dupSrcLabels[scannerIp];
+    if (src) return `<span style="display:inline-block;padding:1px 6px;border-radius:100px;font-size:10px;font-weight:700;color:${src[1]};background:${src[2]}">${src[0]}</span>`;
+    return `<span style="display:inline-block;padding:1px 6px;border-radius:100px;font-size:10px;font-weight:700;color:#374151;background:#e5e7eb">Сканер</span>`;
+}
+const mealTypeNames = { breakfast: 'Завтрак', lunch: 'Обед', dinner: 'Ужин', night: 'Ночное' };
+
+async function findDuplicatePasses() {
+    const resultEl = document.getElementById('dupFindResult');
+    const listEl = document.getElementById('dupList');
+    resultEl.textContent = 'Поиск…';
+    listEl.innerHTML = '';
+    try {
+        const res = await fetch('api/find_duplicate_passes.php', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        const data = await res.json();
+        if (!data.success) { resultEl.textContent = data.message || 'Ошибка'; return; }
+        if (!data.groups.length) { resultEl.textContent = 'Дублей не найдено'; return; }
+        resultEl.textContent = `Найдено групп: ${data.groups.length}`;
+
+        let html = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+            <button type="button" class="btn" onclick="deleteSelectedDuplicates()" style="background:#dc2626;color:#fff">
+                <i class="fas fa-trash"></i> Удалить отмеченные
+            </button>
+        </div>
+        <div style="overflow-x:auto">
+        <table class="report-table" style="min-width:900px">
+            <thead><tr>
+                <th style="width:30px"></th>
+                <th>Сотрудник</th><th>Тип питания</th><th>Дата</th><th>Время</th>
+                <th>Точка</th><th>Оператор</th><th>Источник</th>
+            </tr></thead><tbody>`;
+        data.groups.forEach(g => {
+            g.members.forEach((m, i) => {
+                const dt = new Date(m.scanned_local.replace(' ', 'T'));
+                html += `<tr style="${i===0 ? 'border-top:2px solid #fed7aa' : ''}">
+                    <td><input type="checkbox" class="dup-check" value="${m.id}" ${m.recommended_delete ? 'checked' : ''}></td>
+                    <td>${i===0 ? m.full_name.replace(/</g,'&lt;') : ''}</td>
+                    <td>${mealTypeNames[m.meal_type] || m.meal_type}</td>
+                    <td>${g.local_date.split('-').reverse().join('.')}</td>
+                    <td>${dt.toTimeString().slice(0,8)}</td>
+                    <td>${(m.meal_point_name || '—').replace(/</g,'&lt;')}</td>
+                    <td>${(m.operator_name || '—').replace(/</g,'&lt;')}</td>
+                    <td>${dupSrcBadge(m.scanner_ip)}</td>
+                </tr>`;
+            });
+        });
+        html += `</tbody></table></div>`;
+        listEl.innerHTML = html;
+    } catch (e) {
+        resultEl.textContent = 'Ошибка сети';
+    }
+}
+
+async function deleteSelectedDuplicates() {
+    const ids = Array.from(document.querySelectorAll('.dup-check:checked')).map(c => parseInt(c.value, 10));
+    if (!ids.length) { alert('Не отмечено ни одной записи'); return; }
+    if (!confirm(`Удалить ${ids.length} отмеченных записей? Действие можно отменить только через базу данных.`)) return;
+    try {
+        const res = await fetch('api/delete_duplicate_passes.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ ids }),
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('dupFindResult').textContent = `Удалено: ${data.deleted}`;
+            findDuplicatePasses();
+        } else {
+            alert(data.message || 'Ошибка');
+        }
+    } catch (e) {
+        alert('Ошибка сети');
     }
 }
 </script>
