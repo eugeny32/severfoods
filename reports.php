@@ -21,6 +21,7 @@ $export      = $_GET['export']      ?? null;
 $point_id    = isset($_GET['point_id']) && $_GET['point_id'] !== '' ? (int)$_GET['point_id'] : null;
 $unassigned_only = !empty($_GET['unassigned_only']);
 $out_of_schedule_only = !empty($_GET['out_of_schedule_only']);
+$source = in_array($_GET['source'] ?? '', ['bulk','manual','offline','scanner','all']) ? $_GET['source'] : 'all';
 
 // Доступные точки
 $points = [];
@@ -52,6 +53,8 @@ $params = [':start' => $start_date, ':end' => $end_date];
 if ($meal_type !== 'all') { $sql .= " AND ml.meal_type = :mt"; $params[':mt'] = $meal_type; }
 if ($filter_point_id)     { $sql .= " AND ml.meal_point_id = :pid"; $params[':pid'] = $filter_point_id; }
 if ($unassigned_only)     { $sql .= " AND ml.meal_point_id IS NULL"; }
+if ($source === 'scanner') { $sql .= " AND (ml.scanner_ip IS NULL OR ml.scanner_ip NOT IN ('bulk','manual','offline'))"; }
+elseif ($source !== 'all') { $sql .= " AND ml.scanner_ip = :src"; $params[':src'] = $source; }
 $sql .= " ORDER BY ml.scanned_at DESC";
 
 $stmt = $pdo->prepare($sql); $stmt->execute($params);
@@ -118,6 +121,8 @@ $sqlEmp = "SELECT e.id, e.full_name, e.organization, e.department,
 $paramsEmp = [':start' => $start_date, ':end' => $end_date];
 if ($meal_type !== 'all')  { $sqlEmp .= " AND ml.meal_type = :mt";        $paramsEmp[':mt']  = $meal_type; }
 if ($filter_point_id)      { $sqlEmp .= " AND ml.meal_point_id = :pid";   $paramsEmp[':pid'] = $filter_point_id; }
+if ($source === 'scanner') { $sqlEmp .= " AND (ml.scanner_ip IS NULL OR ml.scanner_ip NOT IN ('bulk','manual','offline'))"; }
+elseif ($source !== 'all') { $sqlEmp .= " AND ml.scanner_ip = :src"; $paramsEmp[':src'] = $source; }
 $sqlEmp .= " GROUP BY e.id, e.full_name, e.organization, e.department
              ORDER BY e.organization, e.full_name";
 $stmtEmp = $pdo->prepare($sqlEmp);
@@ -278,6 +283,16 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
     <input type="hidden" name="point_id" value="<?= $assigned_pid ?>">
     <?php endif; ?>
     <?php if ($report_type === 'meals'): ?>
+    <div class="form-group">
+        <label><i class="fas fa-hand-pointer"></i> Метод проводки</label>
+        <select name="source">
+            <option value="all"     <?= $source==='all'?'selected':''     ?>>Все</option>
+            <option value="scanner" <?= $source==='scanner'?'selected':'' ?>>Сканер</option>
+            <option value="bulk"    <?= $source==='bulk'?'selected':''    ?>>Массовая проводка</option>
+            <option value="manual"  <?= $source==='manual'?'selected':''  ?>>Ручной пропуск</option>
+            <option value="offline" <?= $source==='offline'?'selected':'' ?>>Оффлайн-приложение</option>
+        </select>
+    </div>
     <div class="form-group" style="min-width:auto;flex-direction:row;align-items:center;gap:6px;padding-top:20px">
         <input type="checkbox" id="unassignedOnly" name="unassigned_only" value="1" <?= $unassigned_only?'checked':'' ?> onchange="this.form.submit()">
         <label for="unassignedOnly" style="margin:0;white-space:nowrap">Только не привязанные к точке</label>
