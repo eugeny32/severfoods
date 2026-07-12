@@ -378,6 +378,7 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
             <button class="tab-btn" data-tab="tabOffline"><i class="fas fa-desktop"></i> Оффлайн</button>
             <?php if ($is_super_admin): ?>
             <button class="tab-btn" data-tab="tabChatUsers"><i class="fas fa-comments"></i> Пользователи чата</button>
+            <button class="tab-btn" data-tab="tabDbMaint"><i class="fas fa-database"></i> Обслуживание БД</button>
             <?php endif; ?>
         </div>
 
@@ -772,6 +773,34 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
             </table>
             </div>
             <?php endif; ?>
+        </div>
+
+        <!-- DB MAINTENANCE -->
+        <div id="tabDbMaint" class="tab-pane">
+            <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <span style="font-size:13px;color:#92400e"><i class="fas fa-tools"></i> Привести тип питания записей в соответствие с расписанием точки и фактическим временем — не только «ночные», но и завтрак/обед/ужин, если реально попадают в другое окно расписания.</span>
+                <button type="button" class="btn" onclick="normalizeNightRecords()" style="background:#f59e0b;color:#fff">
+                    <i class="fas fa-broom"></i> Нормализовать тип питания
+                </button>
+                <span id="normalizeResult" style="font-size:13px;color:#92400e"></span>
+            </div>
+            <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <span style="font-size:13px;color:#92400e"><i class="fas fa-clock"></i> Перенести время всех массовых/ручных записей на начало периода расписания точки (например, «завтрак в 19:00» → «завтрак в 07:00»).</span>
+                <button type="button" class="btn" onclick="normalizePassTimes()" style="background:#ea580c;color:#fff">
+                    <i class="fas fa-broom"></i> Нормализовать время проводок
+                </button>
+                <span id="normalizeTimesResult" style="font-size:13px;color:#92400e"></span>
+            </div>
+            <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px">
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                    <span style="font-size:13px;color:#92400e"><i class="fas fa-clone"></i> Найти дубли — один сотрудник, один тип питания, одна местная дата, несколько записей (например, реальный скан + ручная/массовая проводка).</span>
+                    <button type="button" class="btn" onclick="findDuplicatePasses()" style="background:#b45309;color:#fff">
+                        <i class="fas fa-search"></i> Найти дубликаты
+                    </button>
+                    <span id="dupFindResult" style="font-size:13px;color:#92400e"></span>
+                </div>
+                <div id="dupList" style="margin-top:12px"></div>
+            </div>
         </div>
         <?php endif; ?>
 
