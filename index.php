@@ -778,26 +778,28 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
         <!-- DB MAINTENANCE -->
         <div id="tabDbMaint" class="tab-pane">
             <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-                <span style="font-size:13px;color:#92400e"><i class="fas fa-tools"></i> Привести тип питания записей в соответствие с расписанием точки и фактическим временем — не только «ночные», но и завтрак/обед/ужин, если реально попадают в другое окно расписания.</span>
-                <button type="button" class="btn" onclick="normalizeNightRecords()" style="background:#f59e0b;color:#fff">
-                    <i class="fas fa-broom"></i> Нормализовать тип питания
-                </button>
-                <span id="normalizeResult" style="font-size:13px;color:#92400e"></span>
+                <span style="font-size:13px;color:#92400e;flex:1;min-width:200px"><i class="fas fa-tools"></i> Привести тип питания записей в соответствие с расписанием точки и фактическим временем — не только «ночные», но и завтрак/обед/ужин, если реально попадают в другое окно расписания.</span>
+                <div style="display:flex;gap:6px;margin-left:auto">
+                    <button type="button" class="btn" title="Предпросмотр — посчитать, сколько записей изменится, без сохранения" onclick="normalizeNightRecords(true)" style="background:#fff;border:1.5px solid #f59e0b;color:#f59e0b;width:36px;height:36px;padding:0"><i class="fas fa-magnifying-glass"></i></button>
+                    <button type="button" class="btn" title="Нормализовать тип питания" onclick="normalizeNightRecords(false)" style="background:#f59e0b;color:#fff;width:36px;height:36px;padding:0"><i class="fas fa-broom"></i></button>
+                </div>
+                <span id="normalizeResult" style="font-size:13px;color:#92400e;width:100%"></span>
             </div>
             <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-                <span style="font-size:13px;color:#92400e"><i class="fas fa-clock"></i> Перенести время всех массовых/ручных записей на начало периода расписания точки (например, «завтрак в 19:00» → «завтрак в 07:00»).</span>
-                <button type="button" class="btn" onclick="normalizePassTimes()" style="background:#ea580c;color:#fff">
-                    <i class="fas fa-broom"></i> Нормализовать время проводок
-                </button>
-                <span id="normalizeTimesResult" style="font-size:13px;color:#92400e"></span>
+                <span style="font-size:13px;color:#92400e;flex:1;min-width:200px"><i class="fas fa-clock"></i> Перенести время всех массовых/ручных записей на начало периода расписания точки (например, «завтрак в 19:00» → «завтрак в 07:00»).</span>
+                <div style="display:flex;gap:6px;margin-left:auto">
+                    <button type="button" class="btn" title="Предпросмотр — посчитать, сколько записей изменится, без сохранения" onclick="normalizePassTimes(true)" style="background:#fff;border:1.5px solid #ea580c;color:#ea580c;width:36px;height:36px;padding:0"><i class="fas fa-magnifying-glass"></i></button>
+                    <button type="button" class="btn" title="Нормализовать время проводок" onclick="normalizePassTimes(false)" style="background:#ea580c;color:#fff;width:36px;height:36px;padding:0"><i class="fas fa-broom"></i></button>
+                </div>
+                <span id="normalizeTimesResult" style="font-size:13px;color:#92400e;width:100%"></span>
             </div>
             <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px">
                 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-                    <span style="font-size:13px;color:#92400e"><i class="fas fa-clone"></i> Найти дубли — один сотрудник, один тип питания, одна местная дата, несколько записей (например, реальный скан + ручная/массовая проводка).</span>
-                    <button type="button" class="btn" onclick="findDuplicatePasses()" style="background:#b45309;color:#fff">
-                        <i class="fas fa-search"></i> Найти дубликаты
-                    </button>
-                    <span id="dupFindResult" style="font-size:13px;color:#92400e"></span>
+                    <span style="font-size:13px;color:#92400e;flex:1;min-width:200px"><i class="fas fa-clone"></i> Найти дубли — один сотрудник, один тип питания, одна местная дата, несколько записей (например, реальный скан + ручная/массовая проводка).</span>
+                    <div style="display:flex;gap:6px;margin-left:auto">
+                        <button type="button" class="btn" title="Найти дубликаты" onclick="findDuplicatePasses()" style="background:#b45309;color:#fff;width:36px;height:36px;padding:0"><i class="fas fa-search"></i></button>
+                    </div>
+                    <span id="dupFindResult" style="font-size:13px;color:#92400e;width:100%"></span>
                 </div>
                 <div id="dupList" style="margin-top:12px"></div>
             </div>

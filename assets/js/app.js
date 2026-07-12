@@ -1503,18 +1503,20 @@ window.openOrgModal       = openOrgModal;
 
 // ── Обслуживание БД (вкладка «Обслуживание БД», только супер-админ) ──
 
-async function normalizeNightRecords() {
-    if (!confirm('Переклассифицировать все исторические записи (завтрак/обед/ужин/ночное) в соответствии с расписанием точки и фактическим местным временем? Действие необратимо.')) return;
+async function normalizeNightRecords(dryRun) {
+    if (!dryRun && !confirm('Переклассифицировать все исторические записи (завтрак/обед/ужин/ночное) в соответствии с расписанием точки и фактическим местным временем? Действие необратимо.')) return;
     const resultEl = document.getElementById('normalizeResult');
-    resultEl.textContent = 'Выполняется…';
+    resultEl.textContent = dryRun ? 'Считаю…' : 'Выполняется…';
     try {
         const res = await fetch('api/normalize_night_records.php', {
             method: 'POST',
-            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': getCsrfToken() },
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ dry_run: !!dryRun }),
         });
         const data = await res.json();
         if (data.success) {
-            resultEl.textContent = `Готово: всего проверено ${data.total}, изменено — ${data.changed} (завтрак ${data.by_type.breakfast}, обед ${data.by_type.lunch}, ужин ${data.by_type.dinner}), из них время скорректировано (массовая проводка) — ${data.retimed}, пропущено как «вне графика» — ${data.skipped}`;
+            const prefix = dryRun ? 'Предпросмотр (изменения НЕ сохранены)' : 'Готово';
+            resultEl.textContent = `${prefix}: всего проверено ${data.total}, изменится — ${data.changed} (завтрак ${data.by_type.breakfast}, обед ${data.by_type.lunch}, ужин ${data.by_type.dinner}), из них время (массовая проводка) — ${data.retimed}, пропущено как «вне графика» — ${data.skipped}`;
         } else {
             resultEl.textContent = data.message || 'Ошибка';
         }
@@ -1523,18 +1525,20 @@ async function normalizeNightRecords() {
     }
 }
 
-async function normalizePassTimes() {
-    if (!confirm('Перенести время всех массовых и ручных проводок на начало периода расписания точки (по дате существующей записи)? Действие необратимо.')) return;
+async function normalizePassTimes(dryRun) {
+    if (!dryRun && !confirm('Перенести время всех массовых и ручных проводок на начало периода расписания точки (по дате существующей записи)? Действие необратимо.')) return;
     const resultEl = document.getElementById('normalizeTimesResult');
-    resultEl.textContent = 'Выполняется…';
+    resultEl.textContent = dryRun ? 'Считаю…' : 'Выполняется…';
     try {
         const res = await fetch('api/normalize_pass_times.php', {
             method: 'POST',
-            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': getCsrfToken() },
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ dry_run: !!dryRun }),
         });
         const data = await res.json();
         if (data.success) {
-            resultEl.textContent = `Готово: всего ${data.total}, изменено — ${data.retimed} (завтрак ${data.by_type.breakfast}, обед ${data.by_type.lunch}, ужин ${data.by_type.dinner}), уже были корректны — ${data.unchanged}`;
+            const prefix = dryRun ? 'Предпросмотр (изменения НЕ сохранены)' : 'Готово';
+            resultEl.textContent = `${prefix}: всего ${data.total}, изменится — ${data.retimed} (завтрак ${data.by_type.breakfast}, обед ${data.by_type.lunch}, ужин ${data.by_type.dinner}), уже корректны — ${data.unchanged}`;
         } else {
             resultEl.textContent = data.message || 'Ошибка';
         }
@@ -1571,8 +1575,8 @@ async function findDuplicatePasses() {
         resultEl.textContent = `Найдено групп: ${data.groups.length}`;
 
         let html = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-            <button type="button" class="btn" onclick="deleteSelectedDuplicates()" style="background:#dc2626;color:#fff">
-                <i class="fas fa-trash"></i> Удалить отмеченные
+            <button type="button" class="btn" title="Удалить отмеченные" onclick="deleteSelectedDuplicates()" style="background:#dc2626;color:#fff;width:36px;height:36px;padding:0">
+                <i class="fas fa-trash"></i>
             </button>
         </div>
         <div style="overflow-x:auto">

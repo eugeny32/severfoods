@@ -30,6 +30,11 @@ if (($_SESSION['role'] ?? '') !== 'super_admin') {
 if (!isAjax()) { http_response_code(400); echo json_encode(['success' => false, 'message' => 'Только AJAX']); exit; }
 Csrf::guard();
 
+// dry_run=1 — только посчитать, что изменилось бы, без записи в БД
+// (кнопка предпросмотра рядом с действием в «Обслуживание БД»).
+$data   = json_decode(file_get_contents('php://input'), true) ?? [];
+$dryRun = !empty($data['dry_run']);
+
 try {
     $stmt = $pdo->query(
         "SELECT ml.id, ml.scanned_at, ml.meal_type, ml.meal_point_id, ml.scanner_ip, mpt.tz_offset
@@ -51,7 +56,7 @@ try {
     $unchanged = 0;
     $byType   = ['breakfast' => 0, 'lunch' => 0, 'dinner' => 0];
 
-    $pdo->beginTransaction();
+    if (!$dryRun) $pdo->beginTransaction();
     foreach ($rows as $r) {
         $tz = (!empty($r['tz_offset']) && preg_match('/^[+-]\d{2}:\d{2}$/', $r['tz_offset'])) ? $r['tz_offset'] : APP_TZ_OFFSET;
         $ts = strtotime($r['scanned_at'] . ' UTC');
@@ -75,16 +80,19 @@ try {
             continue;
         }
 
-        $upd->execute([$newType, $scannedAt, $r['id']]);
+        if (!$dryRun) $upd->execute([$newType, $scannedAt, $r['id']]);
         $retimed++;
         $byType[$newType]++;
     }
-    $pdo->commit();
+    if (!$dryRun) $pdo->commit();
 
-    logAction('normalize_pass_times', "Нормализовано время массовых/ручных записей: {$retimed} изменено (завтрак {$byType['breakfast']}, обед {$byType['lunch']}, ужин {$byType['dinner']}), {$unchanged} уже были корректны");
+    if (!$dryRun) {
+        logAction('normalize_pass_times', "Нормализовано время массовых/ручных записей: {$retimed} изменено (завтрак {$byType['breakfast']}, обед {$byType['lunch']}, ужин {$byType['dinner']}), {$unchanged} уже были корректны");
+    }
 
     echo json_encode([
         'success'   => true,
+        'dry_run'   => $dryRun,
         'total'     => count($rows),
         'retimed'   => $retimed,
         'unchanged' => $unchanged,

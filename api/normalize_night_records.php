@@ -42,6 +42,11 @@ if (($_SESSION['role'] ?? '') !== 'super_admin') {
 if (!isAjax()) { http_response_code(400); echo json_encode(['success' => false, 'message' => 'Только AJAX']); exit; }
 Csrf::guard();
 
+// dry_run=1 — только посчитать, что изменилось бы, без записи в БД
+// (кнопка предпросмотра рядом с действием в «Обслуживание БД»).
+$data   = json_decode(file_get_contents('php://input'), true) ?? [];
+$dryRun = !empty($data['dry_run']);
+
 // Дефолтные окна для записей без привязанной точки — те же, что в
 // getCurrentMealType() без $meal_point_id.
 function defaultScheduleType(string $localTime): ?string
@@ -78,7 +83,7 @@ try {
     $retimed = 0;
     $skipped = 0; // вне графика — тип не определён однозначно
 
-    $pdo->beginTransaction();
+    if (!$dryRun) $pdo->beginTransaction();
     foreach ($rows as $r) {
         $tz        = (!empty($r['tz_offset']) && preg_match('/^[+-]\d{2}:\d{2}$/', $r['tz_offset'])) ? $r['tz_offset'] : APP_TZ_OFFSET;
         $ts        = strtotime($r['scanned_at'] . ' UTC');
@@ -115,27 +120,33 @@ try {
 
         if ($newType === $r['meal_type']) continue; // уже верный тип — трогать нечего
 
-        if ($r['scanner_ip'] === 'bulk') {
-            $startTime = $defaultStart[$newType];
-            $schedStmt->execute([$r['meal_point_id'], $newType]);
-            $sched = $schedStmt->fetchColumn();
-            if ($sched) $startTime = $sched;
-            $localTs   = strtotime("$localDate $startTime UTC") - offsetToMinutes($tz) * 60;
-            $scannedAt = gmdate('Y-m-d H:i:s', $localTs);
-            $updWithTime->execute([$newType, $scannedAt, $r['id']]);
-            $retimed++;
-        } else {
-            $upd->execute([$newType, $r['id']]);
+        $willRetime = $r['scanner_ip'] === 'bulk';
+        if (!$dryRun) {
+            if ($willRetime) {
+                $startTime = $defaultStart[$newType];
+                $schedStmt->execute([$r['meal_point_id'], $newType]);
+                $sched = $schedStmt->fetchColumn();
+                if ($sched) $startTime = $sched;
+                $localTs   = strtotime("$localDate $startTime UTC") - offsetToMinutes($tz) * 60;
+                $scannedAt = gmdate('Y-m-d H:i:s', $localTs);
+                $updWithTime->execute([$newType, $scannedAt, $r['id']]);
+            } else {
+                $upd->execute([$newType, $r['id']]);
+            }
         }
+        if ($willRetime) $retimed++;
         $changed[$newType]++;
     }
-    $pdo->commit();
+    if (!$dryRun) $pdo->commit();
 
     $total = $changed['breakfast'] + $changed['lunch'] + $changed['dinner'];
-    logAction('normalize_night_records', "Переклассифицировано записей по расписанию: {$total} (завтрак {$changed['breakfast']}, обед {$changed['lunch']}, ужин {$changed['dinner']}), из них с переносом времени (массовая проводка): {$retimed}, пропущено (вне графика): {$skipped}");
+    if (!$dryRun) {
+        logAction('normalize_night_records', "Переклассифицировано записей по расписанию: {$total} (завтрак {$changed['breakfast']}, обед {$changed['lunch']}, ужин {$changed['dinner']}), из них с переносом времени (массовая проводка): {$retimed}, пропущено (вне графика): {$skipped}");
+    }
 
     echo json_encode([
         'success'  => true,
+        'dry_run'  => $dryRun,
         'total'    => count($rows),
         'changed'  => $total,
         'by_type'  => $changed,
