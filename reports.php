@@ -494,7 +494,15 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
                         <?= htmlspecialchars($log['meal_point_name'] ?? '—') ?>
                         <?php endif; ?>
                     </td>
-                    <td style="font-size:12px;color:var(--text-3)"><?= htmlspecialchars($log['operator_name'] ?? '—') ?></td>
+                    <td style="font-size:12px;color:var(--text-3)">
+                        <?= htmlspecialchars($log['operator_name'] ?? '—') ?>
+                        <?php
+                        $srcLabels = ['bulk' => ['Массовая', '#7c2d12', '#fef3c7'], 'manual' => ['Ручной', '#1e3a8a', '#dbeafe'], 'offline' => ['Оффлайн', '#166534', '#dcfce7']];
+                        $src = $srcLabels[$log['scanner_ip'] ?? ''] ?? null;
+                        if ($src): ?>
+                        <span style="display:inline-block;margin-left:4px;padding:1px 6px;border-radius:100px;font-size:10px;font-weight:700;color:<?= $src[1] ?>;background:<?= $src[2] ?>"><?= $src[0] ?></span>
+                        <?php endif; ?>
+                    </td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
