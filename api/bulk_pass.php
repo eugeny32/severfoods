@@ -16,7 +16,11 @@
  *
  * Если на указанную местную дату (по часовому поясу точки) для сотрудника
  * уже есть активная запись с этим типом питания — новая запись не создаётся,
- * сотрудник попадает в список "уже отмечены ранее".
+ * сотрудник попадает в список "уже отмечены ранее". Если у сотрудника на
+ * этот приём пищи уже есть НЕСКОЛЬКО дублирующихся записей (например,
+ * скан + ручная проводка) — SELECT DISTINCT считает их одной, а не
+ * несколькими вхождениями в список "уже отмечены ранее" (см. также
+ * api/check_bulk_pass.php — тот же принцип для предварительной проверки).
  */
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../functions.php';
@@ -83,7 +87,7 @@ $operatorName = $_SESSION['user_name'] ?? 'Администратор';
 // реальный скан на точке пришёлся на границу UTC-суток (см. раздел 3 руководства).
 $placeholders = implode(',', array_fill(0, count($employeeIds), '?'));
 $stmt = $pdo->prepare(
-    "SELECT employee_id FROM meal_logs
+    "SELECT DISTINCT employee_id FROM meal_logs
      WHERE meal_type = ? AND DATE(CONVERT_TZ(scanned_at, '+00:00', ?)) = ? AND access_granted = 1
        AND employee_id IN ($placeholders)"
 );

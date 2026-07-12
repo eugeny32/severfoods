@@ -438,11 +438,11 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                 <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px">
                     <div class="form-group">
                         <label><i class="fas fa-calendar-alt"></i> Дата</label>
-                        <input type="date" id="bpDate" value="<?= localToday() ?>" max="<?= localToday() ?>">
+                        <input type="date" id="bpDate" value="<?= localToday() ?>" max="<?= localToday() ?>" onchange="bpScheduleCheckExisting()">
                     </div>
                     <div class="form-group">
                         <label><i class="fas fa-utensils"></i> Тип питания</label>
-                        <select id="bpMealType">
+                        <select id="bpMealType" onchange="bpScheduleCheckExisting()">
                             <option value="breakfast">Завтрак</option>
                             <option value="lunch" selected>Обед</option>
                             <option value="dinner">Ужин</option>
@@ -450,7 +450,7 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                     </div>
                     <div class="form-group">
                         <label><i class="fas fa-map-marker-alt"></i> Точка питания</label>
-                        <select id="bpPointId">
+                        <select id="bpPointId" onchange="bpScheduleCheckExisting()">
                             <option value="">— не привязывать —</option>
                             <?php foreach ($points as $pt): ?>
                             <option value="<?= $pt['id'] ?>"><?= htmlspecialchars($pt['point_name']) ?></option>
@@ -471,6 +471,7 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                     <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Выбранные сотрудники</div>
                     <div id="bpSelectedList" style="display:flex;flex-wrap:wrap;gap:6px;padding:10px;background:var(--bg);border-radius:10px;border:1px solid var(--border)"></div>
                 </div>
+                <div id="bpExistingWarn" style="display:none;margin-bottom:14px;padding:10px 14px;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;font-size:13px;color:#92400e"></div>
                 <div id="bpResultsList" style="max-height:360px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;margin-bottom:14px">
                     <div style="padding:20px;text-align:center;color:var(--text-3);font-size:13px">Введите фамилию для поиска</div>
                 </div>

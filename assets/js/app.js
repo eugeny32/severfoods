@@ -587,6 +587,7 @@ function bpRemoveSelected(id) {
 function bpUpdateCount() {
     const countEl = document.getElementById('bpSelectedCount');
     if (countEl) countEl.textContent = bpSelectedIds.size;
+    bpScheduleCheckExisting();
 
     const wrap = document.getElementById('bpSelectedWrap');
     const list = document.getElementById('bpSelectedList');
@@ -605,6 +606,39 @@ function bpUpdateCount() {
                 style="border:none;background:var(--bg-deep);color:var(--text-3);width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
         </span>
     `).join('');
+}
+
+let bpCheckTimer = null;
+function bpScheduleCheckExisting() {
+    clearTimeout(bpCheckTimer);
+    bpCheckTimer = setTimeout(bpCheckExisting, 350);
+}
+
+// Предварительная проверка: предупреждает, что для выбранной даты/типа
+// питания у части сотрудников уже ЕСТЬ записи — до нажатия «Провести
+// выбранных», а не только по факту после отправки.
+async function bpCheckExisting() {
+    const warnEl = document.getElementById('bpExistingWarn');
+    if (!warnEl) return;
+    const date     = document.getElementById('bpDate')?.value;
+    const mealType = document.getElementById('bpMealType')?.value;
+    const pointId  = document.getElementById('bpPointId')?.value || null;
+    const ids      = Array.from(bpSelectedIds).map(Number);
+
+    if (!date || !mealType || !ids.length) { warnEl.style.display = 'none'; warnEl.innerHTML = ''; return; }
+
+    try {
+        const res = await fetch('api/check_bulk_pass.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ date, meal_type: mealType, employee_ids: ids, point_id: pointId }),
+        });
+        const data = await res.json();
+        if (!data.success || !data.already.length) { warnEl.style.display = 'none'; warnEl.innerHTML = ''; return; }
+        warnEl.style.display = 'block';
+        warnEl.innerHTML = `<i class="fas fa-triangle-exclamation"></i> На эту дату и тип питания уже есть записи (дублирующиеся записи внутри одного приёма считаются одной) у ${data.already.length} из выбранных: `
+            + `<strong>${data.already.map(e => escHtml(e.name)).join(', ')}</strong>. При проводке эти сотрудники будут пропущены.`;
+    } catch (e) { /* тихо игнорируем — это лишь предупреждение */ }
 }
 
 async function bpSubmit() {
