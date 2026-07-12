@@ -20,6 +20,7 @@ $report_type = in_array($_GET['report_type'] ?? '', ['meals','dry_rations']) ? $
 $export      = $_GET['export']      ?? null;
 $point_id    = isset($_GET['point_id']) && $_GET['point_id'] !== '' ? (int)$_GET['point_id'] : null;
 $unassigned_only = !empty($_GET['unassigned_only']);
+$out_of_schedule_only = !empty($_GET['out_of_schedule_only']);
 
 // Доступные точки
 $points = [];
@@ -55,6 +56,53 @@ $sql .= " ORDER BY ml.scanned_at DESC";
 
 $stmt = $pdo->prepare($sql); $stmt->execute($params);
 $logs = $stmt->fetchAll();
+
+// Проверка на попадание записи в график работы столовой на её точке.
+// Запись считается "вне графика", если для её точки/типа питания либо вообще
+// нет активного расписания, либо местное время (scanned_local) не попадает
+// ни в одно из окон этого типа на этот день недели (с учётом ночных окон,
+// переходящих через полночь). Не привязанные к точке записи не проверяются —
+// для них сначала нужно назначить точку (см. фильтр "не привязанные").
+$schedByPointType = [];
+foreach ($logs as $log) {
+    $pid = $log['meal_point_id'];
+    if (!$pid) continue;
+    $key = $pid . '|' . $log['meal_type'];
+    if (!isset($schedByPointType[$key])) {
+        $ss = $pdo->prepare(
+            "SELECT start_time, end_time, days_of_week FROM meal_point_schedules
+             WHERE meal_point_id = ? AND meal_type = ? AND is_active = 1"
+        );
+        $ss->execute([$pid, $log['meal_type']]);
+        $schedByPointType[$key] = $ss->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+foreach ($logs as &$log) {
+    $log['out_of_schedule'] = false;
+    if (!$log['meal_point_id']) continue;
+    $key = $log['meal_point_id'] . '|' . $log['meal_type'];
+    $scheds = $schedByPointType[$key] ?? [];
+    if (!$scheds) { $log['out_of_schedule'] = true; continue; }
+    $localDate = substr($log['scanned_local'], 0, 10);
+    $localTime = substr($log['scanned_local'], 11, 8);
+    $weekday   = date('N', strtotime($localDate));
+    $matched = false;
+    foreach ($scheds as $s) {
+        if (strpos(',' . $s['days_of_week'] . ',', ',' . $weekday . ',') === false) continue;
+        $start = $s['start_time']; $end = $s['end_time'];
+        if ($end < $start) {
+            if ($localTime >= $start || $localTime < $end) { $matched = true; break; }
+        } else {
+            if ($localTime >= $start && $localTime < $end) { $matched = true; break; }
+        }
+    }
+    $log['out_of_schedule'] = !$matched;
+}
+unset($log);
+
+if ($out_of_schedule_only) {
+    $logs = array_values(array_filter($logs, fn($l) => $l['out_of_schedule']));
+}
 
 // CSV убран — используем Excel (export_excel.php)
 
@@ -233,6 +281,10 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
     <div class="form-group" style="min-width:auto;flex-direction:row;align-items:center;gap:6px;padding-top:20px">
         <input type="checkbox" id="unassignedOnly" name="unassigned_only" value="1" <?= $unassigned_only?'checked':'' ?> onchange="this.form.submit()">
         <label for="unassignedOnly" style="margin:0;white-space:nowrap">Только не привязанные к точке</label>
+    </div>
+    <div class="form-group" style="min-width:auto;flex-direction:row;align-items:center;gap:6px;padding-top:20px">
+        <input type="checkbox" id="outOfScheduleOnly" name="out_of_schedule_only" value="1" <?= $out_of_schedule_only?'checked':'' ?> onchange="this.form.submit()">
+        <label for="outOfScheduleOnly" style="margin:0;white-space:nowrap" title="Записи, чьё местное время не попадает в расписание столовой на точке для этого типа питания (или расписание вовсе не настроено)">Только вне графика столовой</label>
     </div>
     <?php endif; ?>
     <div class="form-group" style="min-width:auto">
@@ -469,6 +521,9 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
                     <td style="white-space:nowrap;font-variant-numeric:tabular-nums">
                         <?= date('d.m.Y', strtotime($log['scanned_local'])) ?><br>
                         <span style="color:var(--text-3);font-size:11px"><?= date('H:i:s', strtotime($log['scanned_local'])) ?></span>
+                        <?php if ($log['out_of_schedule']): ?>
+                        <br><span style="display:inline-block;margin-top:2px;padding:1px 6px;border-radius:100px;font-size:10px;font-weight:700;color:#991b1b;background:#fee2e2" title="Время записи не попадает в расписание столовой на этой точке для этого типа питания (либо расписание не настроено)">вне графика</span>
+                        <?php endif; ?>
                     </td>
                     <td style="font-weight:600"><?= htmlspecialchars($log['full_name']) ?></td>
                     <td><?= htmlspecialchars($log['organization']) ?></td>
