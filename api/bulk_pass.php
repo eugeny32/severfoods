@@ -8,9 +8,15 @@
  * запись создаётся без привязки (meal_point_id = NULL), назначить точку
  * можно позже в разделе «Отчёты» (см. api/assign_meal_point.php).
  *
- * Если на указанную дату для сотрудника уже есть активная запись с этим
- * типом питания — новая запись не создаётся, сотрудник попадает в список
- * "уже отмечены ранее".
+ * Время записи (scanned_at) назначается на НАЧАЛО расписания точки для
+ * выбранного типа питания на указанную дату — не текущий реальный момент
+ * и не произвольное фиксированное время. Это исключает попадание записи
+ * вне окна приёма пищи и конфликты/повторы, если сотрудник в тот же день
+ * ещё и правда пройдёт через сканер на этой точке.
+ *
+ * Если на указанную местную дату (по часовому поясу точки) для сотрудника
+ * уже есть активная запись с этим типом питания — новая запись не создаётся,
+ * сотрудник попадает в список "уже отмечены ранее".
  */
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../functions.php';
@@ -50,6 +56,7 @@ if ($date > localToday()) {
 }
 
 $pointName = null;
+$pointTz   = APP_TZ_OFFSET; // если точка не указана — используем глобальный часовой пояс браузера
 if ($pointId) {
     // Не-super_admin может проводить только на свою точку
     $userRole    = $_SESSION['role'] ?? '';
@@ -65,19 +72,22 @@ if ($pointId) {
         exit;
     }
     $pointName = $point['point_name'];
+    $pointTz   = getPointTz($pdo, $pointId);
 }
 
 $operatorId   = $_SESSION['user_id']   ?? null;
 $operatorName = $_SESSION['user_name'] ?? 'Администратор';
 
-// Уже существующие активные записи этого типа на эту дату
+// Уже существующие активные записи этого типа на указанную МЕСТНУЮ дату (по часовому
+// поясу точки, а не сырую UTC-дату) — иначе можно словить повторную запись, если
+// реальный скан на точке пришёлся на границу UTC-суток (см. раздел 3 руководства).
 $placeholders = implode(',', array_fill(0, count($employeeIds), '?'));
 $stmt = $pdo->prepare(
     "SELECT employee_id FROM meal_logs
-     WHERE meal_type = ? AND DATE(scanned_at) = ? AND access_granted = 1
+     WHERE meal_type = ? AND DATE(CONVERT_TZ(scanned_at, '+00:00', ?)) = ? AND access_granted = 1
        AND employee_id IN ($placeholders)"
 );
-$stmt->execute(array_merge([$mealType, $date], $employeeIds));
+$stmt->execute(array_merge([$mealType, $pointTz, $date], $employeeIds));
 $already = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 $alreadySet = array_flip($already);
 
@@ -91,9 +101,26 @@ foreach ($namesStmt->fetchAll(PDO::FETCH_ASSOC) as $r) $names[(int)$r['id']] = $
 
 $inserted = [];
 if ($toInsert) {
-    // Фиксированное время в середине суток — запись административная, без
-    // привязки к реальному времени скана и часовому поясу конкретной точки.
-    $scannedAt = $date . ' 12:00:00';
+    // Время назначается на НАЧАЛО расписания точки для этого типа питания на указанную
+    // дату (местное время точки → UTC для хранения) — исключает попадание записи вне
+    // окна приёма и конфликты с реальным сканированием на точке в тот же день/тип.
+    // Если у точки нет настроенного расписания на этот тип (или точка не указана) —
+    // используется тот же дефолт, что и в getCurrentMealType() для согласованности.
+    $defaultStart = ['breakfast' => '07:00:00', 'lunch' => '12:00:00', 'dinner' => '18:00:00'][$mealType];
+    $startTime = $defaultStart;
+    if ($pointId) {
+        $schedStmt = $pdo->prepare(
+            "SELECT start_time FROM meal_point_schedules
+             WHERE meal_point_id = ? AND meal_type = ? AND is_active = 1
+             ORDER BY sort_order LIMIT 1"
+        );
+        $schedStmt->execute([$pointId, $mealType]);
+        $sched = $schedStmt->fetchColumn();
+        if ($sched) $startTime = $sched;
+    }
+    $localTs   = strtotime("$date $startTime UTC") - offsetToMinutes($pointTz) * 60;
+    $scannedAt = gmdate('Y-m-d H:i:s', $localTs);
+
     $ins = $pdo->prepare(
         "INSERT INTO meal_logs
              (employee_id, meal_type, access_granted, scanner_ip,
