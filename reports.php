@@ -760,7 +760,7 @@ async function normalizeNightRecords() {
         });
         const data = await res.json();
         if (data.success) {
-            resultEl.textContent = `Готово: всего ${data.total}, в завтрак — ${data.to_breakfast}, в ужин — ${data.to_dinner}`;
+            resultEl.textContent = `Готово: всего ${data.total}, в завтрак — ${data.to_breakfast}, в ужин — ${data.to_dinner}, из них время скорректировано (массовая проводка) — ${data.retimed}`;
         } else {
             resultEl.textContent = data.message || 'Ошибка';
         }
