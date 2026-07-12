@@ -324,6 +324,13 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
     </button>
     <span id="normalizeResult" style="font-size:13px;color:#92400e"></span>
 </div>
+<div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="font-size:13px;color:#92400e"><i class="fas fa-clock"></i> Обслуживание базы: перенести время всех массовых/ручных записей на начало периода расписания точки (например, «завтрак в 19:00» → «завтрак в 07:00»).</span>
+    <button type="button" class="btn" onclick="normalizePassTimes()" style="background:#ea580c;color:#fff">
+        <i class="fas fa-broom"></i> Нормализовать время проводок
+    </button>
+    <span id="normalizeTimesResult" style="font-size:13px;color:#92400e"></span>
+</div>
 <?php endif; ?>
 
 <?php if ($report_type === 'dry_rations'): ?>
@@ -761,6 +768,26 @@ async function normalizeNightRecords() {
         const data = await res.json();
         if (data.success) {
             resultEl.textContent = `Готово: всего ${data.total}, в завтрак — ${data.to_breakfast}, в ужин — ${data.to_dinner}, из них время скорректировано (массовая проводка) — ${data.retimed}`;
+        } else {
+            resultEl.textContent = data.message || 'Ошибка';
+        }
+    } catch (e) {
+        resultEl.textContent = 'Ошибка сети';
+    }
+}
+
+async function normalizePassTimes() {
+    if (!confirm('Перенести время всех массовых и ручных проводок на начало периода расписания точки (по дате существующей записи)? Действие необратимо.')) return;
+    const resultEl = document.getElementById('normalizeTimesResult');
+    resultEl.textContent = 'Выполняется…';
+    try {
+        const res = await fetch('api/normalize_pass_times.php', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': getCsrfToken() },
+        });
+        const data = await res.json();
+        if (data.success) {
+            resultEl.textContent = `Готово: всего ${data.total}, изменено — ${data.retimed} (завтрак ${data.by_type.breakfast}, обед ${data.by_type.lunch}, ужин ${data.by_type.dinner}), уже были корректны — ${data.unchanged}`;
         } else {
             resultEl.textContent = data.message || 'Ошибка';
         }
