@@ -1559,11 +1559,21 @@ function dupSrcBadge(scannerIp) {
 }
 const mealTypeNames = { breakfast: 'Завтрак', lunch: 'Обед', dinner: 'Ужин', night: 'Ночное' };
 
+function dupUpdateDeleteBtn() {
+    const btn = document.getElementById('dupDeleteBtn');
+    if (!btn) return;
+    const any = document.querySelectorAll('.dup-check').length > 0;
+    btn.disabled = !any;
+    btn.style.opacity = any ? '1' : '.4';
+    btn.style.cursor = any ? 'pointer' : 'not-allowed';
+}
+
 async function findDuplicatePasses() {
     const resultEl = document.getElementById('dupFindResult');
     const listEl = document.getElementById('dupList');
     resultEl.textContent = 'Поиск…';
     listEl.innerHTML = '';
+    dupUpdateDeleteBtn();
     try {
         const res = await fetch('api/find_duplicate_passes.php', {
             method: 'POST',
@@ -1572,14 +1582,9 @@ async function findDuplicatePasses() {
         const data = await res.json();
         if (!data.success) { resultEl.textContent = data.message || 'Ошибка'; return; }
         if (!data.groups.length) { resultEl.textContent = 'Дублей не найдено'; return; }
-        resultEl.textContent = `Найдено групп: ${data.groups.length}`;
+        resultEl.textContent = `Найдено групп: ${data.groups.length}. Отмеченные (по умолчанию — ручные при наличии скана) можно снять/добавить перед удалением.`;
 
-        let html = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-            <button type="button" class="btn" title="Удалить отмеченные" onclick="deleteSelectedDuplicates()" style="background:#dc2626;color:#fff;width:36px;height:36px;padding:0">
-                <i class="fas fa-trash"></i>
-            </button>
-        </div>
-        <div style="overflow-x:auto">
+        let html = `<div style="overflow-x:auto">
         <table class="report-table" style="min-width:900px">
             <thead><tr>
                 <th style="width:30px"></th>
@@ -1590,7 +1595,7 @@ async function findDuplicatePasses() {
             g.members.forEach((m, i) => {
                 const dt = new Date(m.scanned_local.replace(' ', 'T'));
                 html += `<tr style="${i===0 ? 'border-top:2px solid #fed7aa' : ''}">
-                    <td><input type="checkbox" class="dup-check" value="${m.id}" ${m.recommended_delete ? 'checked' : ''}></td>
+                    <td><input type="checkbox" class="dup-check" value="${m.id}" ${m.recommended_delete ? 'checked' : ''} onchange="dupUpdateDeleteBtn()"></td>
                     <td>${i===0 ? m.full_name.replace(/</g,'&lt;') : ''}</td>
                     <td>${mealTypeNames[m.meal_type] || m.meal_type}</td>
                     <td>${g.local_date.split('-').reverse().join('.')}</td>
@@ -1603,6 +1608,7 @@ async function findDuplicatePasses() {
         });
         html += `</tbody></table></div>`;
         listEl.innerHTML = html;
+        dupUpdateDeleteBtn();
     } catch (e) {
         resultEl.textContent = 'Ошибка сети';
     }

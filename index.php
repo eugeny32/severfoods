@@ -798,6 +798,7 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                     <span style="font-size:13px;color:#92400e;flex:1;min-width:200px"><i class="fas fa-clone"></i> Найти дубли — один сотрудник, один тип питания, одна местная дата, несколько записей (например, реальный скан + ручная/массовая проводка).</span>
                     <div style="display:flex;gap:6px;margin-left:auto">
                         <button type="button" class="btn" title="Найти дубликаты" onclick="findDuplicatePasses()" style="background:#b45309;color:#fff;width:36px;height:36px;padding:0"><i class="fas fa-search"></i></button>
+                        <button type="button" class="btn" id="dupDeleteBtn" title="Удалить отмеченные" onclick="deleteSelectedDuplicates()" disabled style="background:#dc2626;color:#fff;width:36px;height:36px;padding:0;opacity:.4;cursor:not-allowed"><i class="fas fa-trash"></i></button>
                     </div>
                     <span id="dupFindResult" style="font-size:13px;color:#92400e;width:100%"></span>
                 </div>
