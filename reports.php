@@ -318,9 +318,9 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
 
 <?php if ($is_super_admin): ?>
 <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    <span style="font-size:13px;color:#92400e"><i class="fas fa-tools"></i> Обслуживание базы: привести старые «ночные» записи к завтраку/ужину по местному времени точки.</span>
+    <span style="font-size:13px;color:#92400e"><i class="fas fa-tools"></i> Обслуживание базы: привести тип питания записей в соответствие с расписанием точки и фактическим временем — не только «ночные», но и завтрак/обед/ужин, если реально попадают в другое окно расписания.</span>
     <button type="button" class="btn" onclick="normalizeNightRecords()" style="background:#f59e0b;color:#fff">
-        <i class="fas fa-broom"></i> Нормализовать ночные записи
+        <i class="fas fa-broom"></i> Нормализовать тип питания
     </button>
     <span id="normalizeResult" style="font-size:13px;color:#92400e"></span>
 </div>
@@ -767,7 +767,7 @@ async function assignSingleRow(id, btnEl) {
 }
 
 async function normalizeNightRecords() {
-    if (!confirm('Переклассифицировать все исторические записи с типом «Ночное» в «Завтрак»/«Ужин» по местному времени точки? Действие необратимо.')) return;
+    if (!confirm('Переклассифицировать все исторические записи (завтрак/обед/ужин/ночное) в соответствии с расписанием точки и фактическим местным временем? Действие необратимо.')) return;
     const resultEl = document.getElementById('normalizeResult');
     resultEl.textContent = 'Выполняется…';
     try {
@@ -777,7 +777,7 @@ async function normalizeNightRecords() {
         });
         const data = await res.json();
         if (data.success) {
-            resultEl.textContent = `Готово: всего ${data.total}, в завтрак — ${data.to_breakfast}, в ужин — ${data.to_dinner}, из них время скорректировано (массовая проводка) — ${data.retimed}`;
+            resultEl.textContent = `Готово: всего проверено ${data.total}, изменено — ${data.changed} (завтрак ${data.by_type.breakfast}, обед ${data.by_type.lunch}, ужин ${data.by_type.dinner}), из них время скорректировано (массовая проводка) — ${data.retimed}, пропущено как «вне графика» — ${data.skipped}`;
         } else {
             resultEl.textContent = data.message || 'Ошибка';
         }
