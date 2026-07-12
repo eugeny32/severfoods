@@ -60,7 +60,7 @@ if ($date > localToday()) {
 }
 
 $pointName = null;
-$pointTz   = APP_TZ_OFFSET; // если точка не указана — используем глобальный часовой пояс браузера
+$pointTz   = SERVER_TZ_OFFSET; // если точка не указана — фиксированный серверный часовой пояс (не cookie)
 if ($pointId) {
     // Не-super_admin может проводить только на свою точку
     $userRole    = $_SESSION['role'] ?? '';
@@ -132,12 +132,25 @@ if ($toInsert) {
          VALUES (?, ?, 1, 'bulk', ?, ?, ?, ?, ?)"
     );
     foreach ($toInsert as $empId) {
-        $ins->execute([$empId, $mealType, $operatorId, $operatorName, $pointId, $pointName, $scannedAt]);
-        $inserted[] = ['id' => $empId, 'name' => $names[$empId] ?? "#{$empId}"];
+        // Пакетная проверка $already выше сделана ДО этого цикла — за время
+        // обработки списка сотрудника мог провести кто-то ещё (реальный скан,
+        // другой админ). Лок + повторная точечная проверка перед самой
+        // вставкой закрывают это окно гонки.
+        $locked = acquireMealLock($pdo, $empId);
+        try {
+            if (hasExistingMealLog($pdo, $empId, $mealType, $pointId, $date)) {
+                $already[] = $empId;
+                continue;
+            }
+            $ins->execute([$empId, $mealType, $operatorId, $operatorName, $pointId, $pointName, $scannedAt]);
+            $inserted[] = ['id' => $empId, 'name' => $names[$empId] ?? "#{$empId}"];
+        } finally {
+            if ($locked) releaseMealLock($pdo, $empId);
+        }
     }
 }
 
-$alreadyList = array_map(fn($id) => ['id' => $id, 'name' => $names[$id] ?? "#{$id}"], $already);
+$alreadyList = array_map(fn($id) => ['id' => $id, 'name' => $names[$id] ?? "#{$id}"], array_unique($already));
 
 logAction('bulk_pass', "Массовая проводка ({$mealType}, {$date}" . ($pointName ? ", точка «{$pointName}»" : '') . "): проведено " . count($inserted) . ", уже было " . count($alreadyList));
 

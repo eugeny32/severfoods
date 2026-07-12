@@ -109,9 +109,13 @@ if ($out_of_schedule_only) {
 
 // CSV убран — используем Excel (export_excel.php)
 
-// Сводный отчёт по сотрудникам: кол-во приёмов + уникальных дней, сгруппировано по организациям
+// Сводный отчёт по сотрудникам: кол-во приёмов + уникальных дней, сгруппировано по организациям.
+// COUNT(DISTINCT ...) по типу+дате, а не COUNT(*) по строкам — дублирующиеся
+// записи внутри одного приёма пищи (например, скан + случайно не удалённая
+// ручная проводка) считаются одним приёмом, а не раздувают статистику
+// (та же логика, что и в getTodayStats()).
 $sqlEmp = "SELECT e.id, e.full_name, e.organization, e.department,
-                  COUNT(*) as meals,
+                  COUNT(DISTINCT CONCAT(ml.meal_type,'_',DATE($scannedLocal))) as meals,
                   COUNT(DISTINCT DATE($scannedLocal)) as days
            FROM meal_logs ml
            JOIN employees e ON ml.employee_id = e.id
@@ -696,9 +700,12 @@ async function assignSelectedToPoint() {
         });
         const data = await res.json();
         if (data.success) {
-            resultEl.style.color = '#15803d';
-            resultEl.textContent = `Обновлено записей: ${data.updated}`;
-            setTimeout(() => location.reload(), 900);
+            resultEl.style.color = data.conflicted && data.conflicted.length ? '#b45309' : '#15803d';
+            resultEl.textContent = `Обновлено записей: ${data.updated}`
+                + (data.conflicted && data.conflicted.length
+                    ? `. Пропущено как конфликтующих (уже есть запись на этой точке): ${data.conflicted.length}`
+                    : '');
+            setTimeout(() => location.reload(), data.conflicted && data.conflicted.length ? 2500 : 900);
         } else {
             resultEl.style.color = '#dc2626';
             resultEl.textContent = data.message || 'Ошибка';
@@ -727,6 +734,10 @@ async function assignSingleRow(id, btnEl) {
         if (data.success && data.updated > 0) {
             const cell = btnEl.closest('td');
             cell.textContent = select.options[select.selectedIndex].textContent;
+        } else if (data.success && data.conflicted && data.conflicted.length) {
+            alert('Не назначено: на этой точке уже есть запись этого сотрудника на этот приём пищи (конфликт). Проверьте через «Найти дубликаты».');
+            btnEl.disabled = false;
+            select.disabled = false;
         } else {
             alert(data.message || 'Не удалось назначить точку');
             btnEl.disabled = false;

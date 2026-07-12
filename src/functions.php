@@ -47,8 +47,10 @@ function normalizeMealType(string $type, string $localTime): string
 function getCurrentMealType(?PDO $pdo = null, $meal_point_id = null): string
 {
     // Местное время считаем по часовому поясу КОНКРЕТНОЙ точки (если она известна),
-    // а не по браузерному офсету — иначе расписание точки сверяется с чужим временем.
-    $tz           = ($pdo && $meal_point_id) ? getPointTz($pdo, $meal_point_id) : APP_TZ_OFFSET;
+    // иначе — по фиксированному серверному офсету (SERVER_TZ_OFFSET), а не по
+    // браузерному cookie: иначе расписание/тип питания могли бы определяться
+    // по-разному в зависимости от того, чей браузер сделал запрос.
+    $tz           = ($pdo && $meal_point_id) ? getPointTz($pdo, $meal_point_id) : SERVER_TZ_OFFSET;
     $current_time = gmdate('H:i:s', time() + offsetToMinutes($tz) * 60);
     $current_day  = gmdate('N', time() + offsetToMinutes($tz) * 60); // 1=Пн … 7=Вс
 
@@ -169,39 +171,44 @@ function processAccess(PDO $pdo, string $qr_code, ?string $ip = null): array
 
     $pointTz = getPointTz($pdo, $meal_point_id);
     $today   = gmdate('Y-m-d', time() + offsetToMinutes($pointTz) * 60);
-    $stmt = $pdo->prepare(
-        "SELECT scanned_at FROM meal_logs
-         WHERE employee_id = ? AND meal_type = ? AND DATE(CONVERT_TZ(scanned_at, '+00:00', ?)) = ?
-           AND access_granted = 1
-         ORDER BY scanned_at DESC LIMIT 1"
-    );
-    $stmt->execute([$employee['id'], $meal_type, $pointTz, $today]);
-    $last_scan = $stmt->fetch();
 
-    if ($last_scan) {
-        // Повторное сканирование в течение 30 сек — не ошибка
-        if ((time() - strtotime($last_scan['scanned_at'] . ' UTC')) <= 30) {
-            return ['success' => true,
-                    'message'   => "ДОСТУП РАЗРЕШЁН (повтор): {$employee['full_name']}",
-                    'employee'  => $employee, 'meal_type' => $meal_type, 'code' => 'REPEAT_SCAN'];
-        }
-        return ['success' => false,
-                'message'       => "{$employee['full_name']} уже питался(ась) сегодня — " . getMealTypeName($meal_type),
-                'employee'      => $employee, 'code' => 'ALREADY_ATE',
-                'last_scan_at'  => $last_scan['scanned_at']];
+    // Лок на время проверки+вставки — исключает дубль при двух почти
+    // одновременных сканированиях одного сотрудника (см. hasExistingMealLog).
+    $locked = acquireMealLock($pdo, $employee['id']);
+    if (!$locked) {
+        return ['success' => false, 'message' => 'Система обрабатывает предыдущий запрос, повторите сканирование',
+                'employee' => $employee, 'code' => 'BUSY'];
     }
+    try {
+        $last_scan = hasExistingMealLog($pdo, $employee['id'], $meal_type, $meal_point_id, $today);
 
-    // Новый проход — фиксируем
-    $pdo->prepare(
-        "INSERT INTO meal_logs
-             (employee_id, meal_type, access_granted, scanner_ip,
-              operator_id, operator_name, meal_point_id, meal_point_name)
-         VALUES (?, ?, 1, ?, ?, ?, ?, ?)"
-    )->execute([
-        $employee['id'], $meal_type, $ip,
-        $operator_id, $operator_name,
-        $meal_point_id, $meal_point_name,
-    ]);
+        if ($last_scan) {
+            // Повторное сканирование в течение 30 сек — не ошибка
+            if ((time() - strtotime($last_scan['scanned_at'] . ' UTC')) <= 30) {
+                return ['success' => true,
+                        'message'   => "ДОСТУП РАЗРЕШЁН (повтор): {$employee['full_name']}",
+                        'employee'  => $employee, 'meal_type' => $meal_type, 'code' => 'REPEAT_SCAN'];
+            }
+            return ['success' => false,
+                    'message'       => "{$employee['full_name']} уже питался(ась) сегодня — " . getMealTypeName($meal_type),
+                    'employee'      => $employee, 'code' => 'ALREADY_ATE',
+                    'last_scan_at'  => $last_scan['scanned_at']];
+        }
+
+        // Новый проход — фиксируем
+        $pdo->prepare(
+            "INSERT INTO meal_logs
+                 (employee_id, meal_type, access_granted, scanner_ip,
+                  operator_id, operator_name, meal_point_id, meal_point_name)
+             VALUES (?, ?, 1, ?, ?, ?, ?, ?)"
+        )->execute([
+            $employee['id'], $meal_type, $ip,
+            $operator_id, $operator_name,
+            $meal_point_id, $meal_point_name,
+        ]);
+    } finally {
+        releaseMealLock($pdo, $employee['id']);
+    }
 
     // Аннулировать выездное питание на сегодня (отметить красным, не удалять)
     try {
@@ -481,13 +488,20 @@ function getMealPointById(PDO $pdo, int $id): ?array
     return $stmt->fetch() ?: null;
 }
 
-/** Часовой пояс точки питания ("+07:00") — свой, если задан, иначе глобальный по умолчанию. */
+/**
+ * Часовой пояс точки питания ("+07:00") — свой, если задан, иначе
+ * SERVER_TZ_OFFSET (фиксированное серверное значение, НЕ APP_TZ_OFFSET —
+ * см. комментарий в bootstrap.php: для записей без точки нужна стабильная,
+ * не зависящая от cookie браузера граница суток, иначе дедупликация может
+ * давать разный результат в зависимости от того, кто и в каком браузере её
+ * выполняет).
+ */
 function getPointTz(PDO $pdo, $meal_point_id): string
 {
     static $cache = [];
-    if (!$meal_point_id) return APP_TZ_OFFSET;
+    if (!$meal_point_id) return SERVER_TZ_OFFSET;
     if (isset($cache[$meal_point_id])) return $cache[$meal_point_id];
-    $tz = APP_TZ_OFFSET;
+    $tz = SERVER_TZ_OFFSET;
     try {
         $stmt = $pdo->prepare("SELECT tz_offset FROM meal_points WHERE id = ?");
         $stmt->execute([$meal_point_id]);
@@ -495,4 +509,52 @@ function getPointTz(PDO $pdo, $meal_point_id): string
         if ($v && preg_match('/^[+-]\d{2}:\d{2}$/', $v)) $tz = $v;
     } catch (PDOException $e) {}
     return $cache[$meal_point_id] = $tz;
+}
+
+// ─── Деконфликтинг: единая проверка дублей + межпроцессная блокировка ──
+
+/**
+ * Есть ли у сотрудника уже активная запись этого типа питания на указанную
+ * местную дату (по часовому поясу точки, либо SERVER_TZ_OFFSET если точка
+ * не указана)? $localDate = null → берётся "сегодня" по этому же поясу.
+ * Единая точка применения дедуп-логики — используется во всех путях записи
+ * (реальный скан, ручной пропуск, массовая проводка, оффлайн-синхронизация),
+ * чтобы правило не расходилось между ними.
+ */
+function hasExistingMealLog(PDO $pdo, int $employeeId, string $mealType, $meal_point_id, ?string $localDate = null, ?int $excludeId = null): ?array
+{
+    $tz   = getPointTz($pdo, $meal_point_id);
+    $date = $localDate ?? gmdate('Y-m-d', time() + offsetToMinutes($tz) * 60);
+    $sql  = "SELECT id, scanned_at FROM meal_logs
+             WHERE employee_id = ? AND meal_type = ? AND DATE(CONVERT_TZ(scanned_at, '+00:00', ?)) = ?
+               AND access_granted = 1";
+    $params = [$employeeId, $mealType, $tz, $date];
+    if ($excludeId !== null) { $sql .= " AND id != ?"; $params[] = $excludeId; }
+    $sql .= " ORDER BY scanned_at DESC LIMIT 1";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetch() ?: null;
+}
+
+/**
+ * Межпроцессная блокировка на время "проверить нет ли записи → вставить"
+ * для конкретного сотрудника (MySQL именованный лок, живёт на уровне
+ * соединения). Без неё два почти одновременных запроса (двойной скан,
+ * два админа проводят одного и того же сотрудника, повторная отправка при
+ * обрыве связи) могут оба пройти проверку "записи нет" ещё до того, как
+ * первый INSERT зафиксируется — итог: дубль. Таймаут короткий (5 сек) —
+ * это разовая проверка+вставка, а не долгая операция.
+ */
+function acquireMealLock(PDO $pdo, int $employeeId, int $timeoutSec = 5): bool
+{
+    $stmt = $pdo->prepare('SELECT GET_LOCK(?, ?)');
+    $stmt->execute(['meal_emp_' . $employeeId, $timeoutSec]);
+    return (bool)$stmt->fetchColumn();
+}
+
+function releaseMealLock(PDO $pdo, int $employeeId): void
+{
+    try {
+        $pdo->prepare('SELECT RELEASE_LOCK(?)')->execute(['meal_emp_' . $employeeId]);
+    } catch (PDOException $e) {}
 }

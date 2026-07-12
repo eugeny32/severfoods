@@ -51,22 +51,56 @@ if (!$point) {
 }
 
 try {
+    // Перед назначением проверяем каждую запись: не появится ли на этой
+    // точке дубль (сотрудник + тип питания + местная дата точки), если её
+    // назначить сюда — например, если у сотрудника уже есть настоящий скан
+    // на этой точке в этот же приём пищи. Конфликтные записи пропускаем
+    // (точка НЕ назначается), чтобы не плодить новые дубли, которые потом
+    // придётся вручную чистить через «Найти дубликаты».
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
-    $sql = "UPDATE meal_logs SET meal_point_id = ?, meal_point_name = ?"
-         . ($mealType !== null ? ", meal_type = ?" : "")
-         . " WHERE id IN ($placeholders) AND meal_point_id IS NULL";
+    $rowsStmt = $pdo->prepare(
+        "SELECT id, employee_id, meal_type, scanned_at FROM meal_logs
+         WHERE id IN ($placeholders) AND meal_point_id IS NULL"
+    );
+    $rowsStmt->execute($ids);
+    $rows = $rowsStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $params = [$pointId, $point['point_name']];
-    if ($mealType !== null) $params[] = $mealType;
-    $params = array_merge($params, $ids);
+    $pointTz  = getPointTz($pdo, $pointId);
+    $toUpdate = [];
+    $conflicted = [];
+    foreach ($rows as $row) {
+        $effectiveType = $mealType ?? $row['meal_type'];
+        $localDate = gmdate('Y-m-d', strtotime($row['scanned_at'] . ' UTC') + offsetToMinutes($pointTz) * 60);
+        if (hasExistingMealLog($pdo, (int)$row['employee_id'], $effectiveType, $pointId, $localDate, (int)$row['id'])) {
+            $conflicted[] = (int)$row['id'];
+        } else {
+            $toUpdate[] = (int)$row['id'];
+        }
+    }
 
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    $updated = $stmt->rowCount();
+    $updated = 0;
+    if ($toUpdate) {
+        $ph2 = implode(',', array_fill(0, count($toUpdate), '?'));
+        $sql = "UPDATE meal_logs SET meal_point_id = ?, meal_point_name = ?"
+             . ($mealType !== null ? ", meal_type = ?" : "")
+             . " WHERE id IN ($ph2) AND meal_point_id IS NULL";
 
-    logAction('assign_meal_point', "Назначена точка «{$point['point_name']}» для {$updated} записей" . ($mealType ? " (тип: {$mealType})" : ''));
+        $params = [$pointId, $point['point_name']];
+        if ($mealType !== null) $params[] = $mealType;
+        $params = array_merge($params, $toUpdate);
 
-    echo json_encode(['success' => true, 'updated' => $updated]);
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $updated = $stmt->rowCount();
+    }
+
+    logAction('assign_meal_point', "Назначена точка «{$point['point_name']}» для {$updated} записей" . ($mealType ? " (тип: {$mealType})" : '') . ($conflicted ? ", пропущено как конфликтующих: " . count($conflicted) : ''));
+
+    echo json_encode([
+        'success'    => true,
+        'updated'    => $updated,
+        'conflicted' => $conflicted,
+    ]);
 } catch (PDOException $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Ошибка БД: ' . $e->getMessage()]);

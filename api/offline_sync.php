@@ -205,27 +205,36 @@ function doPush(): void
         }
         $scannedAt = gmdate('Y-m-d H:i:s', $ts);
 
-        // 'night' в базе не хранится — переклассифицируем по местному времени точки
-        // (до полудня — завтрак, после — ужин), см. normalizeMealType().
-        $pointTzForType = $pointId ? getPointTz($pdo, $pointId) : APP_TZ_OFFSET;
-        $localTimeAtScan = gmdate('H:i:s', $ts + offsetToMinutes($pointTzForType) * 60);
-        $mealType = normalizeMealType($mealType, $localTimeAtScan);
-
-        // Дедупликация: тот же сотрудник + тип + тот же МЕСТНЫЙ день → пропуск
-        $day  = gmdate('Y-m-d', $ts + offsetToMinutes($pointTzForType) * 60);
-        $dup  = $pdo->prepare(
-            "SELECT id FROM meal_logs
-             WHERE employee_id=? AND meal_type=? AND DATE(CONVERT_TZ(scanned_at,'+00:00',?))=? AND access_granted=1
-             LIMIT 1"
-        );
-        $dup->execute([$empId, $mealType, $pointTzForType, $day]);
-        if ($dup->fetchColumn()) {
-            $results[] = ['offline_id' => $offlineId, 'status' => 'duplicate'];
-            $skipped++;
-            continue;
+        // Клиент присылает meal_point_id из своего локального кэша — он может
+        // быть устаревшим (точка деактивирована/удалена на сервере). Не
+        // доверяем ему вслепую для расчёта часового пояса/дедупа.
+        if ($pointId) {
+            $point = getMealPointById($pdo, $pointId);
+            if (!$point) $pointId = null;
         }
 
+        // 'night' в базе не хранится — переклассифицируем по местному времени точки
+        // (до полудня — завтрак, после — ужин), см. normalizeMealType().
+        // Если точки нет/невалидна — фиксированный серверный часовой пояс
+        // (SERVER_TZ_OFFSET), НЕ APP_TZ_OFFSET: у офлайн-синхронизации нет
+        // браузера/cookie, так что APP_TZ_OFFSET здесь всегда был бы жёстко
+        // захардкоженным дефолтом — лучше явная стабильная константа.
+        $pointTzForType = $pointId ? getPointTz($pdo, $pointId) : SERVER_TZ_OFFSET;
+        $localTimeAtScan = gmdate('H:i:s', $ts + offsetToMinutes($pointTzForType) * 60);
+        $mealType = normalizeMealType($mealType, $localTimeAtScan);
+        $day = gmdate('Y-m-d', $ts + offsetToMinutes($pointTzForType) * 60);
+
+        // Лок на время проверки+вставки — исключает дубль при повторной
+        // отправке того же батча из-за обрыва связи или при синхронизации
+        // с двух устройств одновременно.
+        $locked = acquireMealLock($pdo, $empId);
         try {
+            if (hasExistingMealLog($pdo, $empId, $mealType, $pointId, $day)) {
+                $results[] = ['offline_id' => $offlineId, 'status' => 'duplicate'];
+                $skipped++;
+                continue;
+            }
+
             $pdo->prepare(
                 "INSERT INTO meal_logs
                      (employee_id, meal_type, access_granted, scanner_ip,
@@ -239,6 +248,8 @@ function doPush(): void
         } catch (PDOException $e) {
             $results[] = ['offline_id' => $offlineId, 'status' => 'error', 'msg' => $e->getMessage()];
             $errors++;
+        } finally {
+            if ($locked) releaseMealLock($pdo, $empId);
         }
     }
 

@@ -34,7 +34,7 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !in_array($mealType, ['breakf
     exit;
 }
 
-$pointTz = APP_TZ_OFFSET;
+$pointTz = SERVER_TZ_OFFSET;
 if ($pointId) {
     $point = getMealPointById($pdo, $pointId);
     if ($point) $pointTz = getPointTz($pdo, $pointId);

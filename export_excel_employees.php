@@ -19,8 +19,11 @@ $assigned_pid = $_SESSION['assigned_point_id'] ?? null;
 if (!$is_super && $assigned_pid) $point_id = $assigned_pid;
 
 $scannedLocal = "CONVERT_TZ(ml.scanned_at, '+00:00', COALESCE(mpt.tz_offset, '" . APP_TZ_OFFSET . "'))";
+// COUNT(DISTINCT ...) по типу+дате — дублирующиеся записи внутри одного
+// приёма пищи считаются одним приёмом, а не раздувают выгрузку (см. также
+// reports.php: тот же принцип для сводки в веб-интерфейсе).
 $sql = "SELECT e.id, e.full_name, e.organization, e.department,
-               COUNT(*) as meals,
+               COUNT(DISTINCT CONCAT(ml.meal_type,'_',DATE($scannedLocal))) as meals,
                COUNT(DISTINCT DATE($scannedLocal)) as days
         FROM meal_logs ml
         JOIN employees e ON ml.employee_id = e.id
