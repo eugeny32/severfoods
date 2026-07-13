@@ -433,8 +433,8 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                     <div class="card-title"><i class="fas fa-users-viewfinder"></i> Массовая проводка сотрудников</div>
                 </div>
                 <p style="font-size:13px;color:var(--text-3);margin-bottom:14px">
-                    Отметить приём пищи сразу нескольким сотрудникам на указанную дату — без сканирования QR.
-                    Точку питания можно указать сразу, либо оставить не привязанной и назначить позже в разделе «Отчёты».
+                    Отметить приём пищи (в т.ч. сухой паёк / выездное питание) сразу нескольким сотрудникам на указанную дату — без сканирования QR.
+                    Точку питания можно указать сразу, либо оставить не привязанной и назначить позже в разделе «Отчёты». Дату можно указать и задним числом.
                 </p>
                 <div class="form-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px">
                     <div class="form-group">
@@ -443,13 +443,15 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                     </div>
                     <div class="form-group">
                         <label><i class="fas fa-utensils"></i> Тип питания</label>
-                        <select id="bpMealType" onchange="bpScheduleCheckExisting()">
+                        <select id="bpMealType" onchange="bpOnMealTypeChange()">
                             <option value="breakfast">Завтрак</option>
                             <option value="lunch" selected>Обед</option>
                             <option value="dinner">Ужин</option>
+                            <option value="dry_ration">Сухой паёк</option>
+                            <option value="field">Выездное питание</option>
                         </select>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="bpPointIdWrap">
                         <label><i class="fas fa-map-marker-alt"></i> Точка питания</label>
                         <select id="bpPointId" onchange="bpScheduleCheckExisting()">
                             <option value="">— не привязывать —</option>
@@ -458,6 +460,9 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                             <?php endforeach; ?>
                         </select>
                     </div>
+                </div>
+                <div id="bpRationHint" style="display:none;font-size:12px;color:#92400e;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:8px;padding:8px 12px;margin-bottom:12px">
+                    <i class="fas fa-circle-info"></i> Если на указанную дату у сотрудника уже отмечены все 3 приёма пищи (завтрак+обед+ужин) — сухой паёк/выездное питание для него проведено не будет, об этом придёт отдельное сообщение.
                 </div>
                 <div class="form-group" style="margin-bottom:12px">
                     <label><i class="fas fa-search"></i> Поиск по фамилии</label>

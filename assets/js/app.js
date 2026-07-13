@@ -608,6 +608,21 @@ function bpUpdateCount() {
     `).join('');
 }
 
+const BP_RATION_TYPES = ['dry_ration', 'field'];
+
+// Точка питания и предпросмотр конфликтов существующих записей не
+// применимы к сухпаю/выездному питанию (они не привязаны к точке и
+// проверяются по другому правилу — все 3 приёма пищи, см. bpSubmit).
+function bpOnMealTypeChange() {
+    const mealType  = document.getElementById('bpMealType')?.value;
+    const isRation  = BP_RATION_TYPES.includes(mealType);
+    const pointWrap = document.getElementById('bpPointIdWrap');
+    const hintEl    = document.getElementById('bpRationHint');
+    if (pointWrap) pointWrap.style.display = isRation ? 'none' : '';
+    if (hintEl) hintEl.style.display = isRation ? '' : 'none';
+    bpScheduleCheckExisting();
+}
+
 let bpCheckTimer = null;
 function bpScheduleCheckExisting() {
     clearTimeout(bpCheckTimer);
@@ -616,7 +631,8 @@ function bpScheduleCheckExisting() {
 
 // Предварительная проверка: предупреждает, что для выбранной даты/типа
 // питания у части сотрудников уже ЕСТЬ записи — до нажатия «Провести
-// выбранных», а не только по факту после отправки.
+// выбранных», а не только по факту после отправки. Для сухпая/выездного
+// питания предпроверки нет — итог виден сразу после проводки (см. bpSubmit).
 async function bpCheckExisting() {
     const warnEl = document.getElementById('bpExistingWarn');
     if (!warnEl) return;
@@ -625,7 +641,9 @@ async function bpCheckExisting() {
     const pointId  = document.getElementById('bpPointId')?.value || null;
     const ids      = Array.from(bpSelectedIds).map(Number);
 
-    if (!date || !mealType || !ids.length) { warnEl.style.display = 'none'; warnEl.innerHTML = ''; return; }
+    if (!date || !mealType || !ids.length || BP_RATION_TYPES.includes(mealType)) {
+        warnEl.style.display = 'none'; warnEl.innerHTML = ''; return;
+    }
 
     try {
         const res = await fetch('api/check_bulk_pass.php', {
@@ -647,16 +665,21 @@ async function bpSubmit() {
     const pointId  = document.getElementById('bpPointId')?.value || null;
     const msgEl    = document.getElementById('bpResultMsg');
     const ids      = Array.from(bpSelectedIds).map(Number);
+    const isRation = BP_RATION_TYPES.includes(mealType);
 
     if (!date) { alert('Укажите дату'); return; }
     if (!ids.length) { alert('Выберите хотя бы одного сотрудника'); return; }
 
     msgEl.innerHTML = '<span style="color:var(--text-3)">Выполняется…</span>';
     try {
-        const res = await fetch('api/bulk_pass.php', {
+        const url  = isRation ? 'api/bulk_dry_ration.php' : 'api/bulk_pass.php';
+        const body = isRation
+            ? { date, ration_type: mealType, employee_ids: ids }
+            : { date, meal_type: mealType, employee_ids: ids, point_id: pointId };
+        const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken(), 'X-Requested-With': 'XMLHttpRequest' },
-            body: JSON.stringify({ date, meal_type: mealType, employee_ids: ids, point_id: pointId }),
+            body: JSON.stringify(body),
         });
         const data = await res.json();
         if (!data.success) {
@@ -673,6 +696,12 @@ async function bpSubmit() {
             html += `<div class="notif" style="background:#fff7ed;border-color:#fed7aa;margin-top:8px"><div class="notif-inner"><div class="notif-icon">ℹ️</div><div class="notif-body">`
                   + `<div class="notif-title">Уже отмечены ранее на эту дату: ${data.already.length}</div>`
                   + `<div style="font-size:12px;margin-top:4px">${data.already.map(e => escHtml(e.name)).join(', ')}</div>`
+                  + `</div></div></div>`;
+        }
+        if (data.conflicted && data.conflicted.length) {
+            html += `<div class="notif" style="background:#fef2f2;border-color:#fecaca;margin-top:8px"><div class="notif-inner"><div class="notif-icon">⚠️</div><div class="notif-body">`
+                  + `<div class="notif-title">Не проведено — уже отмечены все 3 приёма пищи на эту дату: ${data.conflicted.length}</div>`
+                  + `<div style="font-size:12px;margin-top:4px">${data.conflicted.map(e => escHtml(e.name)).join(', ')}</div>`
                   + `</div></div></div>`;
         }
         msgEl.innerHTML = html;
