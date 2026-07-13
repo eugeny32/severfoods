@@ -410,7 +410,6 @@ function renderOrgRows(list) {
         const warn = e.expiry_status === 'expired' ? '<svg width="8" height="8" viewBox="0 0 24 24" style="color:#e53935"><circle cx="12" cy="12" r="10" fill="currentColor"/></svg>' : (e.expiry_status === 'warning' ? '<svg width="8" height="8" viewBox="0 0 24 24" style="color:#f59e0b"><circle cx="12" cy="12" r="10" fill="currentColor"/></svg>' : '');
         const exp  = e.qr_expires_at
             ? '<div style="font-size:10px;color:#94a3b8;margin-top:2px">до ' + escHtml(e.qr_expires_at) + '</div>' : '';
-        const nameJson = JSON.stringify(e.full_name).replace(/[<>&]/g, function(s){return s==='<'?'\u003c':s==='>'?'\u003e':'\u0026';});
 
         const safeName = escHtml(e.full_name).replace(/'/g, "\\'");
         let actions = '<button class="btn-sm green" title="Пропустить вручную"'
@@ -427,7 +426,7 @@ function renderOrgRows(list) {
         }
         if (window.isSuperAdmin) {
             actions += '<button class="btn-sm danger" title="Удалить"'
-                + ' onclick="closeModal(&quot;orgModal&quot;);openDeleteModal(' + e.id + ',' + nameJson + ')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>';
+                + ' onclick="closeModal(&quot;orgModal&quot;);openDeleteModal(' + e.id + ',\'' + safeName + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>';
         }
 
         return '<tr class="emp-row" data-emp-id="' + e.id + '" data-emp-name="' + escHtml(e.full_name) + '" style="cursor:pointer" title="Статистика питания">'
