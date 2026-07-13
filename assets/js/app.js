@@ -704,6 +704,12 @@ async function bpSubmit() {
                   + `<div style="font-size:12px;margin-top:4px">${data.conflicted.map(e => escHtml(e.name)).join(', ')}</div>`
                   + `</div></div></div>`;
         }
+        if (data.limited && data.limited.length) {
+            html += `<div class="notif" style="background:#fef2f2;border-color:#fecaca;margin-top:8px"><div class="notif-inner"><div class="notif-icon">⚠️</div><div class="notif-body">`
+                  + `<div class="notif-title">Не проведено — лимит 4 будущих дней сухпая/выездного питания: ${data.limited.length}</div>`
+                  + `<div style="font-size:12px;margin-top:4px">${data.limited.map(e => escHtml(e.name)).join(', ')}</div>`
+                  + `</div></div></div>`;
+        }
         msgEl.innerHTML = html;
 
         // Сброс выбора после успешного проведения
@@ -1425,23 +1431,21 @@ async function loadEmpStats() {
 
 async function loadRations() {
     if (!_empStatsId) return;
-    const from = $('empStatsFrom').value;
-    const to   = $('empStatsTo').value;
-    // Show rations from stats-from to +90 days (future)
-    const futureEnd = new Date(); futureEnd.setDate(futureEnd.getDate() + 90);
-    const ratTo = futureEnd.toISOString().slice(0,10);
+    // Показываем ВСЮ историю сухпая/выездного питания сотрудника, не
+    // ограничиваясь периодом, выбранным для статистики по столовой.
     const list = $('empRationsList');
     const countEl = $('empRationsCount');
     const addBtn = $('empRationAddBtn');
     const today = new Date().toISOString().slice(0,10);
     try {
-        const d = await fetch(`api/dry_rations.php?employee_id=${_empStatsId}&from=${from}&to=${ratTo}`).then(r=>r.json());
+        const d = await fetch(`api/dry_rations.php?employee_id=${_empStatsId}&from=2000-01-01&to=2100-01-01`).then(r=>r.json());
         if (!d.ok) return;
         const typeLabels = { dry_ration:'Сухой паёк', field:'Выездное питание' };
-        // Count only those within stats period for limit display
-        const inPeriod = d.items.filter(r => r.ration_date >= from && r.ration_date <= to).length;
-        const atLimit = inPeriod >= 4;
-        countEl.textContent = `(${inPeriod}/4 в периоде${d.count > inPeriod ? ', всего: '+d.count : ''})`;
+        // Лимит 4 действует только на ЕЩЁ НЕ НАСТУПИВШИЕ (будущие) активные
+        // записи — прошедшие/сегодняшние в лимит не входят (см. api/dry_rations.php).
+        const futureActive = d.items.filter(r => r.status === 'active' && r.ration_date > today).length;
+        const atLimit = futureActive >= 4;
+        countEl.textContent = `(${futureActive}/4 будущих, всего: ${d.count})`;
         countEl.style.color = atLimit ? '#dc2626' : 'var(--blue-700)';
         if (addBtn) { addBtn.style.opacity = atLimit ? '0.4' : '1'; addBtn.disabled = atLimit; }
 
@@ -1466,12 +1470,17 @@ async function loadRations() {
                     dateColor = 'inherit';
                     badge     = '<span style="font-size:10px;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;margin-left:4px">выполнено</span>';
                 }
+                // Задним числом — дата выдачи была раньше дня, когда запись
+                // фактически создали (не путать с "прошедшая дата вообще").
+                const backdatedBadge = r.is_backdated
+                    ? '<span style="font-size:10px;background:#e0e7ff;color:#3730a3;border-radius:4px;padding:1px 5px;margin-left:4px">задним числом</span>'
+                    : '';
                 const canDelete = !isCancelled;
                 return `<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border)">
                     <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0"></span>
                     <span style="font-size:13px;font-weight:700;min-width:82px;color:${dateColor}">${r.ration_date.split('-').reverse().join('.')}</span>
                     <span style="font-size:12px;color:var(--text-3)">${typeLabels[r.ration_type]||r.ration_type}</span>
-                    ${badge}
+                    ${badge}${backdatedBadge}
                     <span style="flex:1"></span>
                     ${canDelete ? `<button onclick="deleteRation(${r.id})" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:16px;line-height:1;padding:2px 4px" title="Удалить">×</button>` : ''}
                 </div>`;

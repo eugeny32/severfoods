@@ -5,7 +5,8 @@
  * таблицу dry_rations, а не meal_logs (точка питания тут не участвует).
  *
  * Разрешена проводка задним числом (и вперёд — выездное питание часто
- * планируется заранее) — дата не ограничена ни в прошлое, ни в будущее.
+ * планируется заранее) — дата сама по себе не ограничена ни в прошлое,
+ * ни в будущее (лимит на количество будущих записей — см. ниже).
  *
  * Если на указанную дату у сотрудника УЖЕ отмечены все 3 приёма пищи в
  * столовой (завтрак+обед+ужин, реальные активные записи meal_logs) —
@@ -16,6 +17,10 @@
  * Если запись на эту дату у сотрудника уже есть (независимо от типа —
  * dry_rations.ration_date уникален на сотрудника, см. uq_emp_date) —
  * попадает в список "уже отмечены ранее", как и в bulk_pass.php.
+ *
+ * Лимит "не более 4 записей в скользящем окне ±30 дней" (тот же, что и в
+ * api/dry_rations.php) применяется ТОЛЬКО когда указанная дата ещё не
+ * наступила (в будущем) — задним числом и на сегодня лимита нет.
  */
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../functions.php';
@@ -87,15 +92,34 @@ $ins = $pdo->prepare(
      VALUES (?, ?, ?, 'active', ?)"
 );
 
+// Лимит на будущие даты — см. комментарий в шапке файла.
+$today      = localToday();
+$isFuture   = $date > $today;
+$statsFrom  = date('Y-m-d', strtotime($today . ' -30 days'));
+$statsTo    = date('Y-m-d', strtotime($today . ' +30 days'));
+$futureCntStmt = $isFuture ? $pdo->prepare(
+    "SELECT COUNT(*) FROM dry_rations
+     WHERE employee_id=? AND ration_date BETWEEN ? AND ? AND ration_date > ? AND status='active'"
+) : null;
+
 $inserted   = [];
 $already    = [];
 $conflicted = [];
+$limited    = [];
 
 foreach ($employeeIds as $empId) {
     $mealsCountStmt->execute([$empId, SERVER_TZ_OFFSET, $date]);
     if ((int)$mealsCountStmt->fetchColumn() >= 3) {
         $conflicted[] = ['id' => $empId, 'name' => $names[$empId] ?? "#{$empId}"];
         continue;
+    }
+
+    if ($isFuture) {
+        $futureCntStmt->execute([$empId, $statsFrom, $statsTo, $today]);
+        if ((int)$futureCntStmt->fetchColumn() >= 4) {
+            $limited[] = ['id' => $empId, 'name' => $names[$empId] ?? "#{$empId}"];
+            continue;
+        }
     }
 
     $ins->execute([$empId, $date, $rationType, $_SESSION['user_id'] ?? null]);
@@ -107,11 +131,12 @@ foreach ($employeeIds as $empId) {
 }
 
 $typeName = $rationType === 'dry_ration' ? 'Сухой паёк' : 'Выездное питание';
-logAction('bulk_dry_ration', "Массовая проводка ({$typeName}, {$date}): проведено " . count($inserted) . ", уже было " . count($already) . ", конфликт (все 3 приёма пищи) " . count($conflicted));
+logAction('bulk_dry_ration', "Массовая проводка ({$typeName}, {$date}): проведено " . count($inserted) . ", уже было " . count($already) . ", конфликт (все 3 приёма пищи) " . count($conflicted) . ", лимит будущих дней " . count($limited));
 
 echo json_encode([
     'success'    => true,
     'inserted'   => $inserted,
     'already'    => $already,
     'conflicted' => $conflicted,
+    'limited'    => $limited,
 ], JSON_UNESCAPED_UNICODE);

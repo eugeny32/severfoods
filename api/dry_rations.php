@@ -33,9 +33,16 @@ if ($method === 'GET') {
     $to    = $_GET['to']   ?? date('Y-m-d', strtotime(localToday() . ' +90 days'));
     if (!$empId) { echo json_encode(['ok'=>false,'error'=>'No employee_id']); exit; }
 
-    $stmt = $pdo->prepare("SELECT id, ration_date, ration_type, status FROM dry_rations WHERE employee_id=? AND ration_date BETWEEN ? AND ? ORDER BY ration_date");
+    $stmt = $pdo->prepare("SELECT id, ration_date, ration_type, status, created_at FROM dry_rations WHERE employee_id=? AND ration_date BETWEEN ? AND ? ORDER BY ration_date");
     $stmt->execute([$empId, $from, $to]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // "Задним числом" — дата выдачи раньше дня, когда запись была фактически
+    // создана (а не просто "раньше сегодня": вчерашняя запись, добавленная
+    // вчера же, — не задний числом, а обычная текущая).
+    foreach ($rows as &$r) {
+        $r['is_backdated'] = $r['created_at'] && $r['ration_date'] < substr($r['created_at'], 0, 10);
+    }
+    unset($r);
     $activeCount = count(array_filter($rows, fn($r) => $r['status'] === 'active'));
     echo json_encode(['ok'=>true, 'items'=>$rows, 'count'=>$activeCount, 'total'=>count($rows)]);
     exit;
@@ -60,14 +67,27 @@ if ($method === 'POST') {
     while ($cur <= $end) { $dates[] = $cur->format('Y-m-d'); $cur->modify('+1 day'); }
     if (count($dates) > 30) { echo json_encode(['ok'=>false,'error'=>'Диапазон не может превышать 30 дней']); exit; }
 
-    // Count active records in stats period
-    $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM dry_rations WHERE employee_id=? AND ration_date BETWEEN ? AND ? AND status='active'");
-    $cntStmt->execute([$empId, $statsFrom, $statsTo]);
-    $existing = (int)$cntStmt->fetchColumn();
-    $newInPeriod = count(array_filter($dates, fn($d) => $d >= $statsFrom && $d <= $statsTo));
+    // Лимит "не более 4 в период" действует ТОЛЬКО для дат, которые ещё не
+    // наступили (ration_date > сегодня) — задним числом (дата уже прошла)
+    // и на сегодняшнюю дату лимит не действует, чтобы не мешать фиксировать
+    // фактически случившееся выездное питание/паёк.
+    $today = localToday();
+    $futureDates = array_values(array_filter($dates, fn($d) => $d > $today));
 
-    if ($existing + $newInPeriod > 4) {
-        echo json_encode(['ok'=>false,'error'=>'Превышен лимит 4 дней за период (уже: '.$existing.', добавляется: '.$newInPeriod.')']); exit;
+    if ($futureDates) {
+        // Считаем только уже существующие БУДУЩИЕ активные записи в периоде —
+        // прошедшие в лимит не входят.
+        $cntStmt = $pdo->prepare(
+            "SELECT COUNT(*) FROM dry_rations
+             WHERE employee_id=? AND ration_date BETWEEN ? AND ? AND ration_date > ? AND status='active'"
+        );
+        $cntStmt->execute([$empId, $statsFrom, $statsTo, $today]);
+        $existing = (int)$cntStmt->fetchColumn();
+        $newInPeriod = count(array_filter($futureDates, fn($d) => $d >= $statsFrom && $d <= $statsTo));
+
+        if ($existing + $newInPeriod > 4) {
+            echo json_encode(['ok'=>false,'error'=>'Превышен лимит 4 будущих дней за период (уже: '.$existing.', добавляется: '.$newInPeriod.')']); exit;
+        }
     }
 
     $inserted = 0; $skipped = 0;

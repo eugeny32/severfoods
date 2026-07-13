@@ -42,7 +42,10 @@ $stmtDays = $pdo->prepare("
 $stmtDays->execute([$id, $from, $to]);
 $days = (int)$stmtDays->fetchColumn();
 
-// Dry rations / field catering in period
+// Сухой паёк / выездное питание — показываем ЗА ВСЁ ВРЕМЯ, а не только за
+// период, выбранный для статистики по столовой (from/to выше): иначе старые
+// выданные пайки/выездные "пропадали" из карточки сотрудника при смене
+// периода отчёта.
 $rationDays = 0;
 $rationItems = [];
 try {
@@ -58,8 +61,8 @@ try {
     // Add status column if missing (schema migration)
     try { $pdo->exec("ALTER TABLE dry_rations ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active'"); } catch (PDOException $e) {}
     try { $pdo->exec("ALTER TABLE dry_rations ADD COLUMN cancelled_at DATETIME DEFAULT NULL"); } catch (PDOException $e) {}
-    $stmtRat = $pdo->prepare("SELECT ration_date, ration_type, status FROM dry_rations WHERE employee_id=? AND ration_date BETWEEN ? AND ? ORDER BY ration_date");
-    $stmtRat->execute([$id, $from, $to]);
+    $stmtRat = $pdo->prepare("SELECT ration_date, ration_type, status FROM dry_rations WHERE employee_id=? ORDER BY ration_date");
+    $stmtRat->execute([$id]);
     $rationItems = $stmtRat->fetchAll(PDO::FETCH_ASSOC);
     // Only active (not cancelled) count toward days
     $rationDays = count(array_filter($rationItems, fn($r) => $r['status'] === 'active'));
