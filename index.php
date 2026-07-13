@@ -1103,7 +1103,7 @@ function deleteChatUser(id, name) {
                 <div style="font-size:12px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
                     Сухой паёк / Выездное питание <span id="empRationsCount" style="color:var(--blue-700)"></span>
                 </div>
-                <div id="empRationsList" style="margin-bottom:10px;max-height:200px;overflow-y:auto"></div>
+                <div id="empRationsList" style="margin-bottom:10px;max-height:132px;overflow-y:auto"></div>
                 <div id="empRationsAdd" style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">
                     <div>
                         <label style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;display:block;margin-bottom:3px">С</label>

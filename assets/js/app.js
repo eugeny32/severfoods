@@ -1457,6 +1457,9 @@ async function loadRations() {
                 const isCancelled = r.status === 'cancelled';
                 // colour coding
                 let dotColor, dateColor, badge;
+                // Задним числом — дата выдачи была раньше дня, когда запись
+                // фактически создали (не путать с "прошедшая дата вообще").
+                // Один бейдж на запись: «задним числом» перекрывает «выполнено».
                 if (isCancelled) {
                     dotColor  = '#dc2626';
                     dateColor = '#dc2626';
@@ -1465,22 +1468,21 @@ async function loadRations() {
                     dotColor  = '#b45309';
                     dateColor = '#b45309';
                     badge     = '<span style="font-size:10px;background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;margin-left:4px">запланировано</span>';
+                } else if (r.is_backdated) {
+                    dotColor  = '#3730a3';
+                    dateColor = 'inherit';
+                    badge     = '<span style="font-size:10px;background:#e0e7ff;color:#3730a3;border-radius:4px;padding:1px 5px;margin-left:4px">задним числом</span>';
                 } else {
                     dotColor  = '#16a34a';
                     dateColor = 'inherit';
                     badge     = '<span style="font-size:10px;background:#dcfce7;color:#15803d;border-radius:4px;padding:1px 5px;margin-left:4px">выполнено</span>';
                 }
-                // Задним числом — дата выдачи была раньше дня, когда запись
-                // фактически создали (не путать с "прошедшая дата вообще").
-                const backdatedBadge = r.is_backdated
-                    ? '<span style="font-size:10px;background:#e0e7ff;color:#3730a3;border-radius:4px;padding:1px 5px;margin-left:4px">задним числом</span>'
-                    : '';
                 const canDelete = !isCancelled;
                 return `<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border)">
                     <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0"></span>
                     <span style="font-size:13px;font-weight:700;min-width:82px;color:${dateColor}">${r.ration_date.split('-').reverse().join('.')}</span>
                     <span style="font-size:12px;color:var(--text-3)">${typeLabels[r.ration_type]||r.ration_type}</span>
-                    ${badge}${backdatedBadge}
+                    ${badge}
                     <span style="flex:1"></span>
                     ${canDelete ? `<button onclick="deleteRation(${r.id})" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:16px;line-height:1;padding:2px 4px" title="Удалить">×</button>` : ''}
                 </div>`;
