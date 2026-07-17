@@ -15,6 +15,7 @@ $end_date    = preg_replace('/[^0-9\-]/', '', $_GET['end_date']   ?? localToday(
 $meal_type   = in_array($_GET['meal_type'] ?? '', ['breakfast','lunch','dinner','night'])
                ? $_GET['meal_type'] : 'all';
 $report_type = ($_GET['report_type'] ?? 'meals') === 'dry_rations' ? 'dry_rations' : 'meals';
+$dry_type    = in_array($_GET['dry_type'] ?? '', ['dry_ration','field']) ? $_GET['dry_type'] : 'all';
 $point_id    = (isset($_GET['point_id']) && ctype_digit((string)($_GET['point_id'])))
                ? (int)$_GET['point_id'] : null;
 
@@ -31,10 +32,12 @@ if ($report_type === 'dry_rations') {
                FROM dry_rations dr
                JOIN employees e ON dr.employee_id = e.id
                LEFT JOIN employees op ON dr.created_by = op.id
-               WHERE dr.ration_date BETWEEN :s AND :e
-               ORDER BY dr.ration_date DESC, e.full_name";
+               WHERE dr.ration_date BETWEEN :s AND :e";
+    $paramsDry = [':s' => $start_date, ':e' => $end_date];
+    if ($dry_type !== 'all') { $sqlDry .= " AND dr.ration_type = :rt"; $paramsDry[':rt'] = $dry_type; }
+    $sqlDry .= " ORDER BY dr.ration_date DESC, e.full_name";
     $stmtDry = $pdo->prepare($sqlDry);
-    $stmtDry->execute([':s' => $start_date, ':e' => $end_date]);
+    $stmtDry->execute($paramsDry);
     $dryLogs = $stmtDry->fetchAll(PDO::FETCH_ASSOC);
 
     $title   = 'Сухой паёк / Выездное питание: ' . $start_date . ' — ' . $end_date;

@@ -22,6 +22,7 @@ $point_id    = isset($_GET['point_id']) && $_GET['point_id'] !== '' ? (int)$_GET
 $unassigned_only = !empty($_GET['unassigned_only']);
 $out_of_schedule_only = !empty($_GET['out_of_schedule_only']);
 $source = in_array($_GET['source'] ?? '', ['bulk','manual','offline','scanner','all']) ? $_GET['source'] : 'all';
+$dry_type = in_array($_GET['dry_type'] ?? '', ['dry_ration','field','all']) ? $_GET['dry_type'] : 'all';
 
 // Доступные точки
 $points = [];
@@ -150,10 +151,12 @@ if ($report_type === 'dry_rations') {
                    FROM dry_rations dr
                    JOIN employees e ON dr.employee_id = e.id
                    LEFT JOIN employees op ON dr.created_by = op.id
-                   WHERE dr.ration_date BETWEEN :start AND :end
-                   ORDER BY dr.ration_date DESC, e.full_name";
+                   WHERE dr.ration_date BETWEEN :start AND :end";
+        $paramsDry = [':start' => $start_date, ':end' => $end_date];
+        if ($dry_type !== 'all') { $sqlDry .= " AND dr.ration_type = :rt"; $paramsDry[':rt'] = $dry_type; }
+        $sqlDry .= " ORDER BY dr.ration_date DESC, e.full_name";
         $stmtDry = $pdo->prepare($sqlDry);
-        $stmtDry->execute([':start' => $start_date, ':end' => $end_date]);
+        $stmtDry->execute($paramsDry);
         $dryLogs = $stmtDry->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {}
 }
@@ -271,6 +274,16 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
         </select>
     </div>
     <?php endif; ?>
+    <?php if ($report_type === 'dry_rations'): ?>
+    <div class="form-group">
+        <label><i class="fas fa-box"></i> Тип питания</label>
+        <select name="dry_type">
+            <option value="all"        <?= $dry_type==='all'?'selected':''        ?>>Все</option>
+            <option value="dry_ration" <?= $dry_type==='dry_ration'?'selected':'' ?>>Сухой паёк</option>
+            <option value="field"      <?= $dry_type==='field'?'selected':''      ?>>Выездное питание</option>
+        </select>
+    </div>
+    <?php endif; ?>
     <?php if ($is_super_admin && !empty($points)): ?>
     <div class="form-group">
         <label><i class="fas fa-map-marker-alt"></i> Точка</label>
@@ -310,7 +323,7 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
         <label>&nbsp;</label>
         <div style="display:flex;gap:8px">
             <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Применить</button>
-            <a href="export_excel.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&report_type=<?= $report_type ?>&meal_type=<?= $meal_type ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
+            <a href="export_excel.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&report_type=<?= $report_type ?>&meal_type=<?= $meal_type ?>&dry_type=<?= $dry_type ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
                class="btn btn-success" style="background:#1d6f42"><i class="fas fa-table"></i> Excel (детали)</a>
             <?php if ($report_type !== 'dry_rations'): ?>
             <a href="export_excel_employees.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
@@ -641,7 +654,7 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
 
 </div><!-- /page -->
 
-<script src="assets/js/app.js" defer></script>
+<script src="assets/js/app.js?v=<?= @filemtime(__DIR__ . '/assets/js/app.js') ?: time() ?>" defer></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('th.sortable').forEach(th => {

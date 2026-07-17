@@ -1129,7 +1129,7 @@ function deleteChatUser(id, name) {
 </div>
 
 <script src="assets/js/qr-input.js"></script>
-<script src="assets/js/app.js?v=2"></script>
+<script src="assets/js/app.js?v=<?= @filemtime(__DIR__ . '/assets/js/app.js') ?: time() ?>"></script>
 <?php if ($is_admin): ?>
 <style>
 #chatToastContainer {
