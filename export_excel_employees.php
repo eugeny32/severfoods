@@ -18,6 +18,17 @@ $is_super     = ($user_role === 'super_admin');
 $assigned_pid = $_SESSION['assigned_point_id'] ?? null;
 if (!$is_super && $assigned_pid) $point_id = $assigned_pid;
 
+// Регион — см. src/regions.php. Только для супер-администратора, только
+// чтение; при ошибке доступа к чужой БД тихо остаёмся на своём регионе.
+$available_regions = $is_super ? getRegions() : [];
+$region = currentRegionKey();
+if ($is_super && isset($_GET['region']) && isset($available_regions[$_GET['region']])) {
+    $region = $_GET['region'];
+}
+if ($region !== currentRegionKey()) {
+    try { $pdo = getRegionalPdo($region, $pdo); } catch (Throwable $e) { $region = currentRegionKey(); }
+}
+
 $scannedLocal = "CONVERT_TZ(ml.scanned_at, '+00:00', COALESCE(mpt.tz_offset, '" . APP_TZ_OFFSET . "'))";
 // COUNT(DISTINCT ...) по типу+дате — дублирующиеся записи внутри одного
 // приёма пищи считаются одним приёмом, а не раздувают выгрузку (см. также

@@ -24,6 +24,17 @@ $is_super     = ($user_role === 'super_admin');
 $assigned_pid = $_SESSION['assigned_point_id'] ?? null;
 if (!$is_super && $assigned_pid) $point_id = $assigned_pid;
 
+// Регион — см. src/regions.php. Только для супер-администратора, только
+// чтение; при ошибке доступа к чужой БД тихо остаёмся на своём регионе.
+$available_regions = $is_super ? getRegions() : [];
+$region = currentRegionKey();
+if ($is_super && isset($_GET['region']) && isset($available_regions[$_GET['region']])) {
+    $region = $_GET['region'];
+}
+if ($region !== currentRegionKey()) {
+    try { $pdo = getRegionalPdo($region, $pdo); } catch (Throwable $e) { $region = currentRegionKey(); }
+}
+
 if ($report_type === 'dry_rations') {
     // Данные по сухим пайкам
     $sqlDry = "SELECT dr.ration_date, dr.ration_type, dr.status, dr.created_at,

@@ -24,6 +24,24 @@ $out_of_schedule_only = !empty($_GET['out_of_schedule_only']);
 $source = in_array($_GET['source'] ?? '', ['bulk','manual','offline','scanner','all']) ? $_GET['source'] : 'all';
 $dry_type = in_array($_GET['dry_type'] ?? '', ['dry_ration','field','all']) ? $_GET['dry_type'] : 'all';
 
+// Выбор региона — ТОЛЬКО для супер-администратора и ТОЛЬКО для чтения
+// отчётов (см. src/regions.php). Обычные админы/операторы всегда видят
+// исключительно свой регион — переключателя для них нет вообще.
+$available_regions = $is_super_admin ? getRegions() : [];
+$region       = currentRegionKey();
+$region_error = null;
+if ($is_super_admin && isset($_GET['region']) && isset($available_regions[$_GET['region']])) {
+    $region = $_GET['region'];
+}
+if ($region !== currentRegionKey()) {
+    try {
+        $pdo = getRegionalPdo($region, $pdo);
+    } catch (Throwable $e) {
+        $region_error = $e->getMessage();
+        $region = currentRegionKey(); // откатываемся на свой регион, чтобы отчёт не упал совсем
+    }
+}
+
 // Доступные точки
 $points = [];
 if ($is_super_admin) {
@@ -246,7 +264,20 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
 <div style="max-width:1300px;margin:0 auto;padding:20px 16px">
 
 <!-- Filter -->
+<?php if ($region_error): ?>
+<div class="notif error" style="margin-bottom:14px"><div class="notif-inner"><div class="notif-icon">⚠️</div><div class="notif-body"><div class="notif-title"><?= htmlspecialchars($region_error) ?></div><div style="font-size:12px;margin-top:2px">Показан ваш регион (<?= htmlspecialchars($available_regions[currentRegionKey()]['label'] ?? currentRegionKey()) ?>).</div></div></div></div>
+<?php endif; ?>
 <form method="GET" class="filter-bar">
+    <?php if (count($available_regions) > 1): ?>
+    <div class="form-group">
+        <label><i class="fas fa-earth-americas"></i> Регион</label>
+        <select name="region" onchange="this.form.submit()">
+            <?php foreach ($available_regions as $rKey => $rInfo): ?>
+            <option value="<?= htmlspecialchars($rKey) ?>" <?= $region===$rKey?'selected':'' ?>><?= htmlspecialchars($rInfo['label']) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <?php endif; ?>
     <div class="form-group">
         <label><i class="fas fa-calendar-alt"></i> Дата от</label>
         <input type="date" name="start_date" value="<?= $start_date ?>">
@@ -323,10 +354,10 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
         <label>&nbsp;</label>
         <div style="display:flex;gap:8px">
             <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Применить</button>
-            <a href="export_excel.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&report_type=<?= $report_type ?>&meal_type=<?= $meal_type ?>&dry_type=<?= $dry_type ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
+            <a href="export_excel.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&report_type=<?= $report_type ?>&meal_type=<?= $meal_type ?>&dry_type=<?= $dry_type ?>&region=<?= urlencode($region) ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
                class="btn btn-success" style="background:#1d6f42"><i class="fas fa-table"></i> Excel (детали)</a>
             <?php if ($report_type !== 'dry_rations'): ?>
-            <a href="export_excel_employees.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
+            <a href="export_excel_employees.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?>&region=<?= urlencode($region) ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
                class="btn btn-success" style="background:#15803d"><i class="fas fa-users"></i> Excel (сотрудники)</a>
             <?php endif; ?>
         </div>
@@ -595,7 +626,7 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
             Сводный отчёт по сотрудникам (<?= count($empStats) ?> чел.)
         </div>
-        <a href="export_excel_employees.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
+        <a href="export_excel_employees.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?>&region=<?= urlencode($region) ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
            class="btn btn-success" style="background:#15803d;padding:6px 14px;font-size:12px;text-decoration:none;border-radius:7px;color:#fff;font-weight:600">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
             Excel
