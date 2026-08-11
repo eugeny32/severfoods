@@ -95,10 +95,15 @@ function doQueueCommand(): void
     $data     = json_decode(file_get_contents('php://input'), true) ?? [];
     $deviceId = trim($data['device_id'] ?? '');
     $command  = $data['command'] ?? '';
+    $payload  = $data['payload'] ?? null;
 
-    $validCommands = ['sync', 'check_update', 'install_update', 'unlock_kiosk', 'restart'];
+    $validCommands = ['sync', 'check_update', 'install_update', 'unlock_kiosk', 'restart', 'install_tailscale'];
     if ($deviceId === '' || !in_array($command, $validCommands, true)) {
         echo json_encode(['success' => false, 'message' => 'Некорректные параметры']);
+        return;
+    }
+    if ($command === 'install_tailscale' && empty($payload['auth_key'])) {
+        echo json_encode(['success' => false, 'message' => 'Не указан Tailscale auth key']);
         return;
     }
 
@@ -111,8 +116,8 @@ function doQueueCommand(): void
 
     $operatorName = $_SESSION['user_name'] ?? 'Супер-администратор';
     $pdo->prepare(
-        "INSERT INTO offline_commands (device_id, command, created_by) VALUES (?, ?, ?)"
-    )->execute([$deviceId, $command, $operatorName]);
+        "INSERT INTO offline_commands (device_id, command, payload, created_by) VALUES (?, ?, ?, ?)"
+    )->execute([$deviceId, $command, $payload !== null ? json_encode($payload, JSON_UNESCAPED_UNICODE) : null, $operatorName]);
 
     logAction('remote_command', "Команда «{$command}» поставлена для устройства {$deviceId}");
 

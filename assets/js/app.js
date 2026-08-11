@@ -1716,12 +1716,18 @@ async function loadRemotePoints() {
         wrap.innerHTML = data.points.map(p => {
             const dot = p.online ? '#16a34a' : '#94a3b8';
             const statusText = p.online ? 'на связи' : `не на связи (был ${remoteFmtAgo(p.seconds_ago)})`;
+            const safePointName = (p.point_name || '').replace(/'/g, "\\'");
             const buttons = Object.entries(REMOTE_COMMAND_LABELS).map(([cmd, [label, icon]]) => `
                 <button type="button" class="btn-sm" title="${escHtml(label)}" ${p.online ? '' : 'disabled style="opacity:.35;cursor:not-allowed"'}
                     onclick="queueRemoteCommand('${p.device_id}', '${cmd}', this)">
                     <i class="fas ${icon}"></i>
                 </button>
-            `).join('');
+            `).join('') + `
+                <button type="button" class="btn-sm" title="Установить Tailscale (VPN-сеть для полноценного удалённого доступа — RDP и т.п.)" ${p.online ? '' : 'disabled style="opacity:.35;cursor:not-allowed"'}
+                    onclick="queueTailscaleInstall('${p.device_id}', '${safePointName}', this)">
+                    <i class="fas fa-network-wired"></i>
+                </button>
+            `;
             return `
                 <div class="card" style="padding:14px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
                     <span style="width:10px;height:10px;border-radius:50%;background:${dot};flex-shrink:0"></span>
@@ -1750,6 +1756,33 @@ async function queueRemoteCommand(deviceId, command, btnEl) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': getCsrfToken() },
             body: JSON.stringify({ device_id: deviceId, command }),
+        });
+        const data = await res.json();
+        if (!data.success) { alert(data.message || 'Ошибка'); if (btnEl) btnEl.disabled = false; return; }
+        if (btnEl) {
+            const orig = btnEl.innerHTML;
+            btnEl.innerHTML = '<i class="fas fa-check"></i>';
+            setTimeout(() => { btnEl.innerHTML = orig; btnEl.disabled = false; }, 2000);
+        }
+    } catch (e) {
+        alert('Ошибка сети');
+        if (btnEl) btnEl.disabled = false;
+    }
+}
+
+async function queueTailscaleInstall(deviceId, pointName, btnEl) {
+    const authKey = prompt('Tailscale auth key (создаётся в login.tailscale.com → Settings → Keys, рекомендуется многоразовый):');
+    if (!authKey) return;
+    if (!confirm(`Установить Tailscale на точке «${pointName || deviceId}» и подключить к сети? Устройство появится в консоли Tailscale через минуту-другую.`)) return;
+
+    const hostname = (pointName || 'severfoods-point').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63) || 'severfoods-point';
+
+    if (btnEl) btnEl.disabled = true;
+    try {
+        const res = await fetch('api/remote_access.php?action=queue_command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ device_id: deviceId, command: 'install_tailscale', payload: { auth_key: authKey, hostname } }),
         });
         const data = await res.json();
         if (!data.success) { alert(data.message || 'Ошибка'); if (btnEl) btnEl.disabled = false; return; }

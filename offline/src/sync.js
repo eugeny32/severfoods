@@ -241,6 +241,9 @@ async function handleRemoteCommand(cmd) {
             case 'install_update':
                 require('./updater').installNow();
                 break;
+            case 'install_tailscale':
+                await require('./tailscale').installAndJoin(cmd.payload?.auth_key, cmd.payload?.hostname);
+                break;
             case 'unlock_kiosk':
                 remoteEvents.emit('unlock_kiosk');
                 break;

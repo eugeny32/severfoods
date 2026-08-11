@@ -1208,6 +1208,21 @@ function renderSettings() {
             <p class="setting-note">Изменения применятся после перезапуска приложения.</p>
         `);
 
+        // 5b. Super admin: Tailscale (VPN-сеть для полноценного удалённого доступа — RDP и т.п.)
+        grid.innerHTML += card('Удалённая сеть (Tailscale)', 'network-wired', `
+            <div class="setting-row"><label>Статус</label><span id="tsStatus">—</span></div>
+            <div class="setting-row"><label>Адрес в сети</label><span id="tsIp">—</span></div>
+            <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:5px">
+                <label>Tailscale auth key</label>
+                <input id="tsAuthKey" class="setting-input mono" type="text" placeholder="tskey-auth-...">
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <button class="btn-primary" onclick="installTailscale()" id="tsInstallBtn"><i class="fas fa-plug"></i> Установить и подключить</button>
+                <span class="settings-save-msg" id="tsMsg"></span>
+            </div>
+            <p class="setting-note">Ключ создаётся в консоли Tailscale (login.tailscale.com → Settings → Keys), рекомендуется многоразовый (reusable). Установка службы Windows потребует один запрос на подтверждение прав (UAC) — это делает сама Windows, не наше приложение.</p>
+        `);
+
         // 6. Super admin: App info
         grid.innerHTML += card('Система', 'server', `
             <div class="setting-row"><label>Версия приложения</label><span id="setVersion">—</span></div>
@@ -1266,6 +1281,7 @@ function renderSettings() {
         if (isSA) {
             if (el('cfgSyncUrl'))   el('cfgSyncUrl').value   = d.sync_url   || '';
             if (el('cfgSyncToken')) el('cfgSyncToken').value = d.sync_token || '';
+            loadTailscaleStatus();
         }
         if (d.tz_offset) { TZ_OFFSET = d.tz_offset; loadTodayStats(); }
     }).catch(()=>{});
@@ -1354,6 +1370,50 @@ async function saveSyncConfig() {
     const msg  = document.getElementById('cfgSaveMsg');
     if (msg) { msg.style.display = ''; setTimeout(() => { msg.style.display = 'none'; }, 3000); }
     if (!data.ok) alert(data.error || 'Ошибка сохранения');
+}
+
+// ── Tailscale (удалённая сеть) ──────────────────────────────
+async function loadTailscaleStatus() {
+    const statusEl = document.getElementById('tsStatus');
+    const ipEl     = document.getElementById('tsIp');
+    if (!statusEl) return;
+    try {
+        const d = await fetch('/api/tailscale/status').then(r => r.json());
+        if (!d.installed) { statusEl.textContent = 'Не установлен'; ipEl.textContent = '—'; return; }
+        statusEl.textContent = d.running ? '✅ Подключён' : '⚠️ Установлен, не подключён';
+        ipEl.textContent = d.ip || '—';
+    } catch (e) {
+        statusEl.textContent = 'Ошибка проверки';
+    }
+}
+
+async function installTailscale() {
+    const authKey = document.getElementById('tsAuthKey')?.value.trim();
+    if (!authKey) { alert('Укажите auth key из консоли Tailscale'); return; }
+    if (!confirm('Установить Tailscale на этот компьютер и подключить к сети? Потребуется один запрос на подтверждение прав администратора (UAC) — подтвердите его, когда он появится.')) return;
+
+    const btn = document.getElementById('tsInstallBtn');
+    const msg = document.getElementById('tsMsg');
+    if (btn) btn.disabled = true;
+    if (msg) msg.textContent = 'Устанавливаю… это может занять минуту';
+    try {
+        const hostname = (currentUser?.selected_point_name || currentUser?.assigned_point_name || 'severfoods-point')
+            .toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63) || 'severfoods-point';
+        const res = await fetch('/api/tailscale/install', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ auth_key: authKey, hostname }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Ошибка установки');
+        if (msg) msg.textContent = '✅ Подключено';
+        loadTailscaleStatus();
+    } catch (e) {
+        if (msg) msg.textContent = '';
+        alert('Ошибка: ' + e.message);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
 }
 
 // ── Автообновление ──────────────────────────────────────────
