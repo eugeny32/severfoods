@@ -115,4 +115,26 @@ function getStatus() {
     });
 }
 
-module.exports = { isInstalled, installAndJoin, getStatus };
+/**
+ * Автоподключение при старте приложения, если в локальном .env этой машины
+ * задан TAILSCALE_AUTH_KEY — тогда точку не нужно подключать вручную через
+ * Настройки при каждой переустановке/новой машине. Ключ НЕ хранится в коде
+ * и не попадает в git — только в .env конкретной машины, рядом с
+ * OFFLINE_SYNC_TOKEN (тот же принцип, см. main.js writeEnvFile/readEnvFile).
+ * Тихая, не блокирующая запуск приложения операция — ошибки только логируются.
+ */
+async function autoJoinFromEnv(hostname) {
+    const authKey = process.env.TAILSCALE_AUTH_KEY;
+    if (!authKey) return;
+    try {
+        const status = await getStatus();
+        if (status.running) return; // уже подключено — ничего не делаем
+        console.log('[tailscale] TAILSCALE_AUTH_KEY найден в .env — подключаю…');
+        await installAndJoin(authKey, hostname);
+        console.log('[tailscale] Подключено');
+    } catch (e) {
+        console.error('[tailscale] Автоподключение не удалось:', e.message);
+    }
+}
+
+module.exports = { isInstalled, installAndJoin, getStatus, autoJoinFromEnv };

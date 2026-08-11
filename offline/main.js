@@ -19,10 +19,11 @@ function loadEnv(dir) {
 if (!loadEnv(exeDir)) loadEnv(__dirname);
 
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
-const db      = require('./src/db');
-const server  = require('./src/server');
-const sync    = require('./src/sync');
-const updater = require('./src/updater');
+const db        = require('./src/db');
+const server    = require('./src/server');
+const sync      = require('./src/sync');
+const updater   = require('./src/updater');
+const tailscale = require('./src/tailscale');
 
 const PORT = 3847;
 
@@ -245,6 +246,7 @@ ipcMain.handle('setup-finish', async () => {
         await server.start(PORT);
         sync.init();
         updater.init();
+        tailscale.autoJoinFromEnv().catch(() => {}); // тихо, не блокирует запуск
         createWindow();
     } else {
         restoreKiosk();
@@ -280,6 +282,7 @@ app.whenReady().then(async () => {
         await server.start(PORT);
         sync.init();
         updater.init();
+        tailscale.autoJoinFromEnv().catch(() => {}); // тихо, не блокирует запуск
         createWindow();
         // Трей НЕ создаём здесь намеренно — пока приложение заблокировано
         // (kioskLocked), тея-иконки с пунктом "Выход" быть не должно, иначе
