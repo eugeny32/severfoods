@@ -7,4 +7,6 @@ contextBridge.exposeInMainWorld('electron', {
     updateStatus:    () => ipcRenderer.invoke('update-status'),
     updateCheckNow:  () => ipcRenderer.invoke('update-check-now'),
     updateInstallNow:() => ipcRenderer.invoke('update-install-now'),
+
+    kioskUnlock: () => ipcRenderer.invoke('kiosk-unlock'),
 });

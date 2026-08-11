@@ -435,6 +435,40 @@ function updateMealTypeAuto() {
 // Refresh meal type every minute
 setInterval(updateMealTypeAuto, 60000);
 
+// ── Скрытый жест разблокировки киоска: 10 кликов по блоку типа питания ──
+// Единственный штатный способ свернуть приложение на рабочий стол — иначе
+// заблокировано (полноэкранный киоск-режим, Alt+F4/сворачивание отключены,
+// см. offline/main.js). Клики должны идти достаточно часто (не более 1.2с
+// между кликами) — иначе счётчик сбрасывается, чтобы случайные редкие тапы
+// по этому месту экрана не разблокировали приложение по ошибке.
+(function initKioskUnlockGesture() {
+    const GESTURE_CLICKS   = 10;
+    const GESTURE_GAP_MS   = 1200;
+    let clickCount = 0;
+    let lastClickAt = 0;
+
+    function attach() {
+        const el = document.getElementById('mealTypeAuto');
+        if (!el || !window.electron?.kioskUnlock) return;
+        el.addEventListener('click', () => {
+            const now = Date.now();
+            if (now - lastClickAt > GESTURE_GAP_MS) clickCount = 0;
+            lastClickAt = now;
+            clickCount++;
+            if (clickCount >= GESTURE_CLICKS) {
+                clickCount = 0;
+                window.electron.kioskUnlock();
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attach);
+    } else {
+        attach();
+    }
+})();
+
 // ── Scanner ────────────────────────────────────────────────
 function startScanner() {
     if (scannerActive) return;

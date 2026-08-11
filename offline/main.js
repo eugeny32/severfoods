@@ -29,6 +29,12 @@ const PORT = 3847;
 let mainWindow  = null;
 let setupWindow = null;
 let tray        = null;
+// Киоск-режим: пока true — окно развёрнуто на весь экран без рамки,
+// свернуть на рабочий стол нельзя штатными средствами (Alt+F4, закрытие,
+// сворачивание) — только через скрытый жест (10 кликов по блоку типа
+// питания в самом приложении, см. public/assets/app.js). Взводится заново
+// при каждом восстановлении окна из трея.
+let kioskLocked = true;
 
 Menu.setApplicationMenu(null);
 
@@ -89,6 +95,7 @@ function createSetupWindow() {
 // ── Main window ───────────────────────────────────────────
 
 function createWindow() {
+    kioskLocked = true;
     mainWindow = new BrowserWindow({
         width:  1180,
         height: 720,
@@ -97,6 +104,11 @@ function createWindow() {
         icon: path.join(__dirname, 'public/assets/img/icon.ico'),
         title: 'СеверФудс',
         show: false,
+        fullscreen: true,
+        kiosk: true,
+        frame: false,
+        autoHideMenuBar: true,
+        skipTaskbar: true,
         backgroundColor: '#17212b',
         webPreferences: {
             nodeIntegration: false,
@@ -107,26 +119,72 @@ function createWindow() {
     });
 
     mainWindow.loadURL(`http://localhost:${PORT}/`);
-    mainWindow.once('ready-to-show', () => { mainWindow.show(); });
-    mainWindow.on('close', (e) => { if (tray) { e.preventDefault(); mainWindow.hide(); } });
+    mainWindow.once('ready-to-show', () => { mainWindow.show(); mainWindow.setAlwaysOnTop(true, 'screen-saver'); });
+
+    // Пока заблокировано — не даём ни закрыть (Alt+F4), ни свернуть иным
+    // способом, кроме скрытого жеста. Единственный "легальный" путь наружу —
+    // requestUnlock() через IPC (см. ниже), инициируемый 10 кликами в UI.
+    mainWindow.on('close', (e) => {
+        if (kioskLocked) { e.preventDefault(); return; }
+        if (tray) { e.preventDefault(); mainWindow.hide(); }
+    });
+    // Если фокус вдруг ушёл с окна (например, системный диалог или удачный
+    // Alt+Tab) — пока заблокировано, агрессивно возвращаем фокус и киоск.
+    mainWindow.on('blur', () => {
+        if (!kioskLocked || !mainWindow) return;
+        setTimeout(() => {
+            if (kioskLocked && mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.setKiosk(true);
+                mainWindow.show();
+                mainWindow.focus();
+            }
+        }, 50);
+    });
     mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+/** Разблокировка по жесту из UI — сворачивает окно на рабочий стол. */
+function unlockAndMinimize() {
+    if (!mainWindow) return;
+    kioskLocked = false;
+    mainWindow.setAlwaysOnTop(false);
+    mainWindow.setKiosk(false);
+    mainWindow.setFullScreen(false);
+    mainWindow.minimize();
+    createTray(); // без трея свернутое окно было бы негде открыть обратно
+}
+
+/** Восстановление из трея — снова разворачиваем в киоск. */
+function restoreKiosk() {
+    if (!mainWindow) return;
+    mainWindow.show();
+    mainWindow.setFullScreen(true);
+    mainWindow.setKiosk(true);
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    mainWindow.focus();
+    kioskLocked = true;
+}
+
 function createTray() {
+    if (tray) return; // уже создан — не плодим вторую иконку
     const imgPath = path.join(__dirname, 'public/assets/tray.png');
     const img = fs.existsSync(imgPath)
         ? nativeImage.createFromPath(imgPath)
         : nativeImage.createEmpty();
     tray = new Tray(img);
     tray.setToolTip('SeverFoods Offline');
-    tray.on('click', () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } });
+    tray.on('click', () => restoreKiosk());
+    // Трей появляется ТОЛЬКО после разблокировки жестом (см. unlockAndMinimize) —
+    // "Выход"/"Настройки" тем самым недоступны обычному оператору, пока он не
+    // сделал 10 кликов по блоку типа питания. Открыть/восстановить окно можно
+    // всегда — это не обход блокировки, а просто способ вернуться в киоск.
     tray.setContextMenu(Menu.buildFromTemplate([
-        { label: 'Открыть',              click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
+        { label: 'Открыть',              click: () => restoreKiosk() },
         { label: 'Синхронизировать',     click: () => sync.runSync() },
         { label: 'Проверить обновления', click: () => updater.checkNow() },
         { label: 'Настройки',            click: () => openSettings() },
         { type: 'separator' },
-        { label: 'Выход',                click: () => { tray = null; app.quit(); } },
+        { label: 'Выход',                click: () => { tray.destroy(); tray = null; app.quit(); } },
     ]));
 }
 
@@ -144,6 +202,11 @@ ipcMain.handle('open-settings', ()    => { openSettings(); });
 ipcMain.handle('update-status',    ()      => updater.getStatus());
 ipcMain.handle('update-check-now', async () => { await updater.checkNow(); return updater.getStatus(); });
 ipcMain.handle('update-install-now', ()    => { updater.installNow(); });
+
+// Скрытый жест (10 кликов по блоку типа питания) из renderer — см.
+// public/assets/app.js. Единственный штатный способ свернуть киоск на
+// рабочий стол.
+ipcMain.handle('kiosk-unlock', () => { unlockAndMinimize(); return { ok: true }; });
 
 // Setup window handlers
 ipcMain.handle('setup-save', async (_, { token, serverUrl }) => {
@@ -170,10 +233,8 @@ ipcMain.handle('setup-finish', async () => {
         sync.init();
         updater.init();
         createWindow();
-        createTray();
     } else {
-        mainWindow.show();
-        mainWindow.focus();
+        restoreKiosk();
         sync.runSync();
     }
 });
@@ -185,6 +246,18 @@ ipcMain.handle('setup-get-current', () => ({
 
 // ── App startup ───────────────────────────────────────────
 
+// Автозапуск при включении/перезагрузке компьютера — точка питания должна
+// поднимать приложение сама, без участия оператора.
+if (process.platform === 'win32') {
+    try {
+        app.setLoginItemSettings({
+            openAtLogin: true,
+            path: process.execPath,
+            args: [],
+        });
+    } catch (e) { /* не критично, если не удалось (например, в dev-режиме) */ }
+}
+
 app.whenReady().then(async () => {
     if (needsSetup()) {
         // First launch or missing token — show setup before main app
@@ -195,7 +268,10 @@ app.whenReady().then(async () => {
         sync.init();
         updater.init();
         createWindow();
-        createTray();
+        // Трей НЕ создаём здесь намеренно — пока приложение заблокировано
+        // (kioskLocked), тея-иконки с пунктом "Выход" быть не должно, иначе
+        // это был бы обход блокировки в обход скрытого жеста. Трей появляется
+        // только после unlockAndMinimize().
     }
 });
 
