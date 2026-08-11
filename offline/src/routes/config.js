@@ -51,7 +51,7 @@ router.get('/', (req, res) => {
     const env = readEnv();
     res.json({
         ok: true,
-        sync_url:   env.OFFLINE_SYNC_URL   || 'https://www.severfoods.ru/api/offline_sync.php',
+        sync_url:   (env.SERVER_URL ? env.SERVER_URL.replace(/\/$/, '') + '/api/offline_sync.php' : 'https://www.severfoods.ru/api/offline_sync.php'),
         sync_token: env.OFFLINE_SYNC_TOKEN || '',
         tz_offset:  tz.getTzOffset(),
         version:    process.env.npm_package_version || '1.0.0',
@@ -64,7 +64,15 @@ router.get('/', (req, res) => {
 // POST /api/config — update sync_url and/or sync_token and/or tz_offset
 router.post('/', (req, res) => {
     const { sync_url, sync_token, tz_offset } = req.body || {};
-    if (sync_url  !== undefined) writeEnvKey('OFFLINE_SYNC_URL',   sync_url);
+    if (sync_url !== undefined) {
+        // Поле в UI показывает полный URL до offline_sync.php, а реальный код
+        // синхронизации (sync.js/routes/auth.js) читает SERVER_URL как ГОЛЫЙ
+        // адрес сервера и сам достраивает /api/offline_sync.php — приводим
+        // к этому виду перед записью, иначе ключ снова стал бы "молчаливо" не
+        // тем, что реально используется.
+        const base = sync_url.trim().replace(/\/api\/offline_sync\.php\/?$/, '').replace(/\/$/, '');
+        writeEnvKey('SERVER_URL', base);
+    }
     if (sync_token !== undefined) writeEnvKey('OFFLINE_SYNC_TOKEN', sync_token);
     if (tz_offset !== undefined) {
         if (!tz.setTzOffset(tz_offset)) {

@@ -1,7 +1,24 @@
 const fetch = require('node-fetch');
+const crypto = require('crypto');
+const { EventEmitter } = require('events');
 const db    = require('./db');
+const APP_VERSION = require('../package.json').version;
 
-const BASE_URL    = 'https://www.severfoods.ru/api/offline_sync.php';
+// Команды удалённого доступа (см. api/remote_access.php), пришедшие с
+// heartbeat, разбираются здесь и пробрасываются наверх событиями —
+// main.js подписывается на 'unlock_kiosk'/'restart' (там есть ссылка на
+// окно/app), остальное (sync/проверка и установка обновления) выполняется
+// прямо тут же, без участия main.js.
+const remoteEvents = new EventEmitter();
+
+// ВАЖНО: адрес сервера читается заново при каждом запросе (не кэшируется в
+// константе при загрузке модуля) — иначе смена SERVER_URL в настройках (для
+// точек другого региона, например nrg.severfoods.ru) не подхватывалась бы
+// без перезапуска приложения, и запросы продолжали бы уходить не туда.
+function getBaseUrl() {
+    return (process.env.SERVER_URL || 'https://www.severfoods.ru').replace(/\/$/, '')
+        + '/api/offline_sync.php';
+}
 const SYNC_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
 let _status = {
@@ -38,7 +55,7 @@ const TIMEOUT_DEFAULT = 45000;
 const TIMEOUT_PUSH    = 120000; // отправка накопленных офлайн-записей — самый тяжёлый запрос
 
 async function api(action, opts = {}) {
-    const url    = `${BASE_URL}?action=${action}`;
+    const url    = `${getBaseUrl()}?action=${action}`;
     const method = opts.method || 'GET';
     const body   = opts.body ? JSON.stringify(opts.body) : undefined;
     const since  = opts.since ? `&since=${encodeURIComponent(opts.since)}` : '';
@@ -155,6 +172,91 @@ async function networkMonitorLoop() {
         console.log('[sync] Network restored — triggering sync');
         await runSync();
     }
+
+    if (isNow) sendHeartbeat().catch(() => {}); // тихо — heartbeat не критичен
+}
+
+// ── Удалённый доступ супер-администратора (см. api/remote_access.php) ──
+
+/** Устойчивый ID этого конкретного компьютера/установки — генерируется один
+ *  раз и хранится локально, переживает перезапуски приложения. */
+function getDeviceId() {
+    let id = db.getMeta('device_id');
+    if (!id) {
+        id = crypto.randomUUID();
+        db.setMeta('device_id', id);
+    }
+    return id;
+}
+
+function currentSessionInfo() {
+    const raw = db.getMeta('session');
+    if (!raw) return {};
+    try {
+        const sess = JSON.parse(raw);
+        const emp  = sess.employee || {};
+        return {
+            pointId:      emp.selected_point_id || emp.assigned_point_id || null,
+            pointName:    emp.selected_point_name || emp.assigned_point_name || null,
+            employeeName: emp.full_name || null,
+        };
+    } catch (_) { return {}; }
+}
+
+async function sendHeartbeat() {
+    const { pointId, pointName, employeeName } = currentSessionInfo();
+    const data = await api('heartbeat', {
+        method: 'POST',
+        body: {
+            device_id:     getDeviceId(),
+            point_id:      pointId,
+            point_name:    pointName,
+            employee_name: employeeName,
+            app_version:   APP_VERSION,
+        },
+    });
+    for (const cmd of (data.commands || [])) {
+        handleRemoteCommand(cmd); // не ждём — команды выполняются параллельно/в фоне
+    }
+}
+
+async function ackCommand(id, status, result) {
+    try {
+        await api('command_ack', { method: 'POST', body: { command_id: id, status, result: result || null } });
+    } catch (e) {
+        console.error('[remote] ack failed:', e.message);
+    }
+}
+
+async function handleRemoteCommand(cmd) {
+    console.log(`[remote] command: ${cmd.command} (id ${cmd.id})`);
+    try {
+        switch (cmd.command) {
+            case 'sync':
+                await runSync();
+                break;
+            case 'check_update':
+                await require('./updater').checkNow();
+                break;
+            case 'install_update':
+                require('./updater').installNow();
+                break;
+            case 'unlock_kiosk':
+                remoteEvents.emit('unlock_kiosk');
+                break;
+            case 'restart':
+                // Подтверждаем ДО перезапуска и с небольшой задержкой — иначе
+                // процесс может завершиться раньше, чем успеет уйти ack-запрос.
+                await ackCommand(cmd.id, 'done');
+                setTimeout(() => remoteEvents.emit('restart'), 500);
+                return;
+            default:
+                throw new Error(`Неизвестная команда: ${cmd.command}`);
+        }
+        await ackCommand(cmd.id, 'done');
+    } catch (e) {
+        await ackCommand(cmd.id, 'failed', e.message);
+    }
 }
 
 function init() {
@@ -178,11 +280,10 @@ function destroy() {
 }
 
 function reloadConfig() {
-    // Pick up new OFFLINE_SYNC_TOKEN / SERVER_URL from process.env after setup save
-    const newBase = (process.env.SERVER_URL || 'https://www.severfoods.ru').replace(/\/$/, '')
-        + '/api/offline_sync.php';
-    // Trigger a fresh sync with the new token
+    // OFFLINE_SYNC_TOKEN / SERVER_URL уже обновлены в process.env к этому моменту
+    // (см. main.js writeEnvFile) — getBaseUrl()/api() подхватят их на следующий же
+    // запрос сами, здесь просто триггерим свежую синхронизацию.
     setTimeout(runSync, 500);
 }
 
-module.exports = { init, destroy, runSync, getStatus, reloadConfig };
+module.exports = { init, destroy, runSync, getStatus, reloadConfig, remoteEvents, getDeviceId };

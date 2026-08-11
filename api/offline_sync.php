@@ -46,6 +46,8 @@ switch ($action) {
     case 'push':       doPush();       break;
     case 'auth':       doAuth();           break;
     case 'mobile_chat_login': doMobileChatLogin(); break;
+    case 'heartbeat':    doHeartbeat();   break;
+    case 'command_ack':  doCommandAck();  break;
     default:
         http_response_code(400);
         echo json_encode(['error' => 'Unknown action']);
@@ -63,6 +65,128 @@ function doPing(): void
         'server'  => 'severfoods.ru',
         'version' => APP_VERSION,
     ]);
+}
+
+// ─── Удалённый доступ супер-администратора (см. api/remote_access.php) ──
+// Точка периодически (каждые ~30с, см. offline/src/sync.js) сообщает
+// "я жива" + получает в ответ очередь команд, поставленных админом через
+// веб-интерфейс (запустить синхронизацию, проверить/установить обновление,
+// разблокировать киоск, перезапустить). Никакого входящего соединения к
+// точке не требуется — вся связь инициируется точкой (poll), это работает
+// даже если точка за NAT/файрволом без белого IP.
+
+function ensureRemoteAccessTables(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS offline_presence (
+            device_id     VARCHAR(64) NOT NULL PRIMARY KEY,
+            point_id      INT DEFAULT NULL,
+            point_name    VARCHAR(255) DEFAULT NULL,
+            employee_name VARCHAR(255) DEFAULT NULL,
+            app_version   VARCHAR(20) DEFAULT NULL,
+            ip_address    VARCHAR(64) DEFAULT NULL,
+            last_seen_at  DATETIME DEFAULT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (PDOException $e) {}
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS offline_commands (
+            id          INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            device_id   VARCHAR(64) NOT NULL,
+            command     VARCHAR(30) NOT NULL,
+            payload     TEXT DEFAULT NULL,
+            status      VARCHAR(20) NOT NULL DEFAULT 'pending',
+            result      TEXT DEFAULT NULL,
+            created_by  VARCHAR(100) DEFAULT NULL,
+            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+            executed_at DATETIME DEFAULT NULL,
+            INDEX idx_device_status (device_id, status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (PDOException $e) {}
+}
+
+function doHeartbeat(): void
+{
+    global $pdo;
+    ensureRemoteAccessTables($pdo);
+
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    $deviceId = trim($body['device_id'] ?? '');
+    if ($deviceId === '' || strlen($deviceId) > 64) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'device_id required']);
+        return;
+    }
+    $pointId      = isset($body['point_id']) && $body['point_id'] !== null ? (int)$body['point_id'] : null;
+    $pointName    = isset($body['point_name'])    ? mb_substr((string)$body['point_name'], 0, 255)    : null;
+    $employeeName = isset($body['employee_name']) ? mb_substr((string)$body['employee_name'], 0, 255) : null;
+    $appVersion   = isset($body['app_version'])   ? mb_substr((string)$body['app_version'], 0, 20)     : null;
+    $ip           = $_SERVER['REMOTE_ADDR'] ?? null;
+
+    $pdo->prepare(
+        "INSERT INTO offline_presence (device_id, point_id, point_name, employee_name, app_version, ip_address, last_seen_at)
+         VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())
+         ON DUPLICATE KEY UPDATE
+             point_id = VALUES(point_id), point_name = VALUES(point_name),
+             employee_name = VALUES(employee_name), app_version = VALUES(app_version),
+             ip_address = VALUES(ip_address), last_seen_at = VALUES(last_seen_at)"
+    )->execute([$deviceId, $pointId, $pointName, $employeeName, $appVersion, $ip]);
+
+    // Очередь команд для этого устройства — отдаём и сразу помечаем "выдано"
+    // (executed_at заполняется по факту ack от точки, а не тут; status
+    // остаётся 'pending' до ack, чтобы повторный heartbeat до ack не потерял
+    // команду, если точка не успела её выполнить между двумя heartbeat'ами
+    // — но и не выдаём её же второй раз, если она уже была отдана недавно).
+    $cmdStmt = $pdo->prepare(
+        "SELECT id, command, payload FROM offline_commands
+         WHERE device_id = ? AND status = 'pending'
+         ORDER BY created_at LIMIT 10"
+    );
+    $cmdStmt->execute([$deviceId]);
+    $commands = $cmdStmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($commands as &$c) {
+        $c['id'] = (int)$c['id'];
+        $c['payload'] = $c['payload'] !== null ? json_decode($c['payload'], true) : null;
+    }
+    unset($c);
+
+    // Отмечаем как "выдано" (status='sent'), чтобы не отдавать повторно
+    // каждые 30с, пока точка её ещё выполняет — ack (doCommandAck) переведёт
+    // в 'done'/'failed'. Если точка так и не отчиталась за 10 минут, считаем
+    // команду потерянной и снова отдаём (см. WHERE ниже) — самоисцеляющаяся
+    // очередь на случай разрыва связи прямо во время выполнения.
+    if ($commands) {
+        $ids = array_column($commands, 'id');
+        $ph  = implode(',', array_fill(0, count($ids), '?'));
+        $pdo->prepare("UPDATE offline_commands SET status = 'sent' WHERE id IN ($ph)")->execute($ids);
+    }
+    $pdo->prepare(
+        "UPDATE offline_commands SET status = 'pending'
+         WHERE device_id = ? AND status = 'sent' AND created_at < UTC_TIMESTAMP() - INTERVAL 10 MINUTE"
+    )->execute([$deviceId]);
+
+    echo json_encode(['ok' => true, 'commands' => $commands], JSON_UNESCAPED_UNICODE);
+}
+
+function doCommandAck(): void
+{
+    global $pdo;
+    ensureRemoteAccessTables($pdo);
+
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    $id     = (int)($body['command_id'] ?? 0);
+    $status = in_array($body['status'] ?? '', ['done', 'failed'], true) ? $body['status'] : 'failed';
+    $result = isset($body['result']) ? mb_substr((string)$body['result'], 0, 2000) : null;
+
+    if (!$id) { echo json_encode(['ok' => false, 'error' => 'command_id required']); return; }
+
+    $pdo->prepare(
+        "UPDATE offline_commands SET status = ?, result = ?, executed_at = UTC_TIMESTAMP() WHERE id = ?"
+    )->execute([$status, $result, $id]);
+
+    echo json_encode(['ok' => true]);
 }
 
 function doEmployees(): void

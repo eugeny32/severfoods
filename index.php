@@ -379,6 +379,7 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
             <?php if ($is_super_admin): ?>
             <button class="tab-btn" data-tab="tabChatUsers"><i class="fas fa-comments"></i> Пользователи чата</button>
             <button class="tab-btn" data-tab="tabDbMaint"><i class="fas fa-database"></i> Обслуживание БД</button>
+            <button class="tab-btn" data-tab="tabRemoteAccess"><i class="fas fa-satellite-dish"></i> Удалённый доступ</button>
             <?php endif; ?>
         </div>
 
@@ -809,6 +810,19 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                 </div>
                 <div id="dupList" style="margin-top:12px"></div>
             </div>
+        </div>
+
+        <!-- REMOTE ACCESS -->
+        <div id="tabRemoteAccess" class="tab-pane">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+                <p style="font-size:13px;color:var(--text-3);flex:1;min-width:240px;margin:0">
+                    Точки питания с запущенным оффлайн-приложением сами сообщают о себе серверу примерно раз в 30 секунд —
+                    список ниже отражает, кто сейчас на связи. Действия ставятся в очередь и выполняются точкой при следующем
+                    таком сеансе связи (обычно в пределах минуты).
+                </p>
+                <button type="button" class="btn btn-secondary" onclick="loadRemotePoints()"><i class="fas fa-rotate"></i> Обновить</button>
+            </div>
+            <div id="remotePointsList" style="display:flex;flex-direction:column;gap:10px"></div>
         </div>
         <?php endif; ?>
 

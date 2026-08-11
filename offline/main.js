@@ -38,6 +38,19 @@ let kioskLocked = true;
 
 Menu.setApplicationMenu(null);
 
+// ── Удалённый доступ супер-администратора (команды с сервера, см. sync.js) ──
+// 'unlock_kiosk' и 'restart' нуждаются в доступе к mainWindow/app, которого
+// нет у sync.js — поэтому обрабатываются здесь, через событие.
+sync.remoteEvents.on('unlock_kiosk', () => {
+    console.log('[remote] unlock_kiosk — сворачиваю на рабочий стол');
+    unlockAndMinimize();
+});
+sync.remoteEvents.on('restart', () => {
+    console.log('[remote] restart — перезапуск приложения');
+    app.relaunch();
+    app.exit(0);
+});
+
 // ── Check if setup is needed ──────────────────────────────
 
 function needsSetup() {

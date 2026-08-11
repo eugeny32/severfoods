@@ -1081,6 +1081,7 @@ document.addEventListener('DOMContentLoaded', () => {
             $$('.tab-pane').forEach(p => p.classList.remove('active'));
             btn.classList.add('active');
             $(target)?.classList.add('active');
+            if (target === 'tabRemoteAccess' && typeof loadRemotePoints === 'function') loadRemotePoints();
         });
     });
 
@@ -1672,5 +1673,93 @@ async function deleteSelectedDuplicates() {
         }
     } catch (e) {
         alert('Ошибка сети');
+    }
+}
+
+// ── Удалённый доступ (вкладка «Удалённый доступ», только супер-админ) ──
+
+const REMOTE_COMMAND_LABELS = {
+    sync:            ['Синхронизировать', 'fa-rotate'],
+    check_update:    ['Проверить обновление', 'fa-magnifying-glass'],
+    install_update:  ['Установить обновление', 'fa-download'],
+    unlock_kiosk:    ['Снять с киоска', 'fa-lock-open'],
+    restart:         ['Перезапустить', 'fa-power-off'],
+};
+const REMOTE_COMMAND_CONFIRM = {
+    install_update: 'Установить обновление на этой точке прямо сейчас (не дожидаясь ночного окна)? Приложение перезапустится.',
+    restart:        'Перезапустить приложение на этой точке? На несколько секунд сканирование станет недоступно.',
+    unlock_kiosk:   'Снять точку с киоск-режима и свернуть на рабочий стол? Обычно это делает оператор сам жестом — снимайте удалённо только если точно знаете, зачем.',
+};
+
+function remoteFmtAgo(sec) {
+    if (sec === null || sec === undefined) return '—';
+    if (sec < 60) return `${sec} с назад`;
+    if (sec < 3600) return `${Math.floor(sec / 60)} мин назад`;
+    return `${Math.floor(sec / 3600)} ч назад`;
+}
+
+async function loadRemotePoints() {
+    const wrap = document.getElementById('remotePointsList');
+    if (!wrap) return;
+    wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-3);font-size:13px"><i class="fas fa-spinner fa-spin"></i> Загрузка…</div>';
+    try {
+        const res = await fetch('api/remote_access.php?action=list', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        const data = await res.json();
+        if (!data.success) { wrap.innerHTML = `<div class="empty">${escHtml(data.message || 'Ошибка')}</div>`; return; }
+        if (!data.points.length) {
+            wrap.innerHTML = '<div class="empty" style="padding:20px;text-align:center;color:var(--text-3)">Ни одна точка ещё не выходила на связь</div>';
+            return;
+        }
+
+        wrap.innerHTML = data.points.map(p => {
+            const dot = p.online ? '#16a34a' : '#94a3b8';
+            const statusText = p.online ? 'на связи' : `не на связи (был ${remoteFmtAgo(p.seconds_ago)})`;
+            const buttons = Object.entries(REMOTE_COMMAND_LABELS).map(([cmd, [label, icon]]) => `
+                <button type="button" class="btn-sm" title="${escHtml(label)}" ${p.online ? '' : 'disabled style="opacity:.35;cursor:not-allowed"'}
+                    onclick="queueRemoteCommand('${p.device_id}', '${cmd}', this)">
+                    <i class="fas ${icon}"></i>
+                </button>
+            `).join('');
+            return `
+                <div class="card" style="padding:14px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+                    <span style="width:10px;height:10px;border-radius:50%;background:${dot};flex-shrink:0"></span>
+                    <div style="flex:1;min-width:220px">
+                        <div style="font-weight:700;font-size:14px">${escHtml(p.point_name || 'Точка не выбрана')}</div>
+                        <div style="font-size:12px;color:var(--text-3);margin-top:2px">
+                            ${escHtml(p.employee_name || '—')} · v${escHtml(p.app_version || '—')} · ${statusText}
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap" id="remoteBtns-${p.device_id}">${buttons}</div>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        wrap.innerHTML = '<div class="empty">Ошибка сети</div>';
+    }
+}
+
+async function queueRemoteCommand(deviceId, command, btnEl) {
+    const confirmMsg = REMOTE_COMMAND_CONFIRM[command];
+    if (confirmMsg && !confirm(confirmMsg)) return;
+
+    if (btnEl) btnEl.disabled = true;
+    try {
+        const res = await fetch('api/remote_access.php?action=queue_command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ device_id: deviceId, command }),
+        });
+        const data = await res.json();
+        if (!data.success) { alert(data.message || 'Ошибка'); if (btnEl) btnEl.disabled = false; return; }
+        if (btnEl) {
+            const orig = btnEl.innerHTML;
+            btnEl.innerHTML = '<i class="fas fa-check"></i>';
+            setTimeout(() => { btnEl.innerHTML = orig; btnEl.disabled = false; }, 2000);
+        }
+    } catch (e) {
+        alert('Ошибка сети');
+        if (btnEl) btnEl.disabled = false;
     }
 }

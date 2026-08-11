@@ -2,8 +2,14 @@ const router = require('express').Router();
 const fetch  = require('node-fetch');
 const db     = require('../db');
 
-// Use HTTPS explicitly to avoid HTTP→HTTPS redirect (which converts POST→GET)
-const SERVER_URL = 'https://www.severfoods.ru/api/offline_sync.php';
+// Use HTTPS explicitly to avoid HTTP→HTTPS redirect (which converts POST→GET).
+// Читаем process.env.SERVER_URL заново при каждом запросе (не константой при
+// загрузке модуля) — иначе смена сервера в настройках (например, для точки
+// другого региона) не подхватывалась бы без перезапуска приложения.
+function serverUrl() {
+    return (process.env.SERVER_URL || 'https://www.severfoods.ru').replace(/\/$/, '')
+        + '/api/offline_sync.php';
+}
 
 function syncToken() { return process.env.OFFLINE_SYNC_TOKEN || ''; }
 
@@ -25,7 +31,7 @@ router.post('/login', async (req, res) => {
 
     // Try server auth
     try {
-        const r = await fetch(`${SERVER_URL}?action=auth`, {
+        const r = await fetch(`${serverUrl()}?action=auth`, {
             method:  'POST',
             headers: {
                 'X-Sync-Token': syncToken(),
