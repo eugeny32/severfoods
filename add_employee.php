@@ -19,9 +19,25 @@ try { $pdo->exec("ALTER TABLE employees ADD COLUMN assigned_point_id INT DEFAULT
 $data = json_decode(file_get_contents('php://input'), true);
 if (!$data) { echo json_encode(['success' => false, 'message' => 'Нет данных']); exit; }
 
+$current_role = $_SESSION['role'] ?? 'admin';
+$is_super     = $current_role === 'super_admin';
+
 $full_name    = trim($data['full_name']    ?? '');
 $birth_date   = $data['birth_date']        ?? null;
-$organization = trim($data['organization'] ?? '');
+// Организацию свободно указывает только супер-администратор. Обычный
+// админ предприятия может добавлять сотрудников ТОЛЬКО в свою же
+// организацию (ту, что указана в его собственной карточке) — сколько бы
+// он ни прислал в запросе, подставляется его собственная.
+if ($is_super) {
+    $organization = trim($data['organization'] ?? '');
+} else {
+    $me = getEmployeeById($pdo, (int)($_SESSION['user_id'] ?? 0));
+    $organization = trim($me['organization'] ?? '');
+    if ($organization === '') {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'У вашей учётной записи не указана организация — обратитесь к супер-администратору']); exit;
+    }
+}
 $department   = trim($data['department']   ?? '');
 $position     = trim($data['position']     ?? '');
 $vjg_type     = trim($data['vjg_type']     ?? '');
@@ -47,8 +63,7 @@ if (!empty($errors)) {
 }
 
 // Только super_admin может назначать привилегированные роли
-$current_role = $_SESSION['role'] ?? 'admin';
-if ($current_role !== 'super_admin' && in_array($role, ['admin','super_admin'], true)) {
+if (!$is_super && in_array($role, ['admin','super_admin'], true)) {
     $role = null;
 }
 // Admin can only assign operator to their own point

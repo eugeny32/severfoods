@@ -9,4 +9,15 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['is_admin'])) {
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $emp = getEmployeeById($pdo, $id);
 if (!$emp) { http_response_code(404); echo json_encode(['error'=>'Not found']); exit; }
+
+// Обычный админ предприятия видит карточки только своей организации —
+// та же граница, что и в add_employee.php/update_employee.php.
+if (($_SESSION['role'] ?? '') !== 'super_admin') {
+    $me = getEmployeeById($pdo, (int)($_SESSION['user_id'] ?? 0));
+    $myOrg = trim($me['organization'] ?? '');
+    if ($myOrg === '' || trim($emp['organization'] ?? '') !== $myOrg) {
+        http_response_code(403); echo json_encode(['error'=>'Forbidden']); exit;
+    }
+}
+
 echo json_encode($emp, JSON_UNESCAPED_UNICODE);

@@ -770,9 +770,9 @@ function openAddModal() {
     $('empModalTitle').innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Добавление сотрудника';
     $('empForm').reset();
     $('editId').value = '';
-    $('regenerateQrRow')?.setAttribute('style','display:none');
     $('empIsActive').checked = true;
     fillOrgDatalist();
+    applyOrgFieldLock();
     openModal('empModal');
 }
 
@@ -780,6 +780,26 @@ function fillOrgDatalist() {
     const dl = document.getElementById('orgDatalist');
     if (!dl || !window.ORG_LIST) return;
     dl.innerHTML = window.ORG_LIST.map(o => `<option value="${o.replace(/"/g,'&quot;')}">`).join('');
+}
+
+// Обычный админ предприятия работает только со своей организацией — поле
+// заблокировано и уже проставлено сервером в window.myOrganization; сам
+// выбор недоступен ни при добавлении, ни при редактировании (сервер это
+// в любом случае перепроверяет — см. add_employee.php/update_employee.php,
+// это только для ясности интерфейса).
+function applyOrgFieldLock() {
+    const el = $('empOrg');
+    if (!el) return;
+    if (!window.isSuperAdmin && window.myOrganization) {
+        el.value = window.myOrganization;
+        el.readOnly = true;
+        el.style.background = 'var(--bg-deep, #f1f5f9)';
+        el.title = 'Вы можете добавлять/редактировать сотрудников только своей организации';
+    } else {
+        el.readOnly = false;
+        el.style.background = '';
+        el.title = '';
+    }
 }
 
 function openEditModal(id) {
@@ -791,6 +811,7 @@ function openEditModal(id) {
         $('empFullName').value  = emp.full_name || '';
         $('empBirthDate').value = emp.birth_date || '';
         $('empOrg').value       = emp.organization || '';
+        applyOrgFieldLock();
         $('empDept').value      = emp.department || '';
         $('empPos').value       = emp.position || '';
         $('empVjg').value       = emp.vjg_type || '';
@@ -801,7 +822,6 @@ function openEditModal(id) {
         if ($('empPointId')) $('empPointId').value = emp.assigned_point_id || '';
         const pg = $('pointSelectGroup');
         if (pg) pg.style.display = ['admin','operator','super_admin'].includes(emp.role || '') ? '' : 'none';
-        $('regenerateQrRow')?.removeAttribute('style');
         openModal('empModal');
     })
     .catch(() => alert('Ошибка загрузки данных сотрудника'));
@@ -835,7 +855,6 @@ document.addEventListener('DOMContentLoaded', () => {
             qr_status:       $('empQrStatus').value,
             is_active:       $('empIsActive').checked ? 1 : 0,
             role:            $('empRole')?.value || null,
-            regenerate_qr:   $('regenerateQr')?.checked || false,
             assigned_point_id: $('empPointId')?.value || null,
         };
         if (isEdit) data.id = parseInt(id);

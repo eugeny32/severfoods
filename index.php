@@ -18,6 +18,15 @@ if ($assigned_point_id) {
     $assigned_point_name = $ap['point_name'] ?? null;
 }
 
+// Обычный админ предприятия видит/добавляет/редактирует только сотрудников
+// своей организации (совпадающей с его собственной карточкой) — см.
+// add_employee.php/update_employee.php. Значение используется в интерфейсе,
+// чтобы заранее заблокировать поле "Организация", а не только на сервере.
+$my_organization = null;
+if ($is_admin && !$is_super_admin) {
+    $my_organization = trim(getEmployeeById($pdo, (int)($_SESSION['user_id'] ?? 0))['organization'] ?? '');
+}
+
 // Выход
 if (isset($_GET['logout'])) logout();
 
@@ -968,10 +977,6 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                     <input type="checkbox" id="empIsActive" checked>
                     <label for="empIsActive">Сотрудник активен (имеет доступ)</label>
                 </div>
-                <div class="checkbox-row" id="regenerateQrRow" style="display:none">
-                    <input type="checkbox" id="regenerateQr">
-                    <label for="regenerateQr"><i class="fas fa-sync-alt"></i> Перегенерировать QR-код</label>
-                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('empModal')">Отмена</button>
@@ -1060,6 +1065,7 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
 (function(){
     window.isAdmin          = <?= json_encode($is_admin) ?>;
     window.isSuperAdmin     = <?= json_encode($is_super_admin) ?>;
+    window.myOrganization   = <?= json_encode($my_organization) ?>;
     window.allEmployeesData = <?= json_encode($allEmployeesJson, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.orgStats         = <?= json_encode($orgStats,         JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.points           = <?= json_encode($points,           JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;

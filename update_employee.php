@@ -25,9 +25,29 @@ $id = intval($data['id']);
 $emp = getEmployeeById($pdo, $id);
 if (!$emp) { echo json_encode(['success' => false, 'message' => 'Сотрудник не найден']); exit; }
 
+$current_role = $_SESSION['role'] ?? 'admin';
+$is_super     = $current_role === 'super_admin';
+
+// Админ конкретного предприятия видит/редактирует только сотрудников СВОЕЙ
+// организации (той же, что указана в его собственной карточке) и не может
+// перенести сотрудника в другую организацию — это разрешено только
+// супер-администратору (см. ниже, "отношение к организации").
+$my_organization = null;
+if (!$is_super) {
+    $me = getEmployeeById($pdo, (int)($_SESSION['user_id'] ?? 0));
+    $my_organization = trim($me['organization'] ?? '');
+    if ($my_organization === '' || trim($emp['organization'] ?? '') !== $my_organization) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Можно редактировать только сотрудников своей организации']); exit;
+    }
+}
+
 $full_name    = trim($data['full_name']    ?? '');
 $birth_date   = $data['birth_date']        ?? null;
-$organization = trim($data['organization'] ?? '');
+// Организацию менять может только супер-администратор — обычный админ
+// всегда сохраняет ту же организацию, что была (и что совпадает с его
+// собственной, проверено выше), даже если в запросе прислано другое.
+$organization = $is_super ? trim($data['organization'] ?? '') : $emp['organization'];
 $department   = trim($data['department']   ?? '');
 $position     = trim($data['position']     ?? '');
 $vjg_type     = trim($data['vjg_type']     ?? '');
@@ -37,7 +57,6 @@ $qr_status    = in_array($data['qr_status'] ?? '', ['active','expired','blocked'
                 ? $data['qr_status'] : 'active';
 $is_active    = isset($data['is_active']) ? (int)(bool)$data['is_active'] : 1;
 $role         = !empty($data['role']) ? $data['role'] : null;
-$regen        = !empty($data['regenerate_qr']);
 $assigned_point_id = !empty($data['assigned_point_id']) ? intval($data['assigned_point_id']) : null;
 
 $errors = [];
@@ -49,8 +68,7 @@ if (!empty($errors)) {
 }
 
 // Только super_admin может менять привилегированные роли
-$current_role = $_SESSION['role'] ?? 'admin';
-if ($current_role !== 'super_admin' && $role !== $emp['role']) {
+if (!$is_super && $role !== $emp['role']) {
     $role = $emp['role'];
 }
 // Admin can only assign operator to their own point
@@ -62,8 +80,12 @@ if (!in_array($role, ['admin','operator','super_admin'], true)) {
     $assigned_point_id = null;
 }
 
-$qr_code = $regen ? generateUniqueQrCode() : $emp['qr_code'];
-if ($regen) logAction('regenerate_qr', "Перегенерирован QR для: {$full_name} (ID:{$id})");
+// QR-код (qr_code) НИКОГДА не меняется при редактировании — ни для админа,
+// ни для супер-администратора: карточка сотрудника должна оставаться
+// действительной и распознаваться и онлайн-, и офлайн-системой. Меняются
+// только записи в базе (ФИО, организация, статус и т.д.), сам физический
+// QR-код/карточка не перевыпускается.
+$qr_code = $emp['qr_code'];
 
 try {
     $pdo->prepare(
