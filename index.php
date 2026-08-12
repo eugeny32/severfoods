@@ -331,7 +331,7 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
                         <div style="display:flex;gap:6px;flex-shrink:0">
                             <button class="btn-sm green" title="Ручной пропуск"
                                 onclick="openManualModal(<?= $emp['id'] ?>,'<?= htmlspecialchars(addslashes($emp['full_name'])) ?>')"><i class="fas fa-sign-out-alt"></i></button>
-                            <?php if ($is_admin): ?>
+                            <?php if ($is_admin && ($is_super_admin || ($emp['role'] ?? '') !== 'super_admin')): ?>
                             <button class="btn-sm" title="Редактировать"
                                 onclick="openEditModal(<?= $emp['id'] ?>)"><i class="fas fa-pencil-alt"></i></button>
                             <?php endif; ?>

@@ -10,7 +10,19 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['is_admin'])) {
 $org_filter  = trim($_GET['org']  ?? '');
 $dep_filter  = trim($_GET['dep']  ?? '');
 
+$is_super_admin = ($_SESSION['role'] ?? '') === 'super_admin';
 $all_employees = getEmployees($pdo);
+
+// Защита от компрометации QR супер-администраторов: обычный админ не
+// видит и не печатает карточки супер-админов вообще, а карточки видит
+// только своей организации (та же граница, что и в get_employee.php).
+if (!$is_super_admin) {
+    $me = getEmployeeById($pdo, (int)($_SESSION['user_id'] ?? 0));
+    $myOrg = trim($me['organization'] ?? '');
+    $all_employees = array_values(array_filter($all_employees, function ($e) use ($myOrg) {
+        return ($e['role'] ?? '') !== 'super_admin' && trim($e['organization'] ?? '') === $myOrg;
+    }));
+}
 
 // Build org list from all employees
 $orgList = array_values(array_unique(array_filter(array_column($all_employees, 'organization'))));

@@ -2,9 +2,30 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/functions.php';
 
+// Раньше эта страница была доступна без авторизации вообще — любой, кто
+// знал ID сотрудника, мог получить его QR-код. Плюс отдельная защита от
+// компрометации QR супер-администратора: обычный админ не должен вообще
+// видеть/печатать карточку супер-админа (даже своей организации), а
+// карточки чужих организаций — не видит никто, кроме супер-админа.
+if (!isset($_SESSION['user_id']) || empty($_SESSION['is_admin'])) {
+    http_response_code(403); die('<p>Доступ запрещён</p>');
+}
+
 $id  = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $emp = getEmployeeById($pdo, $id);
 if (!$emp) { http_response_code(404); die('<p>Сотрудник не найден</p>'); }
+
+$is_super_admin = ($_SESSION['role'] ?? '') === 'super_admin';
+if (!$is_super_admin) {
+    if (($emp['role'] ?? '') === 'super_admin') {
+        http_response_code(403); die('<p>Доступ запрещён</p>');
+    }
+    $me = getEmployeeById($pdo, (int)($_SESSION['user_id'] ?? 0));
+    $myOrg = trim($me['organization'] ?? '');
+    if ($myOrg === '' || trim($emp['organization'] ?? '') !== $myOrg) {
+        http_response_code(403); die('<p>Доступ запрещён</p>');
+    }
+}
 
 require_once __DIR__ . '/print_card.php';
 $cardHtml = renderCard($emp, 260);

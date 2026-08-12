@@ -388,7 +388,7 @@ function getExpiringEmployees(PDO $pdo, int $days = 7): array
     // Используем prepare + биндинг — не строковую интерполяцию
     try {
         $stmt = $pdo->prepare(
-            "SELECT id, full_name, organization, qr_expires_at
+            "SELECT id, full_name, organization, qr_expires_at, role
              FROM employees
              WHERE is_active = 1 AND qr_expires_at IS NOT NULL
                AND qr_expires_at <= DATE_ADD(?, INTERVAL ? DAY)

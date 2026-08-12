@@ -34,6 +34,13 @@ $is_super     = $current_role === 'super_admin';
 // супер-администратору (см. ниже, "отношение к организации").
 $my_organization = null;
 if (!$is_super) {
+    // Защита от компрометации QR супер-администратора: карточку с ролью
+    // super_admin обычный админ не открывает и не редактирует ни при каких
+    // условиях, даже если формально числится в той же организации.
+    if (($emp['role'] ?? '') === 'super_admin') {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Недостаточно прав']); exit;
+    }
     $me = getEmployeeById($pdo, (int)($_SESSION['user_id'] ?? 0));
     $my_organization = trim($me['organization'] ?? '');
     if ($my_organization === '' || trim($emp['organization'] ?? '') !== $my_organization) {

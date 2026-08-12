@@ -412,15 +412,22 @@ function renderOrgRows(list) {
             ? '<div style="font-size:10px;color:#94a3b8;margin-top:2px">до ' + escHtml(e.qr_expires_at) + '</div>' : '';
 
         const safeName = escHtml(e.full_name).replace(/'/g, "\\'");
+        // Защита от компрометации QR супер-администратора: обычный админ не
+        // видит ни кнопку редактирования, ни печать QR для карточек с ролью
+        // super_admin (сервер эти запросы всё равно отклонит — см.
+        // get_employee.php/print_qr.php, — но кнопки прячем и в интерфейсе).
+        const canSeeCard = window.isSuperAdmin || e.role !== 'super_admin';
         let actions = '<button class="btn-sm green" title="Пропустить вручную"'
             + ' onclick="openManualFromOrg(' + e.id + ',\'' + safeName + '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>'
             + '<button class="btn-sm" title="Статистика питания"'
             + ' data-stats-id="' + e.id + '" data-stats-name="' + escHtml(e.full_name) + '">'
             + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8"/><line x1="12" y1="12" x2="12" y2="16"/></svg>'
-            + '</button>'
-            + '<a class="btn-sm" href="print_qr.php?id=' + e.id + '" target="_blank" title="Печать QR"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></a>';
+            + '</button>';
+        if (canSeeCard) {
+            actions += '<a class="btn-sm" href="print_qr.php?id=' + e.id + '" target="_blank" title="Печать QR"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></a>';
+        }
 
-        if (window.isAdmin) {
+        if (window.isAdmin && canSeeCard) {
             actions += '<button class="btn-sm" title="Редактировать"'
                 + ' onclick="closeModal(&quot;orgModal&quot;);openEditModal(' + e.id + ')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
         }
@@ -489,6 +496,8 @@ function renderEmployeeTable(list) {
         const statusClass = e.qr_status || 'active';
         const statusLabels = { active:'Активен', expired:'Истёк', blocked:'Заблок.' };
         const expiryWarn = e.expiry_status === 'expired' ? '<svg width="8" height="8" viewBox="0 0 24 24" style="color:#e53935"><circle cx="12" cy="12" r="10" fill="currentColor"/></svg>' : (e.expiry_status === 'warning' ? '<svg width="8" height="8" viewBox="0 0 24 24" style="color:#f59e0b"><circle cx="12" cy="12" r="10" fill="currentColor"/></svg>' : '');
+        // Защита от компрометации QR супер-администратора — см. renderOrgRows().
+        const canSeeCard = window.isSuperAdmin || e.role !== 'super_admin';
 
         return `
         <tr class="emp-row" data-emp-id="${e.id}" data-emp-name="${escHtml(e.full_name)}" style="cursor:pointer" title="Статистика питания">
@@ -508,8 +517,8 @@ function renderEmployeeTable(list) {
                     <button class="btn-sm" title="Статистика питания" data-stats-id="${e.id}" data-stats-name="${escHtml(e.full_name)}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
                     </button>
-                    <a class="btn-sm" href="print_qr.php?id=${e.id}" target="_blank" title="Печать QR" onclick="event.stopPropagation()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></a>
-                    ${window.isAdmin ? `
+                    ${canSeeCard ? `<a class="btn-sm" href="print_qr.php?id=${e.id}" target="_blank" title="Печать QR" onclick="event.stopPropagation()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></a>` : ''}
+                    ${window.isAdmin && canSeeCard ? `
                         <button class="btn-sm" title="Редактировать" onclick="openEditModal(${e.id});event.stopPropagation()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
                         ${window.isSuperAdmin ? `<button class="btn-sm danger" title="Удалить" onclick="openDeleteModal(${e.id},'${escHtml(e.full_name).replace(/'/g,"&#39;")}');event.stopPropagation()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></button>` : ''}
                     ` : ''}
