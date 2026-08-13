@@ -67,8 +67,26 @@ if ($is_super_admin) {
     $stats_title = $meal_point_name !== 'Не выбрана' ? htmlspecialchars($meal_point_name) : 'Сегодня';
 }
 
-// Сотрудники
+// Сотрудники.
+// Справочник уходит в HTML-код страницы (window.allEmployeesData ниже).
+// Раньше он содержал ФИО, дату рождения, работодателя, отдел, категорию и
+// цену питания ВСЕХ сотрудников ВСЕХ организаций — и получал его каждый
+// вошедший, включая оператора сканера. Это же обходило разграничение по
+// организациям, сделанное для администраторов.
+//
+// Список оператору всё же нужен: когда карта не читается, он находит
+// человека по фамилии и проводит вручную. Поэтому список остаётся, но
+// чувствительные поля из него вырезаются ниже (см. $allEmployeesJson) —
+// для ручного пропуска достаточно ФИО и отдела.
 $allEmployees = getEmployees($pdo);
+
+// Администратор предприятия видит только свою организацию (супер-админ — все).
+if ($is_admin && !$is_super_admin) {
+    $myOrg = currentUserOrganization($pdo);
+    $allEmployees = $myOrg === ''
+        ? []
+        : array_values(array_filter($allEmployees, fn($e) => trim($e['organization'] ?? '') === $myOrg));
+}
 
 // Чат-пользователи (только для суперадмина)
 $chatUsers = [];
@@ -114,9 +132,13 @@ if ($is_admin) {
     $topEmployees = getTopEmployees($pdo, 10, $assigned_point_id && !$is_super_admin ? $assigned_point_id : null);
 }
 
-// JSON для JS
+// JSON для JS.
+// Оператору отдаём только то, что нужно для ручного пропуска: ФИО, отдел,
+// статус карты. Дата рождения, работодатель, категория и цена питания —
+// персональные данные, для работы сканера не нужны и в код страницы не
+// попадают.
 $todayLocal = localToday();
-$allEmployeesJson = array_map(function($e) use ($todayLocal) {
+$allEmployeesJson = array_map(function($e) use ($todayLocal, $is_admin) {
     $today = $todayLocal;
     $expires = $e['qr_expires_at'];
     $expStatus = 'valid';
@@ -124,19 +146,28 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal) {
         if ($expires < $today) $expStatus = 'expired';
         elseif ($expires < date('Y-m-d', strtotime($today . ' +7 days'))) $expStatus = 'warning';
     }
-    return [
+    $row = [
         'id'           => (int)$e['id'],
         'full_name'    => trim($e['full_name']),
-        'birth_date'   => $e['birth_date'] ? date('d.m.Y', strtotime($e['birth_date'])) : '',
-        'organization' => trim($e['organization']),
         'department'   => trim($e['department'] ?? ''),
-        'vjg_type'     => trim($e['vjg_type'] ?? ''),
-        'price'        => $e['price'],
         'qr_status'    => $e['qr_status'],
         'qr_expires_at'=> $expires ? date('d.m.Y', strtotime($expires)) : null,
         'expiry_status'=> $expStatus,
         'role'         => $e['role'] ?? null,
     ];
+    if ($is_admin) {
+        $row['birth_date']   = $e['birth_date'] ? date('d.m.Y', strtotime($e['birth_date'])) : '';
+        $row['organization'] = trim($e['organization']);
+        $row['vjg_type']     = trim($e['vjg_type'] ?? '');
+        $row['price']        = $e['price'];
+    } else {
+        // Поля должны существовать — интерфейс их читает при отрисовке строк.
+        $row['birth_date']   = '';
+        $row['organization'] = trim($e['organization']); // нужен для группировки по организациям
+        $row['vjg_type']     = '';
+        $row['price']        = null;
+    }
+    return $row;
 }, $allEmployees);
 ?>
 <!DOCTYPE html>

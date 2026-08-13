@@ -2,7 +2,11 @@
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../functions.php';
 
+// Раньше хватало любой сессии: оператор мог по ?id= получить историю питания
+// ЛЮБОГО сотрудника любой организации. Теперь — только администраторы и
+// только по своей организации (см. canAccessEmployeeCard).
 if (!isset($_SESSION['user_id'])) { http_response_code(401); die(json_encode(['error'=>'Unauthorized'])); }
+if (empty($_SESSION['is_admin'])) { http_response_code(403); die(json_encode(['error'=>'Forbidden'])); }
 
 $id   = (int)($_GET['id'] ?? 0);
 $from = $_GET['from'] ?? date('Y-m-d', strtotime(localToday() . ' -30 days'));
@@ -12,6 +16,11 @@ if (!$id) { echo json_encode(['error'=>'No id']); exit; }
 
 $emp = getEmployeeById($pdo, $id);
 if (!$emp) { echo json_encode(['error'=>'Not found']); exit; }
+
+if (!canAccessEmployeeCard($pdo, $emp)) {
+    http_response_code(403);
+    die(json_encode(['error'=>'Forbidden']));
+}
 
 $scannedLocal = "CONVERT_TZ(ml.scanned_at, '+00:00', COALESCE(mpt.tz_offset, '" . APP_TZ_OFFSET . "'))";
 $stmt = $pdo->prepare("

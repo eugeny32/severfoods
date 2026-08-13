@@ -30,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $demoPass  = env('DEMO_ADMIN_PASS');
 
         if ($demoLogin && $demoPass && $login === $demoLogin && $password === $demoPass) {
+            session_regenerate_id(true); // защита от фиксации сессии
             $_SESSION['user_id']           = 0;
             $_SESSION['user_name']         = 'Администратор (демо)';
             $_SESSION['role']              = 'admin';
@@ -49,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $admin = $stmt->fetch();
 
         if ($admin) {
+            session_regenerate_id(true); // защита от фиксации сессии
             $_SESSION['user_id']           = $admin['id'];
             $_SESSION['user_name']         = $admin['full_name'];
             $_SESSION['role']              = $admin['role'];
@@ -86,6 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 if ($user) {
                     $is_admin = in_array($user['role'], ['admin', 'super_admin'], true);
+                    session_regenerate_id(true); // защита от фиксации сессии
                     $_SESSION['user_id']           = $user['id'];
                     $_SESSION['user_name']         = $user['full_name'];
                     $_SESSION['role']              = $user['role'];

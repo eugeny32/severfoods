@@ -1534,7 +1534,7 @@ async function addRation() {
 
     const d = await fetch('api/dry_rations.php', {
         method: 'POST',
-        headers: { 'Content-Type':'application/json' },
+        headers: { 'Content-Type':'application/json', 'X-CSRF-Token': getCsrfToken() },
         body: JSON.stringify({ employee_id: _empStatsId, ration_date_from: dateFrom, ration_date_to: dateTo, ration_type: type, from, to }),
     }).then(r=>r.json()).catch(()=>({ok:false,error:'Ошибка сети'}));
 
@@ -1544,7 +1544,10 @@ async function addRation() {
 }
 
 async function deleteRation(id) {
-    const d = await fetch(`api/dry_rations.php?id=${id}`, { method:'DELETE' }).then(r=>r.json()).catch(()=>({ok:false}));
+    const d = await fetch(`api/dry_rations.php?id=${id}`, {
+        method: 'DELETE',
+        headers: { 'X-CSRF-Token': getCsrfToken() },
+    }).then(r=>r.json()).catch(()=>({ok:false}));
     if (d.ok) loadEmpStats();
 }
 

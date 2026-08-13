@@ -513,6 +513,41 @@ function getPointTz(PDO $pdo, $meal_point_id): string
 
 // ─── Деконфликтинг: единая проверка дублей + межпроцессная блокировка ──
 
+// ─── Разграничение доступа к карточкам сотрудников ────────────────────
+// Единое правило для всех эндпоинтов, работающих с карточкой сотрудника
+// (get_employee.php, update_employee.php, employee_stats.php, dry_rations.php,
+// print_qr.php и т.д.), чтобы оно не расходилось между ними.
+
+/** Организация текущего пользователя (по его собственной карточке). */
+function currentUserOrganization(PDO $pdo): string
+{
+    static $cache = null;
+    if ($cache !== null) return $cache;
+    $me = getEmployeeById($pdo, (int)($_SESSION['user_id'] ?? 0));
+    return $cache = trim($me['organization'] ?? '');
+}
+
+/**
+ * Может ли текущий пользователь просматривать/редактировать карточку
+ * этого сотрудника?
+ *
+ * Правило: супер-администратор — любую; остальные — только своей
+ * организации и НИКОГДА карточку супер-администратора (защита QR высшего
+ * звена от компрометации).
+ *
+ * ВАЖНО: это правило про КАРТОЧКУ сотрудника (его данные), а не про выдачу
+ * питания. Проход через точку намеренно НЕ ограничен организацией — на одной
+ * точке питаются сотрудники разных организаций, и оператор обязан обслужить
+ * любого из них (см. manual_pass.php).
+ */
+function canAccessEmployeeCard(PDO $pdo, array $emp): bool
+{
+    if (($_SESSION['role'] ?? '') === 'super_admin') return true;
+    if (($emp['role'] ?? '') === 'super_admin') return false;
+    $myOrg = currentUserOrganization($pdo);
+    return $myOrg !== '' && trim($emp['organization'] ?? '') === $myOrg;
+}
+
 /**
  * Есть ли у сотрудника уже активная запись этого типа питания на указанную
  * местную дату (по часовому поясу точки, либо SERVER_TZ_OFFSET если точка

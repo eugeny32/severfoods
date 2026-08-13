@@ -4,7 +4,23 @@ require_once __DIR__ . '/../functions.php';
 
 header('Content-Type: application/json');
 
+// Раньше хватало любой сессии: оператор мог создать или удалить сухпай
+// ЛЮБОМУ сотруднику любой организации, причём без CSRF-защиты. Теперь —
+// только администраторы и только по своей организации (проверка карточки
+// ниже, после определения employee_id для конкретного метода).
 if (!isset($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'Unauthorized']); exit; }
+if (empty($_SESSION['is_admin']))  { http_response_code(403); echo json_encode(['ok'=>false,'error'=>'Forbidden']); exit; }
+
+/** Единая проверка доступа к карточке сотрудника для всех методов ниже. */
+function guardEmployeeAccess(PDO $pdo, int $empId): void
+{
+    $emp = getEmployeeById($pdo, $empId);
+    if (!$emp || !canAccessEmployeeCard($pdo, $emp)) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Forbidden']);
+        exit;
+    }
+}
 
 // Ensure table exists with status column
 try {
@@ -32,6 +48,7 @@ if ($method === 'GET') {
     $from  = $_GET['from'] ?? date('Y-m-d', strtotime(localToday() . ' -30 days'));
     $to    = $_GET['to']   ?? date('Y-m-d', strtotime(localToday() . ' +90 days'));
     if (!$empId) { echo json_encode(['ok'=>false,'error'=>'No employee_id']); exit; }
+    guardEmployeeAccess($pdo, $empId);
 
     $stmt = $pdo->prepare("SELECT id, ration_date, ration_type, status, created_at FROM dry_rations WHERE employee_id=? AND ration_date BETWEEN ? AND ? ORDER BY ration_date");
     $stmt->execute([$empId, $from, $to]);
@@ -60,6 +77,8 @@ if ($method === 'POST') {
 
     if (!$empId || !$dateFrom) { echo json_encode(['ok'=>false,'error'=>'Нет данных']); exit; }
     if ($dateTo < $dateFrom)   { echo json_encode(['ok'=>false,'error'=>'Дата «по» раньше «с»']); exit; }
+    Csrf::guard();
+    guardEmployeeAccess($pdo, $empId);
 
     $dates = [];
     $cur = new DateTime($dateFrom);
@@ -104,6 +123,17 @@ if ($method === 'POST') {
 if ($method === 'DELETE') {
     $id = (int)($_GET['id'] ?? 0);
     if (!$id) { echo json_encode(['ok'=>false,'error'=>'No id']); exit; }
+    Csrf::guard();
+
+    // Раньше строка удалялась по одному только id, без проверки, чья она —
+    // любой залогиненный мог удалить чужую запись. Сначала выясняем владельца
+    // и проверяем доступ к его карточке.
+    $own = $pdo->prepare("SELECT employee_id FROM dry_rations WHERE id=?");
+    $own->execute([$id]);
+    $ownerId = (int)$own->fetchColumn();
+    if (!$ownerId) { echo json_encode(['ok'=>false,'error'=>'Not found']); exit; }
+    guardEmployeeAccess($pdo, $ownerId);
+
     // Only allow deletion of active records
     $pdo->prepare("DELETE FROM dry_rations WHERE id=? AND status='active'")->execute([$id]);
     echo json_encode(['ok'=>true]);
