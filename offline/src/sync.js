@@ -87,18 +87,30 @@ async function checkOnline() {
     }
 }
 
+// Справочник приходит целиком, сотнями записей. Без пакетного режима каждая
+// строка вызывала бы полную перезапись файла базы (см. db.js: beginBatch).
 async function pullEmployees() {
     const data = await api('employees');
-    for (const e of data.employees) {
-        db.upsertEmployee(e);
+    db.beginBatch();
+    try {
+        for (const e of data.employees) {
+            db.upsertEmployee(e);
+        }
+    } finally {
+        db.endBatch(); // одна запись на диск вместо N
     }
     return data.employees.length;
 }
 
 async function pullMealPoints() {
     const data = await api('meal_points');
-    for (const p of data.meal_points) {
-        db.upsertMealPoint(p, p.schedules);
+    db.beginBatch();
+    try {
+        for (const p of data.meal_points) {
+            db.upsertMealPoint(p, p.schedules);
+        }
+    } finally {
+        db.endBatch();
     }
     return data.meal_points.length;
 }

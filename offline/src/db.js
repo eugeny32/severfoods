@@ -20,8 +20,32 @@ async function init() {
     _save();
 }
 
+// Пакетный режим. sql.js держит базу в памяти, а _save() сериализует её
+// ЦЕЛИКОМ и переписывает файл. При обычной работе это незаметно (несколько
+// записей в минуту), но синхронизация справочника вызывает upsertEmployee в
+// цикле — на 1000 сотрудников получалось 1000 полных перезаписей базы.
+// В пакетном режиме сохранение откладывается до конца операции: один проход
+// вместо тысячи.
+//
+// Одиночные записи (проход сотрудника) СОЗНАТЕЛЬНО сохраняются сразу, без
+// задержки: терминал могут просто обесточить, и отложенная запись означала бы
+// потерю уже проведённого питания.
+let _batchDepth   = 0;
+let _batchPending = false;
+
+function beginBatch() { _batchDepth++; }
+
+function endBatch() {
+    if (_batchDepth > 0) _batchDepth--;
+    if (_batchDepth === 0 && _batchPending) {
+        _batchPending = false;
+        _save();
+    }
+}
+
 function _save() {
     if (!db || !dbPath) return;
+    if (_batchDepth > 0) { _batchPending = true; return; }
     fs.writeFileSync(dbPath, Buffer.from(db.export()));
 }
 
@@ -232,4 +256,5 @@ module.exports = {
     upsertMealPoint, getMealPoints, updateSchedules,
     insertMealLog, getMealLogs, getUnsyncedLogs, markLogsSynced, hasTodayLog,
     getMeta, setMeta, getDbPath,
+    beginBatch, endBatch,
 };
