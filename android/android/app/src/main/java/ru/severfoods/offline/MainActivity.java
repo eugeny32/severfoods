@@ -54,7 +54,7 @@ public class MainActivity extends BridgeActivity {
 
     /** Возвращаем закрепление, если оператор вышел и вернулся в приложение. */
     @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
         pinScreen();
     }
