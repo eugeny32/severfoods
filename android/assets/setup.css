@@ -1,0 +1,88 @@
+/* Экран первичной настройки Android-версии (см. core/boot.js).
+   Отдельный файл, потому что появляется он ровно один раз в жизни планшета и
+   не должен зависеть от темы и вёрстки основного интерфейса.
+   Размеры — под палец: поля 56px, кнопка 56px (норма для сенсора — 44px). */
+.sf-setup {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: #12161c;
+    color: #e8ecf1;
+    font-family: 'Onest', system-ui, sans-serif;
+    overflow-y: auto;
+}
+
+.sf-setup-card {
+    width: 100%;
+    max-width: 560px;
+    background: #1a2029;
+    border: 1px solid #2a3340;
+    border-radius: 16px;
+    padding: 28px;
+}
+
+.sf-setup-card h1 {
+    margin: 0 0 8px;
+    font-size: 24px;
+    font-weight: 600;
+}
+
+.sf-setup-card p {
+    margin: 0 0 24px;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #9aa7b6;
+}
+
+.sf-setup-card label {
+    display: block;
+    margin: 16px 0 6px;
+    font-size: 14px;
+    color: #9aa7b6;
+}
+
+.sf-setup-card input {
+    width: 100%;
+    height: 56px;
+    padding: 0 16px;
+    font-size: 16px; /* меньше 16px — Android сам зумит страницу при фокусе */
+    color: #e8ecf1;
+    background: #12161c;
+    border: 1px solid #2a3340;
+    border-radius: 10px;
+    box-sizing: border-box;
+}
+
+.sf-setup-card input:focus {
+    outline: none;
+    border-color: #4f9cf9;
+}
+
+.sf-setup-err {
+    min-height: 20px;
+    margin-top: 12px;
+    font-size: 14px;
+    color: #ff6b6b;
+}
+
+.sf-setup-card button {
+    width: 100%;
+    height: 56px;
+    margin-top: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    background: #2f7dd1;
+    border: 0;
+    border-radius: 10px;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.sf-setup-card button:active {
+    background: #276cb8;
+}
