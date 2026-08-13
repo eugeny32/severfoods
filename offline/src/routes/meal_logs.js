@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const db     = require('../db');
 const tz     = require('../tz');
+const sync   = require('../sync');
 const crypto = require('crypto');
 
 const VALID_TYPES = ['breakfast', 'lunch', 'dinner', 'night'];
@@ -15,16 +16,26 @@ router.get('/', (req, res) => {
 });
 
 // POST /api/meal_logs — register a meal scan
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
     const { employee_id, meal_type, meal_point_id, meal_point_name, operator_name } = req.body || {};
 
     if (!employee_id || !VALID_TYPES.includes(meal_type)) {
         return res.status(400).json({ ok: false, error: 'invalid_params' });
     }
 
-    // local dedup: same employee + type + today (местные сутки по настроенному часовому поясу)
+    // 1. Локальная проверка — быстрая и работает всегда, даже без сети.
     if (db.hasTodayLog(employee_id, meal_type, tz.todayWindowUtc())) {
         return res.json({ ok: false, error: 'duplicate', message: 'Уже зафиксировано сегодня' });
+    }
+
+    // 2. Проверка на сервере — видит записи с ДРУГИХ точек, о которых локальная
+    //    база ещё не знает (важно, когда точки раздачи стоят рядом). Если сети
+    //    нет или сервер не ответил за 2 сек — возвращается null, и решение
+    //    принимается только по локальной базе, как раньше. Питание из-за
+    //    проблем со связью никогда не блокируется.
+    const remote = await sync.checkMealRemotely(employee_id, meal_type, meal_point_id);
+    if (remote === true) {
+        return res.json({ ok: false, error: 'duplicate', message: 'Уже питался сегодня на другой точке' });
     }
 
     const offline_id  = crypto.randomUUID();
@@ -39,6 +50,11 @@ router.post('/', (req, res) => {
         operator_name:   operator_name   || 'Офлайн',
         scanned_at,
     });
+
+    // 3. Отправляем на сервер сразу, не дожидаясь часовой синхронизации —
+    //    чтобы соседняя точка увидела запись в ближайшие секунды. Строго в
+    //    фоне: ответ оператору уходит немедленно, ниже.
+    sync.pushSoon();
 
     res.json({ ok: true, offline_id, scanned_at });
 });

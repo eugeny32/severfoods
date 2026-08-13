@@ -124,6 +124,56 @@ async function pushLogs() {
     return totals;
 }
 
+// ── Мгновенная синхронизация ────────────────────────────────────────────
+// Плановая синхронизация идёт раз в час. Когда две точки раздачи стоят рядом,
+// этого мало: всё это время соседняя точка не знает, что человек уже поел, и
+// он может получить питание дважды. Поэтому запись уходит на сервер сразу
+// после скана — но строго в фоне: оператор ничего не ждёт, а если сети нет,
+// запись остаётся в локальной очереди и уйдёт плановой синхронизацией, как
+// и раньше. Оффлайн-режим при этом не меняется вообще.
+
+const INSTANT_PUSH_DELAY_MS = 1500; // серия быстрых сканов уйдёт одним запросом
+let _instantPushTimer = null;
+
+function pushSoon() {
+    if (!_status.online) return;      // сети нет — молча ждём плановую отправку
+    if (_instantPushTimer) return;    // отправка уже запланирована
+    _instantPushTimer = setTimeout(async () => {
+        _instantPushTimer = null;
+        if (!_status.online || _status.inProgress) return;
+        try {
+            const res = await pushLogs();
+            if (res.inserted) console.log(`[sync] мгновенно отправлено: ${res.inserted}`);
+        } catch (e) {
+            // Не показываем оператору и не повторяем — записи останутся в
+            // очереди и уйдут при следующей плановой синхронизации.
+            console.error('[sync] мгновенная отправка не удалась:', e.message);
+        }
+    }, INSTANT_PUSH_DELAY_MS);
+}
+
+const CHECK_MEAL_TIMEOUT_MS = 2000; // оператор ждёт этот ответ — держим коротким
+
+/**
+ * Спрашивает у сервера, не питался ли человек этим приёмом пищи сегодня на
+ * ДРУГОЙ точке. Возвращает true/false, либо null — если ответа нет (нет сети,
+ * таймаут, старый сервер без этого действия). null означает "не знаем" —
+ * вызывающий код в этом случае должен решать по локальной базе, как раньше.
+ */
+async function checkMealRemotely(employeeId, mealType, mealPointId) {
+    if (!_status.online) return null;
+    try {
+        const data = await api('check_meal', {
+            method:  'POST',
+            timeout: CHECK_MEAL_TIMEOUT_MS,
+            body: { employee_id: employeeId, meal_type: mealType, meal_point_id: mealPointId || null },
+        });
+        return !!data.exists;
+    } catch (e) {
+        return null; // сеть/таймаут/старый сервер — не блокируем выдачу питания
+    }
+}
+
 async function runSync() {
     if (_status.inProgress) return;
     _status.inProgress = true;
@@ -289,4 +339,7 @@ function reloadConfig() {
     setTimeout(runSync, 500);
 }
 
-module.exports = { init, destroy, runSync, getStatus, reloadConfig, remoteEvents, getDeviceId };
+module.exports = {
+    init, destroy, runSync, getStatus, reloadConfig, remoteEvents, getDeviceId,
+    pushSoon, checkMealRemotely,
+};

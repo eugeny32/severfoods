@@ -48,6 +48,7 @@ switch ($action) {
     case 'mobile_chat_login': doMobileChatLogin(); break;
     case 'heartbeat':    doHeartbeat();   break;
     case 'command_ack':  doCommandAck();  break;
+    case 'check_meal':   doCheckMeal();   break;
     default:
         http_response_code(400);
         echo json_encode(['error' => 'Unknown action']);
@@ -187,6 +188,54 @@ function doCommandAck(): void
     )->execute([$status, $result, $id]);
 
     echo json_encode(['ok' => true]);
+}
+
+/**
+ * Быстрая проверка: питался ли сотрудник этим приёмом пищи сегодня —
+ * ВКЛЮЧАЯ записи с других точек. Нужна, когда две точки раздачи стоят рядом:
+ * оффлайн-приложение знает только свою локальную базу и до плановой
+ * синхронизации не видит, что человек уже поел у соседей.
+ *
+ * Только чтение, ничего не пишет. Отвечает максимально коротко — точка
+ * ждёт этот ответ перед выдачей питания, поэтому важна скорость.
+ *
+ * Действие ДОБАВЛЕНО, существующие не меняются — старые версии приложения
+ * его просто не вызывают и работают как прежде.
+ */
+function doCheckMeal(): void
+{
+    global $pdo;
+
+    $body     = json_decode(file_get_contents('php://input'), true) ?? [];
+    $empId    = (int)($body['employee_id'] ?? 0);
+    $mealType = $body['meal_type'] ?? '';
+    $pointId  = isset($body['meal_point_id']) && $body['meal_point_id'] !== null
+        ? (int)$body['meal_point_id'] : null;
+
+    if ($empId <= 0 || !in_array($mealType, ['breakfast', 'lunch', 'dinner', 'night'], true)) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'employee_id and meal_type required']);
+        return;
+    }
+
+    // Точку из запроса не принимаем вслепую — от неё зависит часовой пояс,
+    // по которому считается "сегодня" (см. ту же проверку в doPush).
+    if ($pointId && !getMealPointById($pdo, $pointId)) $pointId = null;
+
+    // 'night' в базе не хранится — приводим к тому же типу, что и при записи,
+    // иначе проверка искала бы несуществующий тип и всегда возвращала "нет".
+    if ($mealType === 'night') {
+        $tz = $pointId ? getPointTz($pdo, $pointId) : SERVER_TZ_OFFSET;
+        $mealType = normalizeMealType('night', gmdate('H:i:s', time() + offsetToMinutes($tz) * 60));
+    }
+
+    $existing = hasExistingMealLog($pdo, $empId, $mealType, $pointId);
+
+    echo json_encode([
+        'ok'     => true,
+        'exists' => (bool)$existing,
+        'at'     => $existing['scanned_at'] ?? null,
+    ]);
 }
 
 function doEmployees(): void
