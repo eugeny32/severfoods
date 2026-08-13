@@ -1034,8 +1034,12 @@ function showQrModal(empId) {
     const canvas = document.getElementById('qrCanvas');
     openModal('qrModal');
 
-    if (typeof QRCode !== 'undefined') {
-        QRCode.toCanvas(canvas, emp.qr_code, { width: 300, margin: 2, color: { dark:'#000000', light:'#ffffff' } }, () => {});
+    // QRious — та же библиотека, что и при печати карточек на сайте
+    // (assets/js/qrious.min.js). Раньше здесь вызывался QRCode.toCanvas из
+    // CDN-скрипта, которого по указанному адресу не существует — QR-пропуск
+    // не рисовался никогда, ошибка молча гасилась проверкой typeof.
+    if (typeof QRious !== 'undefined') {
+        new QRious({ element: canvas, value: emp.qr_code, size: 300, level: 'M' });
     }
 }
 
