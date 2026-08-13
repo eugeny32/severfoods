@@ -9,4 +9,7 @@ contextBridge.exposeInMainWorld('electron', {
     updateInstallNow:() => ipcRenderer.invoke('update-install-now'),
 
     kioskUnlock: () => ipcRenderer.invoke('kiosk-unlock'),
+
+    oskToggle: () => ipcRenderer.invoke('osk-toggle'),
+    oskStatus: () => ipcRenderer.invoke('osk-status'),
 });

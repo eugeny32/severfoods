@@ -435,30 +435,86 @@ function updateMealTypeAuto() {
 // Refresh meal type every minute
 setInterval(updateMealTypeAuto, 60000);
 
-// ── Скрытый жест разблокировки киоска: 10 кликов по блоку типа питания ──
-// Единственный штатный способ свернуть приложение на рабочий стол — иначе
-// заблокировано (полноэкранный киоск-режим, Alt+F4/сворачивание отключены,
-// см. offline/main.js). Клики должны идти достаточно часто (не более 1.2с
-// между кликами) — иначе счётчик сбрасывается, чтобы случайные редкие тапы
-// по этому месту экрана не разблокировали приложение по ошибке.
-(function initKioskUnlockGesture() {
-    const GESTURE_CLICKS   = 10;
-    const GESTURE_GAP_MS   = 1200;
-    let clickCount = 0;
-    let lastClickAt = 0;
+// ── Скрытые жесты киоска ────────────────────────────────────────────────
+// Приложение работает в полноэкранном киоске (Alt+F4 и сворачивание
+// отключены, см. offline/main.js), поэтому служебные действия спрятаны за
+// жестами, которые оператор не выполнит случайно:
+//   • 10 кликов по блоку типа питания или по логотипу → экранная клавиатура
+//   • долгое нажатие ~3 сек по тем же местам        → свернуть на рабочий стол
+// Клики должны идти подряд (не более 1.2 с между ними) — иначе счётчик
+// сбрасывается, чтобы редкие случайные тапы ничего не активировали.
 
+const GESTURE_CLICKS = 10;
+const GESTURE_GAP_MS = 1200;
+const LONGPRESS_MS   = 3000;
+
+/** Счётчик N быстрых кликов по элементу с визуальным откликом. */
+function attachClickGesture(el, onComplete) {
+    if (!el) return;
+    let count = 0;
+    let lastAt = 0;
+    el.addEventListener('click', () => {
+        const now = Date.now();
+        if (now - lastAt > GESTURE_GAP_MS) count = 0;
+        lastAt = now;
+        count++;
+        // Визуальный отклик: без него на сенсоре непонятно, засчитались ли
+        // касания. Подсветка появляется со второго клика, чтобы обычные
+        // одиночные нажатия ничем не выделялись.
+        if (count >= 2) {
+            el.style.transition = 'opacity .12s';
+            el.style.opacity = String(Math.max(0.35, 1 - count / GESTURE_CLICKS * 0.65));
+            clearTimeout(el._gestureResetTimer);
+            el._gestureResetTimer = setTimeout(() => { el.style.opacity = ''; }, GESTURE_GAP_MS);
+        }
+        if (count >= GESTURE_CLICKS) {
+            count = 0;
+            el.style.opacity = '';
+            onComplete();
+        }
+    });
+}
+
+/** Долгое нажатие (мышь и сенсор) с визуальным откликом. */
+function attachLongPressGesture(el, onComplete) {
+    if (!el) return;
+    let timer = null;
+    const start = () => {
+        clearTimeout(timer);
+        el.style.transition = `opacity ${LONGPRESS_MS}ms linear`;
+        el.style.opacity = '0.3';
+        timer = setTimeout(() => {
+            el.style.transition = '';
+            el.style.opacity = '';
+            onComplete();
+        }, LONGPRESS_MS);
+    };
+    const cancel = () => {
+        clearTimeout(timer);
+        el.style.transition = 'opacity .15s';
+        el.style.opacity = '';
+    };
+    el.addEventListener('pointerdown', start);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => el.addEventListener(ev, cancel));
+}
+
+(function initKioskGestures() {
     function attach() {
-        const el = document.getElementById('mealTypeAuto');
-        if (!el || !window.electron?.kioskUnlock) return;
-        el.addEventListener('click', () => {
-            const now = Date.now();
-            if (now - lastClickAt > GESTURE_GAP_MS) clickCount = 0;
-            lastClickAt = now;
-            clickCount++;
-            if (clickCount >= GESTURE_CLICKS) {
-                clickCount = 0;
-                window.electron.kioskUnlock();
-            }
+        if (!window.electron) return;
+        // Логотипы есть на обоих экранах: .brand — на входе (там вводится QR
+        // вручную), .logo — в боковой панели после входа (поиск, настройки).
+        // Блок типа питания оставлен для совместимости с привычкой операторов.
+        const targets = [
+            document.getElementById('mealTypeAuto'),
+            document.querySelector('.brand'),
+            document.querySelector('.logo'),
+        ].filter(Boolean);
+
+        targets.forEach(el => {
+            el.style.cursor = 'pointer';
+            el.style.userSelect = 'none';
+            if (window.electron.oskToggle)   attachClickGesture(el, () => window.electron.oskToggle());
+            if (window.electron.kioskUnlock) attachLongPressGesture(el, () => window.electron.kioskUnlock());
         });
     }
 

@@ -24,6 +24,7 @@ const server    = require('./src/server');
 const sync      = require('./src/sync');
 const updater   = require('./src/updater');
 const tailscale = require('./src/tailscale');
+const osk       = require('./src/osk');
 
 const PORT = 3847;
 
@@ -133,7 +134,7 @@ function createWindow() {
     });
 
     mainWindow.loadURL(`http://localhost:${PORT}/`);
-    mainWindow.once('ready-to-show', () => { mainWindow.show(); mainWindow.setAlwaysOnTop(true, 'screen-saver'); });
+    mainWindow.once('ready-to-show', () => { mainWindow.show(); applyTopMost(true); });
 
     // Пока заблокировано — не даём ни закрыть (Alt+F4), ни свернуть иным
     // способом, кроме скрытого жеста. Единственный "легальный" путь наружу —
@@ -144,10 +145,16 @@ function createWindow() {
     });
     // Если фокус вдруг ушёл с окна (например, системный диалог или удачный
     // Alt+Tab) — пока заблокировано, агрессивно возвращаем фокус и киоск.
+    //
+    // ВАЖНО: экранная клавиатура Windows при появлении сама забирает фокус.
+    // Без проверки osk.isOpen() этот обработчик отбирал бы фокус обратно
+    // через 50 мс, и клавиатура закрывалась бы сразу после открытия —
+    // именно из-за этого на терминалах с сенсором нельзя было набрать текст.
     mainWindow.on('blur', () => {
         if (!kioskLocked || !mainWindow) return;
+        if (osk.isOpen()) return; // клавиатура открыта — фокус не отбираем
         setTimeout(() => {
-            if (kioskLocked && mainWindow && !mainWindow.isDestroyed()) {
+            if (kioskLocked && !osk.isOpen() && mainWindow && !mainWindow.isDestroyed()) {
                 mainWindow.setKiosk(true);
                 mainWindow.show();
                 mainWindow.focus();
@@ -157,11 +164,26 @@ function createWindow() {
     mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+/**
+ * "Поверх всех окон". Уровень 'screen-saver' выше, чем у экранной клавиатуры
+ * Windows, поэтому пока она открыта — режим снимается совсем, иначе окно
+ * закрыло бы клавиатуру собой. Сюда же сведены все места, где раньше
+ * вызывался setAlwaysOnTop, чтобы поведение было в одном месте.
+ */
+function applyTopMost(on) {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (on && !osk.isOpen()) {
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    } else {
+        mainWindow.setAlwaysOnTop(false);
+    }
+}
+
 /** Разблокировка по жесту из UI — сворачивает окно на рабочий стол. */
 function unlockAndMinimize() {
     if (!mainWindow) return;
     kioskLocked = false;
-    mainWindow.setAlwaysOnTop(false);
+    applyTopMost(false);
     mainWindow.setKiosk(false);
     mainWindow.setFullScreen(false);
     mainWindow.minimize();
@@ -174,7 +196,7 @@ function restoreKiosk() {
     mainWindow.show();
     mainWindow.setFullScreen(true);
     mainWindow.setKiosk(true);
-    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+    applyTopMost(true);
     mainWindow.focus();
     kioskLocked = true;
 }
@@ -221,6 +243,24 @@ ipcMain.handle('update-install-now', ()    => { updater.installNow(); });
 // public/assets/app.js. Единственный штатный способ свернуть киоск на
 // рабочий стол.
 ipcMain.handle('kiosk-unlock', () => { unlockAndMinimize(); return { ok: true }; });
+
+// Экранная клавиатура по секретному жесту (10 кликов по логотипу).
+// Пока она открыта, окно снимается с "поверх всех" и обработчик blur не
+// отбирает фокус — иначе клавиатура закрылась бы сразу (см. createWindow).
+ipcMain.handle('osk-toggle', async () => {
+    const wasOpen = osk.isOpen();
+    const res = await osk.toggle();
+    if (!res.ok) return res;
+    if (!wasOpen) {
+        applyTopMost(false); // открыли — пропускаем клавиатуру вперёд
+    } else {
+        applyTopMost(kioskLocked); // закрыли — возвращаем киоск наверх
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.focus();
+    }
+    return { ok: true, open: osk.isOpen() };
+});
+
+ipcMain.handle('osk-status', () => ({ open: osk.isOpen(), available: osk.isAvailable() }));
 
 // Setup window handlers
 ipcMain.handle('setup-save', async (_, { token, serverUrl }) => {

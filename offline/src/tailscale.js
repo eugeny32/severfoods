@@ -54,8 +54,30 @@ function psQuote(s) {
 }
 
 /** Запускает файл с повышением прав (один UAC-промпт), ждёт завершения. */
+/**
+ * Окно киоска держится поверх всех окон — системный UAC-запрос оказался бы
+ * ЗА ним, оператор его не увидел бы и установка выглядела бы как зависание.
+ * На время elevation снимаем "поверх всех" и возвращаем после.
+ */
+function withTopMostSuspended(fn) {
+    let windows = [];
+    try {
+        const { BrowserWindow } = require('electron');
+        windows = BrowserWindow.getAllWindows().filter(w => w.isAlwaysOnTop());
+        windows.forEach(w => w.setAlwaysOnTop(false));
+    } catch (_) { /* вне Electron (тесты) — просто выполняем */ }
+
+    const restore = () => {
+        windows.forEach(w => { try { if (!w.isDestroyed()) w.setAlwaysOnTop(true, 'screen-saver'); } catch (_) {} });
+    };
+    return fn().then(
+        (res) => { restore(); return res; },
+        (err) => { restore(); throw err; }
+    );
+}
+
 function runElevated(file, args) {
-    return new Promise((resolve, reject) => {
+    return withTopMostSuspended(() => new Promise((resolve, reject) => {
         const argList = args.length ? `-ArgumentList @(${args.map(psQuote).join(',')}) ` : '';
         const script = `Start-Process -FilePath ${psQuote(file)} ${argList}-Verb RunAs -Wait -WindowStyle Hidden`;
         execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script],
@@ -65,7 +87,7 @@ function runElevated(file, args) {
                 resolve({ stdout, stderr });
             }
         );
-    });
+    }));
 }
 
 /**
