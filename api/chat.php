@@ -28,11 +28,27 @@ if (ob_get_level() === 0) ob_start();
 require_once dirname(__DIR__) . '/config.php';
 
 header('Content-Type: application/json; charset=utf-8');
-// CORS for mobile app
+
+// ─── CORS ────────────────────────────────────────────────────────────────
+// Раньше сюда подставлялся ЛЮБОЙ присланный Origin вместе с
+// Allow-Credentials: true — это позволяло любому стороннему сайту читать
+// чат от имени залогиненного администратора (его куки уходили бы вместе с
+// запросом). Теперь с куками работают только свои домены.
+//
+// Мобильное приложение это не ломает: оно авторизуется заголовком
+// X-Mobile-Token, а не куками, и как нативный клиент вообще не подчиняется
+// правилам CORS.
+$allowedOrigins = array_filter([
+    rtrim(SITE_URL, '/'),
+    'https://www.severfoods.ru',
+    'https://severfoods.ru',
+    'https://nrg.severfoods.ru',
+]);
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if ($origin) header("Access-Control-Allow-Origin: $origin");
-else header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Credentials: true');
+if ($origin && in_array(rtrim($origin, '/'), $allowedOrigins, true)) {
+    header("Access-Control-Allow-Origin: $origin");
+    header('Access-Control-Allow-Credentials: true');
+}
 header('Access-Control-Allow-Headers: Content-Type, X-Mobile-Token, X-Sync-Token');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }

@@ -4,6 +4,7 @@ const path    = require('path');
 const { execSync } = require('child_process');
 const db      = require('../db');
 const tz      = require('../tz');
+const guard   = require('../auth_guard');
 
 const ENV_PATH = path.join(require('electron').app.getPath('userData'), '../../../.env');
 // Fallback for dev: look next to main.js
@@ -46,24 +47,50 @@ function writeEnvKey(key, value) {
     fs.writeFileSync(envPath, updated.filter((l,i,a) => l || i < a.length-1).join('\n'), 'utf8');
 }
 
-// GET /api/config — returns current config (super_admin only checked client-side)
+// GET /api/config — состав ответа зависит от роли.
+// Раньше этот эндпоинт отдавал ТОКЕН СИНХРОНИЗАЦИИ вообще без проверки прав
+// (роль проверялась только на клиенте) — токен мог прочитать любой процесс
+// или человек на компьютере точки. Секретные поля теперь только супер-админу,
+// а часовой пояс и версия остаются доступны всем: они нужны обычному экрану
+// настроек оператора.
 router.get('/', (req, res) => {
     const env = readEnv();
-    res.json({
+    const out = {
         ok: true,
-        sync_url:   (env.SERVER_URL ? env.SERVER_URL.replace(/\/$/, '') + '/api/offline_sync.php' : 'https://www.severfoods.ru/api/offline_sync.php'),
-        sync_token: env.OFFLINE_SYNC_TOKEN || '',
-        tz_offset:  tz.getTzOffset(),
-        version:    process.env.npm_package_version || '1.0.0',
-        commit_date: (() => { try { return execSync('git log -1 --format=%cd --date=format:%d.%m.%Y', { cwd: path.join(__dirname, '../..'), stdio: ['pipe','pipe','pipe'] }).toString().trim(); } catch(_){ return '—'; } })(),
-        db_path:    db.getDbPath ? db.getDbPath() : '—',
-        env_path:   findEnvPath(),
-    });
+        tz_offset: tz.getTzOffset(),
+        version:   process.env.npm_package_version || '1.0.0',
+    };
+
+    if (guard.isAdmin()) {
+        out.sync_url = env.SERVER_URL
+            ? env.SERVER_URL.replace(/\/$/, '') + '/api/offline_sync.php'
+            : 'https://www.severfoods.ru/api/offline_sync.php';
+        out.db_path  = db.getDbPath ? db.getDbPath() : '—';
+        out.env_path = findEnvPath();
+        out.commit_date = (() => { try { return execSync('git log -1 --format=%cd --date=format:%d.%m.%Y', { cwd: path.join(__dirname, '../..'), stdio: ['pipe','pipe','pipe'] }).toString().trim(); } catch(_){ return '—'; } })();
+    }
+
+    // Секрет — только супер-администратору.
+    if (guard.isSuperAdmin()) {
+        out.sync_token = env.OFFLINE_SYNC_TOKEN || '';
+    }
+
+    res.json(out);
 });
 
 // POST /api/config — update sync_url and/or sync_token and/or tz_offset
 router.post('/', (req, res) => {
     const { sync_url, sync_token, tz_offset } = req.body || {};
+
+    // Адрес сервера и токен меняет только супер-админ; часовой пояс — любой
+    // администратор (это его штатная настройка точки).
+    if ((sync_url !== undefined || sync_token !== undefined) && !guard.isSuperAdmin()) {
+        return res.status(403).json({ ok: false, error: 'Доступно только супер-администратору' });
+    }
+    if (tz_offset !== undefined && !guard.isAdmin()) {
+        return res.status(403).json({ ok: false, error: 'Доступно только администратору' });
+    }
+
     if (sync_url !== undefined) {
         // Поле в UI показывает полный URL до offline_sync.php, а реальный код
         // синхронизации (sync.js/routes/auth.js) читает SERVER_URL как ГОЛЫЙ
