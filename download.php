@@ -42,6 +42,10 @@ $apkName     = $hasApk ? basename($apk) : null;
 $apkSize     = $hasApk ? round(filesize($apk) / 1024 / 1024, 1) . ' МБ' : null;
 $apkDate     = $hasApk ? date('d.m.Y', filemtime($apk)) : null;
 $apkVersion  = ($apkName && preg_match('/(\d+\.\d+\.\d+)/', $apkName, $m)) ? 'v' . $m[1] : '';
+// Сборка без ключа подписи помечается суффиксом -test: она годится для
+// проверки, но не для рабочих точек — обновить её боевой сборкой можно
+// только с удалением приложения и потерей несинхронизированных записей.
+$apkIsTest   = $apkName && str_contains($apkName, '-test');
 
 // Direct download trigger
 if (isset($_GET['get'])) {
@@ -143,6 +147,15 @@ body{font-family:'Onest',sans-serif;background:#f1f5f9;color:#0f172a;min-height:
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Скачать APK
         </a>
+        <?php if ($apkIsTest): ?>
+            <div class="no-file">
+                <strong>Это тестовая сборка.</strong><br>
+                Она подписана служебным ключом и предназначена только для проверки
+                на одном планшете. Для рабочих точек нужна сборка с вашим ключом
+                подписи — иначе перейти на неё можно будет только с удалением
+                приложения.
+            </div>
+        <?php endif; ?>
         <div style="font-size:12px;color:#94a3b8">
             Установка с планшета: разрешите «Установка из неизвестных источников».<br>
             Дальнейшие обновления приложение предложит само.

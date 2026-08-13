@@ -82,7 +82,12 @@ jobs:
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/severfoods.jks"
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/severfoods.jks" >> "$GITHUB_ENV"
 
-      - name: Build release APK
+      # Без ключа подписи release-сборка даёт НЕУСТАНАВЛИВАЕМЫЙ APK: Android
+      # отказывается ставить приложение без подписи вообще. Чтобы порт можно
+      # было проверить на живом планшете до появления ключа, в этом случае
+      # собираем отладочную версию — она подписана служебным ключом Android и
+      # ставится нормально.
+      - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -90,28 +95,40 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          if [ -n "${ANDROID_KEYSTORE_PATH:-}" ]; then
+            ./gradlew assembleRelease --no-daemon
+          else
+            echo "::warning::Ключ подписи не задан — собирается ТЕСТОВАЯ (debug) сборка. Она пригодна для проверки, но не для рабочих точек: обновить её боевой сборкой можно только с удалением приложения."
+            ./gradlew assembleDebug --no-daemon
+          fi
 
       - name: Collect APK
         id: apk
         run: |
           mkdir -p ../offline/dist/android
-          APK=$(find android/app/build/outputs/apk/release -name '*.apk' | head -1)
-          if [ -z "$APK" ]; then echo "APK не найден"; exit 1; fi
-          NAME="SeverFoods-${{ steps.pkg.outputs.version }}.apk"
+          VER="${{ steps.pkg.outputs.version }}"
+          if [ -n "${ANDROID_KEYSTORE_PATH:-}" ]; then
+            SRC=android/app/build/outputs/apk/release
+            NAME="SeverFoods-$VER.apk"
+          else
+            SRC=android/app/build/outputs/apk/debug
+            NAME="SeverFoods-$VER-test.apk"
+          fi
+          APK=$(find "$SRC" -name '*.apk' | head -1)
+          if [ -z "$APK" ]; then echo "APK не найден в $SRC"; exit 1; fi
           cp "$APK" "../offline/dist/android/$NAME"
-          # Манифест обновления для самого приложения (см. android/core/update.js).
-          # Формат electron-updater (latest.yml) здесь не подходит — он про .exe.
-          cat > ../offline/dist/android/latest-android.json <<EOF
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+          # Манифест обновления пишем ТОЛЬКО для подписанной сборки: иначе
+          # планшеты увидели бы «обновление», которое не сможет установиться.
+          if [ -n "${ANDROID_KEYSTORE_PATH:-}" ]; then
+            cat > ../offline/dist/android/latest-android.json <<EOF
           {
-            "version": "${{ steps.pkg.outputs.version }}",
+            "version": "$VER",
             "url": "$NAME",
             "releaseDate": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           }
           EOF
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          if [ -z "${ANDROID_KEYSTORE_PATH:-}" ]; then
-            echo "::warning::APK собран БЕЗ подписи — обновить им уже установленное приложение будет нельзя."
           fi
 
       - name: Upload APK artifact
