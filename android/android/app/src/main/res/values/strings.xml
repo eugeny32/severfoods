@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">СеверФудс</string>
+    <string name="title_activity_main">СеверФудс</string>
+    <string name="package_name">ru.severfoods.offline</string>
+    <string name="custom_url_scheme">ru.severfoods.offline</string>
+</resources>

@@ -1,0 +1,12 @@
+# Манифест обновления читает само приложение из вебвью, то есть как браузер с
+# origin https://localhost — без этого заголовка запрос молча блокируется
+# политикой CORS и планшет никогда не узнает о новой версии.
+<IfModule mod_headers.c>
+    <FilesMatch "\.json$">
+        Header set Access-Control-Allow-Origin "*"
+        Header set Cache-Control "no-cache"
+    </FilesMatch>
+</IfModule>
+
+# APK должен скачиваться, а не открываться браузером как текст.
+AddType application/vnd.android.package-archive .apk

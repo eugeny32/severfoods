@@ -24,14 +24,38 @@ $fileDate  = $hasFile ? date('d.m.Y', filemtime($latest)) : null;
 $version   = '';
 if ($fileName && preg_match('/(\d+\.\d+\.\d+)/', $fileName, $m)) $version = 'v' . $m[1];
 
+// То же самое для Android-версии (планшеты 10″). Отдельный поиск, потому что
+// APK лежит в своей папке и собирается отдельным workflow.
+$apkDir  = __DIR__ . '/offline/dist/android/';
+$apk     = null;
+$apkVer  = [0,0,0];
+if (is_dir($apkDir)) {
+    foreach (glob($apkDir . '*.apk') as $f) {
+        if (preg_match('/(\d+)\.(\d+)\.(\d+)/', basename($f), $m)) {
+            $v = [(int)$m[1], (int)$m[2], (int)$m[3]];
+            if ($v > $apkVer) { $apkVer = $v; $apk = $f; }
+        }
+    }
+}
+$hasApk      = $apk !== null;
+$apkName     = $hasApk ? basename($apk) : null;
+$apkSize     = $hasApk ? round(filesize($apk) / 1024 / 1024, 1) . ' МБ' : null;
+$apkDate     = $hasApk ? date('d.m.Y', filemtime($apk)) : null;
+$apkVersion  = ($apkName && preg_match('/(\d+\.\d+\.\d+)/', $apkName, $m)) ? 'v' . $m[1] : '';
+
 // Direct download trigger
-if (isset($_GET['get']) && $hasFile) {
-    header('Content-Type: application/octet-stream');
-    header('Content-Disposition: attachment; filename="' . $fileName . '"');
-    header('Content-Length: ' . filesize($latest));
-    header('Cache-Control: no-cache');
-    readfile($latest);
-    exit;
+if (isset($_GET['get'])) {
+    $isApk = $_GET['get'] === 'apk';
+    $file  = $isApk ? $apk     : $latest;
+    $name  = $isApk ? $apkName : $fileName;
+    if ($file) {
+        header('Content-Type: ' . ($isApk ? 'application/vnd.android.package-archive' : 'application/octet-stream'));
+        header('Content-Disposition: attachment; filename="' . $name . '"');
+        header('Content-Length: ' . filesize($file));
+        header('Cache-Control: no-cache');
+        readfile($file);
+        exit;
+    }
 }
 ?><!DOCTYPE html>
 <html lang="ru">
@@ -106,6 +130,30 @@ body{font-family:'Onest',sans-serif;background:#f1f5f9;color:#0f172a;min-height:
             <li>Токен синхронизации (выдаёт администратор)</li>
         </ul>
     </div>
+
+    <hr class="divider">
+
+    <div class="app-name" style="font-size:19px">Версия для планшетов</div>
+    <div class="app-sub" style="margin-bottom:18px">Android 5.1 и новее · экран от 10″</div>
+
+    <?php if ($hasApk): ?>
+        <div class="version-badge"><?= htmlspecialchars($apkVersion) ?></div>
+        <div class="file-info"><?= htmlspecialchars($apkName) ?> · <?= $apkSize ?> · <?= $apkDate ?></div>
+        <a href="download.php?get=apk" class="btn-download">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Скачать APK
+        </a>
+        <div style="font-size:12px;color:#94a3b8">
+            Установка с планшета: разрешите «Установка из неизвестных источников».<br>
+            Дальнейшие обновления приложение предложит само.
+        </div>
+    <?php else: ?>
+        <div class="no-file">
+            <strong>APK ещё не собран.</strong><br>
+            Администратору: запустите сборку «Build Android APK» — файл появится
+            в папке <code>offline/dist/android/</code>.
+        </div>
+    <?php endif; ?>
 
     <hr class="divider">
     <a href="manual.php" class="manual-link">

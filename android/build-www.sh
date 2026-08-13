@@ -75,4 +75,15 @@ open(path, 'w', encoding='utf-8').write(html)
 print('  index.html: ядро подключено, зум отключён')
 PY
 
+# 4. Версия для Gradle. versionCode обязан расти при каждом выпуске, иначе
+#    Android откажется ставить обновление поверх: составляем его из номера
+#    версии (1.7.1 → 10701), это монотонно и читаемо.
+IFS=. read -r MAJ MIN PAT <<<"$VERSION"
+VCODE=$(( MAJ * 10000 + MIN * 100 + PAT ))
+cat > "$AND/version.properties" <<EOF
+versionName=$VERSION
+versionCode=$VCODE
+EOF
+echo "  версия $VERSION (versionCode $VCODE)"
+
 echo "✓ Готово: $WWW"

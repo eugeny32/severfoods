@@ -22,8 +22,14 @@ require_once dirname(__DIR__) . '/functions.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Headers: X-Sync-Token, Content-Type');
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit; }
+header('Access-Control-Allow-Headers: X-Sync-Token, Content-Type, Accept');
+// Android-версия работает в вебвью, то есть как браузер: перед POST с
+// заголовком X-Sync-Token он шлёт предварительный запрос OPTIONS и требует,
+// чтобы метод был явно перечислен здесь. Windows-версия ходит через Node и
+// предварительных запросов не делает — для неё эти заголовки безразличны.
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Max-Age: 86400');
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
 // ─── Аутентификация ──────────────────────────────────
 $syncToken = env('OFFLINE_SYNC_TOKEN', '');
