@@ -469,9 +469,28 @@ function logAction(string $action, ?string $details = null): void
 
 // ─── Точки питания ────────────────────────────────────
 
+/**
+ * Досоздание колонки tz_offset для баз, развёрнутых до её появления.
+ *
+ * Раньше эта попытка стояла прямо в getMealPoints()/getMealPointById() и
+ * выполнялась при КАЖДОМ вызове. В отправке офлайн-записей (doPush) точка
+ * запрашивается на каждую запись, то есть на пакете в несколько сотен строк
+ * сервер столько же раз пытался менять схему таблицы. Старые версии
+ * приложения (1.3.x) шлют весь накопленный пакет одним запросом и ждут
+ * ответа всего 15 секунд — из-за этого точка могла не уложиться в таймаут и
+ * навсегда застрять с неотправленными записями.
+ */
+function ensureMealPointTzColumn(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try { $pdo->exec("ALTER TABLE meal_points ADD COLUMN tz_offset VARCHAR(6) DEFAULT NULL"); } catch (PDOException $e) {}
+}
+
 function getMealPoints(PDO $pdo, bool $onlyActive = true): array
 {
-    try { $pdo->exec("ALTER TABLE meal_points ADD COLUMN tz_offset VARCHAR(6) DEFAULT NULL"); } catch (PDOException $e) {}
+    ensureMealPointTzColumn($pdo);
     $sql = "SELECT * FROM meal_points";
     $sql .= $onlyActive ? " WHERE is_active = 1" : '';
     $sql .= " ORDER BY sort_order, point_name";
@@ -482,10 +501,21 @@ function getMealPoints(PDO $pdo, bool $onlyActive = true): array
 
 function getMealPointById(PDO $pdo, int $id): ?array
 {
-    try { $pdo->exec("ALTER TABLE meal_points ADD COLUMN tz_offset VARCHAR(6) DEFAULT NULL"); } catch (PDOException $e) {}
+    // Кэш в пределах запроса — по образцу getPointTz() ниже. В doPush() точка
+    // у всего пакета обычно одна и та же, так что вместо сотен одинаковых
+    // запросов остаётся один. Отсутствие точки тоже кэшируем (значение null),
+    // иначе неверный id продолжал бы бить в базу на каждой записи.
+    // Ключ включает соединение: в отчётах супер-администратор смотрит другой
+    // регион через getRegionalPdo() (см. src/regions.php), а это ДРУГАЯ база с
+    // такими же id точек — кэш только по id отдал бы точку не из той базы.
+    static $cache = [];
+    $key = spl_object_id($pdo) . ':' . $id;
+    if (array_key_exists($key, $cache)) return $cache[$key];
+
+    ensureMealPointTzColumn($pdo);
     $stmt = $pdo->prepare("SELECT * FROM meal_points WHERE id = ?");
     $stmt->execute([$id]);
-    return $stmt->fetch() ?: null;
+    return $cache[$key] = ($stmt->fetch() ?: null);
 }
 
 /**
@@ -500,7 +530,10 @@ function getPointTz(PDO $pdo, $meal_point_id): string
 {
     static $cache = [];
     if (!$meal_point_id) return SERVER_TZ_OFFSET;
-    if (isset($cache[$meal_point_id])) return $cache[$meal_point_id];
+    // Ключ с соединением — по той же причине, что и в getMealPointById():
+    // у другого региона своя база с такими же id точек.
+    $ck = spl_object_id($pdo) . ':' . $meal_point_id;
+    if (isset($cache[$ck])) return $cache[$ck];
     $tz = SERVER_TZ_OFFSET;
     try {
         $stmt = $pdo->prepare("SELECT tz_offset FROM meal_points WHERE id = ?");
@@ -508,7 +541,7 @@ function getPointTz(PDO $pdo, $meal_point_id): string
         $v = $stmt->fetchColumn();
         if ($v && preg_match('/^[+-]\d{2}:\d{2}$/', $v)) $tz = $v;
     } catch (PDOException $e) {}
-    return $cache[$meal_point_id] = $tz;
+    return $cache[$ck] = $tz;
 }
 
 // ─── Деконфликтинг: единая проверка дублей + межпроцессная блокировка ──
