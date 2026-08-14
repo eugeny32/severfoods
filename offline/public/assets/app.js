@@ -34,41 +34,77 @@ const RU_TO_EN = {
     'Х':'{','Ъ':'}','Ф':'A','Ы':'S','В':'D','А':'F','П':'G','Р':'H','О':'J','Л':'K',
     'Д':'L','Ж':':','Э':'"','Я':'Z','Ч':'X','С':'C','М':'V','И':'B','Т':'N','Ь':'M',
     'Б':'<','Ю':'>',
+    'ё':'`','Ё':'~',
 };
 
-function initUsbQrInput() {
-    const input   = document.getElementById('qrUsbInput');
-    const pillLay = document.getElementById('qsfLayout');
+/** Кириллица → латиница по позициям клавиш. Латиница и цифры проходят как есть. */
+function convertLayout(str) {
+    return String(str).split('').map(c => RU_TO_EN[c] ?? c).join('');
+}
+
+/**
+ * Навешивает перекодировку раскладки на поле ввода QR-кода.
+ *
+ * Три слоя нужны потому, что символ может попасть в поле тремя разными путями:
+ * посимвольный ввод (сканер и клавиатура), вставка из буфера и «оптовая»
+ * подстановка значения (автозаполнение, экранная клавиатура с предиктивным
+ * вводом). Пропустишь один слой — при русской раскладке код молча уйдёт
+ * кириллицей и карта не опознается.
+ *
+ * pillEl — необязательный индикатор «раскладка исправлена»; на экране входа
+ * его нет, и это нормально.
+ */
+function attachLayoutConverter(input, pillEl) {
     if (!input) return;
 
-    // RU→EN layout conversion on keydown (когда поле реально в фокусе — ручной ввод)
+    const blink = () => {
+        if (!pillEl) return;
+        pillEl.style.display = '';
+        setTimeout(() => { pillEl.style.display = 'none'; }, 1500);
+    };
+
     input.addEventListener('keydown', e => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const val = input.value.trim();
-            if (val) { handleQrScan(val); input.value = ''; }
-            return;
-        }
         const mapped = RU_TO_EN[e.key];
-        if (mapped) {
-            e.preventDefault();
-            const s = input.selectionStart, end = input.selectionEnd;
-            input.value = input.value.slice(0, s) + mapped + input.value.slice(end);
-            input.setSelectionRange(s+1, s+1);
-            pillLay.style.display = '';
-            setTimeout(() => { pillLay.style.display = 'none'; }, 1500);
-            input.dispatchEvent(new Event('input'));
-        }
+        if (!mapped) return;
+        e.preventDefault();
+        const s = input.selectionStart, end = input.selectionEnd;
+        input.value = input.value.slice(0, s) + mapped + input.value.slice(end);
+        input.setSelectionRange(s + 1, s + 1);
+        blink();
+        input.dispatchEvent(new Event('input'));
     });
 
-    // Paste: convert RU chars
     input.addEventListener('paste', e => {
         e.preventDefault();
-        const pasted = (e.clipboardData || window.clipboardData).getData('text');
-        const converted = pasted.split('').map(c => RU_TO_EN[c] || c).join('');
+        const pasted    = (e.clipboardData || window.clipboardData).getData('text');
+        const converted = convertLayout(pasted);
         const s = input.selectionStart, end = input.selectionEnd;
         input.value = input.value.slice(0, s) + converted + input.value.slice(end);
         input.setSelectionRange(s + converted.length, s + converted.length);
+        if (converted !== pasted) blink();
+    });
+
+    input.addEventListener('input', () => {
+        const converted = convertLayout(input.value);
+        if (converted === input.value) return;
+        const pos = input.selectionStart;
+        input.value = converted;
+        try { input.setSelectionRange(pos, pos); } catch (_) {}
+        blink();
+    });
+}
+
+function initUsbQrInput() {
+    const input = document.getElementById('qrUsbInput');
+    if (!input) return;
+
+    attachLayoutConverter(input, document.getElementById('qsfLayout'));
+
+    input.addEventListener('keydown', e => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const val = input.value.trim();
+        if (val) { handleQrScan(val); input.value = ''; }
     });
 }
 
@@ -255,7 +291,10 @@ function stopLoginCam() {
 // ── Login ─────────────────────────────────────────────────
 async function doLogin(role) {
     const qrInput  = document.getElementById(role === 'operator' ? 'opQrInput' : 'adQrInput');
-    const qr_code  = qrInput.value.trim();
+    // Последний рубеж: сюда значение попадает любым путём — набором, вставкой,
+    // подстановкой из глобального перехвата. Если какой-то из слоёв его
+    // пропустил, код всё равно уйдёт на сервер латиницей.
+    const qr_code  = convertLayout(qrInput.value.trim());
     const pointSel = document.getElementById('opPointSelect');
     const meal_point_id = (role === 'operator' && pointSel) ? parseInt(pointSel.value) || null : null;
 
@@ -294,10 +333,18 @@ function showLoginError(msg) {
 }
 function hideLoginError() { document.getElementById('loginError').style.display = 'none'; }
 
-// Enter key on QR inputs
+// Поля входа: перекодировка раскладки + Enter.
+//
+// Перекодировки здесь раньше не было вовсе — при русской раскладке сканер
+// вводил кириллицу, и карта не опознавалась. Глобальный перехват сканера
+// (initGlobalScanCapture) тут не выручает: он намеренно не вмешивается, когда
+// целевое поле в фокусе, а фокус в него ставится автоматически при открытии
+// экрана входа — то есть подстраховать поле было некому.
 ['opQrInput','adQrInput'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(id === 'opQrInput' ? 'operator' : 'admin'); });
+    if (!el) return;
+    attachLayoutConverter(el); // индикатора раскладки на экране входа нет — и не нужно
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(id === 'opQrInput' ? 'operator' : 'admin'); });
 });
 
 function showLogin() {
@@ -570,22 +617,12 @@ function stopScanner() {
     if (activeUi) activeUi.style.display = 'none';
 }
 
-// Hide mode badge when user types manually; also convert RU→EN for any input method (IME, autofill, scanner)
+// Прячем подсказку режима, когда в поле что-то набрано.
+// Перекодировкой раскладки этот обработчик больше не занимается — она в
+// attachLayoutConverter(), общей для всех полей ввода QR.
 document.getElementById('qrUsbInput')?.addEventListener('input', e => {
-    const input = e.target;
-    const converted = input.value.split('').map(c => RU_TO_EN[c] ?? c).join('');
-    if (converted !== input.value) {
-        const pos = input.selectionStart;
-        input.value = converted;
-        try { input.setSelectionRange(pos, pos); } catch(_) {}
-        const pillLay = document.getElementById('qsfLayout');
-        if (pillLay) {
-            pillLay.style.display = '';
-            setTimeout(() => { pillLay.style.display = 'none'; }, 1500);
-        }
-    }
     const badge = document.getElementById('modeBadge');
-    if (badge) badge.style.display = input.value.trim() ? 'none' : '';
+    if (badge) badge.style.display = e.target.value.trim() ? 'none' : '';
 });
 
 function doManualCheck() {
@@ -600,6 +637,10 @@ function doManualCheck() {
 }
 
 async function handleQrScan(qrData) {
+    // Единственная точка входа рабочего экрана — сюда приходит и скан, и ручной
+    // ввод, и результат распознавания с камеры. Латиница и цифры проходят через
+    // convertLayout без изменений, поэтому камере это не вредит.
+    qrData = convertLayout(qrData);
     closeScanResultPopup(); // dismiss any previous result immediately
     if (scanCooldown) return;
     scanCooldown = true;
