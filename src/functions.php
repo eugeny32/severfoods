@@ -467,6 +467,56 @@ function logAction(string $action, ?string $details = null): void
     }
 }
 
+// ─── Дистрибутивы приложения ──────────────────────────
+
+/**
+ * Самый свежий файл сборки в каталоге: установщик Windows или APK.
+ *
+ * Один хелпер на все места, где предлагается скачать приложение — раньше
+ * этот перебор был скопирован в download.php и в index.php, а с появлением
+ * APK добавилось бы третье место, причём с нетривиальным правилом.
+ *
+ * Правило: **боевая сборка всегда важнее тестовой**, даже если у тестовой
+ * номер версии выше. Сборка без ключа подписи помечается суффиксом "-test";
+ * поставить её можно, а обновить потом боевой — уже нет, поэтому предлагать
+ * её вместо боевой нельзя ни при каких условиях. При равном статусе
+ * побеждает бо́льшая версия.
+ *
+ * @return array{path:string,name:string,version:string,size:string,date:string,is_test:bool}|null
+ */
+function latestBuildFile(string $dir, string $ext): ?array
+{
+    if (!is_dir($dir)) return null;
+
+    $best = null; $bestVer = [0, 0, 0]; $bestIsRelease = false;
+
+    foreach (glob(rtrim($dir, '/') . '/*.' . $ext) as $f) {
+        $name = basename($f);
+        if (!preg_match('/(\d+)\.(\d+)\.(\d+)/', $name, $m)) continue;
+        $ver    = [(int)$m[1], (int)$m[2], (int)$m[3]];
+        $isTest = str_contains($name, '-test');
+
+        if ($best === null)                        { $take = true; }
+        elseif ($bestIsRelease !== !$isTest)       { $take = !$isTest; }
+        else                                       { $take = $ver > $bestVer; }
+
+        if ($take) { $best = $f; $bestVer = $ver; $bestIsRelease = !$isTest; }
+    }
+
+    if ($best === null) return null;
+
+    $name = basename($best);
+    preg_match('/(\d+\.\d+\.\d+)/', $name, $m);
+    return [
+        'path'    => $best,
+        'name'    => $name,
+        'version' => 'v' . ($m[1] ?? '?'),
+        'size'    => round(filesize($best) / 1024 / 1024, 1) . ' МБ',
+        'date'    => date('d.m.Y', filemtime($best)),
+        'is_test' => !$bestIsRelease,
+    ];
+}
+
 // ─── Точки питания ────────────────────────────────────
 
 /**

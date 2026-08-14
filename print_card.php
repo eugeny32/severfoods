@@ -54,7 +54,18 @@ function renderCard(array $emp, int $qrSize = 240): string {
     $fgColor = ltrim($c['header'], '#');
 
     ob_start(); ?>
-<div class="qr-card" style="background:<?= $c['bg'] ?>;border-color:<?= $c['border'] ?>">
+<?php /* data-атрибуты нужны сборщику PDF (assets/js/qr-pdf.js): он берёт
+         данные отсюда, а не с сервера, поэтому новых эндпоинтов и новых
+         проверок прав не требуется. Должность выводится только в PDF —
+         печатный пропуск намеренно оставлен прежним. */ ?>
+<div class="qr-card" style="background:<?= $c['bg'] ?>;border-color:<?= $c['border'] ?>"
+     data-emp-name="<?= htmlspecialchars($emp['full_name'] ?? '', ENT_QUOTES) ?>"
+     data-emp-org="<?= htmlspecialchars($emp['organization'] ?? '', ENT_QUOTES) ?>"
+     data-emp-dep="<?= htmlspecialchars($emp['department'] ?? '', ENT_QUOTES) ?>"
+     data-emp-pos="<?= htmlspecialchars($emp['position'] ?? '', ENT_QUOTES) ?>"
+     data-emp-expires="<?= htmlspecialchars($expires, ENT_QUOTES) ?>"
+     data-emp-valid="<?= $valid ? '1' : '0' ?>"
+     data-emp-color="<?= htmlspecialchars($c['header'], ENT_QUOTES) ?>">
     <div class="card-header" style="background:<?= $c['header'] ?>">
         <img src="logo.png" alt="" onerror="this.style.display='none'">
         <div class="header-text">

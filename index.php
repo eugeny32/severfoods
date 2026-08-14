@@ -676,24 +676,15 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal, $is_admin) {
                         </div>
                     </div>
                     <?php
-                    $dlDir = __DIR__ . '/offline/dist/';
-                    $dlLatest = null; $dlLatestVer = [0,0,0];
-                    if (is_dir($dlDir)) {
-                        foreach (glob($dlDir . '*.exe') as $f) {
-                            if (preg_match('/(\d+)\.(\d+)\.(\d+)/', basename($f), $m)) {
-                                $ver = [(int)$m[1],(int)$m[2],(int)$m[3]];
-                                if ($ver > $dlLatestVer) { $dlLatestVer = $ver; $dlLatest = $f; }
-                            }
-                        }
-                    }
-                    if ($dlLatest):
-                        $dlName = basename($dlLatest);
-                        $dlVer = ''; if (preg_match('/(\d+\.\d+\.\d+)/', $dlName, $m)) $dlVer = 'v'.$m[1];
-                        $dlSize = round(filesize($dlLatest)/1024/1024,1).' МБ';
+                    // Поиск свежей сборки — общий хелпер (src/functions.php),
+                    // тот же, что на странице download.php.
+                    $dlWin = latestBuildFile(__DIR__ . '/offline/dist/', 'exe');
+                    $dlApk = latestBuildFile(__DIR__ . '/offline/dist/android/', 'apk');
+                    if ($dlWin):
                     ?>
                     <div style="background:var(--bg-input);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text-2)">
-                        <span style="font-weight:700;color:var(--blue-700)"><?= htmlspecialchars($dlVer) ?></span>
-                        · <?= htmlspecialchars($dlName) ?> · <?= $dlSize ?>
+                        <span style="font-weight:700;color:var(--blue-700)"><?= htmlspecialchars($dlWin['version']) ?></span>
+                        · <?= htmlspecialchars($dlWin['name']) ?> · <?= htmlspecialchars($dlWin['size']) ?>
                     </div>
                     <a href="download.php?get=1" style="display:inline-flex;align-items:center;gap:8px;background:#003366;color:#fff;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:700;text-decoration:none;justify-content:center">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -710,6 +701,43 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal, $is_admin) {
                     <div style="font-size:11px;color:var(--text-3)">
                         Токен синхронизации — см. карточку ниже. Обновление: запустите новый установщик, поле токена оставьте пустым.
                     </div>
+                </div>
+
+                <!-- ── Версия для планшетов Android ── -->
+                <div class="card" style="display:flex;flex-direction:column;gap:14px">
+                    <div style="display:flex;align-items:center;gap:12px">
+                        <div style="width:44px;height:44px;background:#166534;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+                        </div>
+                        <div>
+                            <div style="font-size:15px;font-weight:700;color:var(--text-main)">Версия для планшетов</div>
+                            <div style="font-size:12px;color:var(--text-3)">Android 5.1 и новее · экран от 10″</div>
+                        </div>
+                    </div>
+                    <?php if ($dlApk): ?>
+                    <div style="background:var(--bg-input);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--text-2)">
+                        <span style="font-weight:700;color:#166534"><?= htmlspecialchars($dlApk['version']) ?></span>
+                        · <?= htmlspecialchars($dlApk['name']) ?> · <?= htmlspecialchars($dlApk['size']) ?>
+                    </div>
+                    <?php if ($dlApk['is_test']): ?>
+                    <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e">
+                        <strong>Это тестовая сборка.</strong> Поставить можно, но обновить её боевой версией
+                        не получится — только удалив приложение. Для рабочих точек нужна сборка с ключом подписи.
+                    </div>
+                    <?php endif; ?>
+                    <a href="download.php?get=apk" style="display:inline-flex;align-items:center;gap:8px;background:#166534;color:#fff;border-radius:10px;padding:10px 18px;font-size:14px;font-weight:700;text-decoration:none;justify-content:center">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Скачать APK
+                    </a>
+                    <div style="font-size:11px;color:var(--text-3)">
+                        На планшете разрешите «Установка из неизвестных источников». Дальнейшие обновления
+                        приложение предложит само.
+                    </div>
+                    <?php else: ?>
+                    <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e">
+                        APK не найден. Соберите его и поместите в папку <code>offline/dist/android/</code> на сервере.
+                    </div>
+                    <?php endif; ?>
                 </div>
 
                 <?php if ($is_super_admin): ?>

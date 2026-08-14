@@ -4,64 +4,34 @@
  * Файлы дистрибутива кладите в папку downloads/ рядом с этим файлом.
  */
 
-// Найти .exe с максимальным номером версии в имени
-$dir = __DIR__ . '/offline/dist/';
-$latest = null;
-$latestVer = [0,0,0];
-if (is_dir($dir)) {
-    foreach (glob($dir . '*.exe') as $f) {
-        if (preg_match('/(\d+)\.(\d+)\.(\d+)/', basename($f), $m)) {
-            $ver = [(int)$m[1], (int)$m[2], (int)$m[3]];
-            if ($ver > $latestVer) { $latestVer = $ver; $latest = $f; }
-        }
-    }
-}
-$hasFile   = $latest !== null;
-$fileName  = $hasFile ? basename($latest) : null;
-$fileSize  = $hasFile ? round(filesize($latest) / 1024 / 1024, 1) . ' МБ' : null;
-$fileDate  = $hasFile ? date('d.m.Y', filemtime($latest)) : null;
-// Extract version from filename like SeverFoods-Setup-1.3.0.exe
-$version   = '';
-if ($fileName && preg_match('/(\d+\.\d+\.\d+)/', $fileName, $m)) $version = 'v' . $m[1];
+// Поиск свежего файла — общий хелпер, см. src/functions.php:
+// он же используется во вкладке «Оффлайн» на главной странице, чтобы
+// правила выбора не разъезжались между страницами.
+require_once __DIR__ . '/src/functions.php';
 
-// То же самое для Android-версии (планшеты 10″). Отдельный поиск, потому что
-// APK лежит в своей папке и собирается отдельным workflow.
-$apkDir  = __DIR__ . '/offline/dist/android/';
-$apk     = null;
-$apkVer  = [0,0,0];
-if (is_dir($apkDir)) {
-    // Боевая сборка всегда важнее тестовой, даже если номер версии одинаковый.
-    // Без явного приоритета при равных версиях побеждал бы первый по алфавиту,
-    // а "SeverFoods-1.7.1-test.apk" сортируется РАНЬШЕ "SeverFoods-1.7.1.apk"
-    // (дефис младше точки) — страница предлагала бы тестовый APK, который
-    // потом нельзя обновить.
-    $apkIsBest = false; // подписана ли уже выбранная сборка
-    foreach (glob($apkDir . '*.apk') as $f) {
-        if (!preg_match('/(\d+)\.(\d+)\.(\d+)/', basename($f), $m)) continue;
-        $v      = [(int)$m[1], (int)$m[2], (int)$m[3]];
-        $isTest = str_contains(basename($f), '-test');
+$win = latestBuildFile(__DIR__ . '/offline/dist/', 'exe');
+$apk = latestBuildFile(__DIR__ . '/offline/dist/android/', 'apk');
 
-        if ($apk === null) { $take = true; }
-        elseif ($apkIsBest !== !$isTest) { $take = !$isTest; } // боевая вытесняет тестовую
-        else { $take = $v > $apkVer; }                         // при равном статусе — по версии
+$hasFile   = $win !== null;
+$fileName  = $win['name']    ?? null;
+$fileSize  = $win['size']    ?? null;
+$fileDate  = $win['date']    ?? null;
+$version   = $win['version'] ?? '';
 
-        if ($take) { $apkVer = $v; $apk = $f; $apkIsBest = !$isTest; }
-    }
-}
 $hasApk      = $apk !== null;
-$apkName     = $hasApk ? basename($apk) : null;
-$apkSize     = $hasApk ? round(filesize($apk) / 1024 / 1024, 1) . ' МБ' : null;
-$apkDate     = $hasApk ? date('d.m.Y', filemtime($apk)) : null;
-$apkVersion  = ($apkName && preg_match('/(\d+\.\d+\.\d+)/', $apkName, $m)) ? 'v' . $m[1] : '';
+$apkName     = $apk['name']    ?? null;
+$apkSize     = $apk['size']    ?? null;
+$apkDate     = $apk['date']    ?? null;
+$apkVersion  = $apk['version'] ?? '';
 // Сборка без ключа подписи помечается суффиксом -test: она годится для
 // проверки, но не для рабочих точек — обновить её боевой сборкой можно
 // только с удалением приложения и потерей несинхронизированных записей.
-$apkIsTest   = $apkName && str_contains($apkName, '-test');
+$apkIsTest   = $apk['is_test'] ?? false;
 
 // Direct download trigger
 if (isset($_GET['get'])) {
     $isApk = $_GET['get'] === 'apk';
-    $file  = $isApk ? $apk     : $latest;
+    $file  = $isApk ? ($apk['path'] ?? null) : ($win['path'] ?? null);
     $name  = $isApk ? $apkName : $fileName;
     if ($file) {
         header('Content-Type: ' . ($isApk ? 'application/vnd.android.package-archive' : 'application/octet-stream'));

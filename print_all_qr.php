@@ -258,6 +258,14 @@ body { background: #e8edf2; padding: 20px; }
         <span id="printLabel">Печать (<?= count($employees) ?>)</span>
     </button>
 
+    <button class="btn-print" id="pdfBtn" onclick="doPdfZip(this)" style="background:#166534;color:#fff;border-color:#166534"
+            title="Отдельный PDF на каждого сотрудника, имя файла по ФИО — для отправки в мессенджер">
+        <svg style="display:inline;vertical-align:middle;margin-right:6px" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="10" y1="18" x2="14" y2="18"/>
+        </svg>
+        <span id="pdfLabel">PDF архивом (<?= count($employees) ?>)</span>
+    </button>
+
     <span class="count" id="totalCount">Найдено: <?= count($employees) ?> сотрудников</span>
 </div>
 
@@ -289,6 +297,9 @@ body { background: #e8edf2; padding: 20px; }
 </div>
 
 <script src="assets/js/qrious.min.js"></script>
+<script src="assets/js/jspdf.umd.min.js"></script>
+<script src="assets/js/jszip.min.js"></script>
+<script src="assets/js/qr-pdf.js"></script>
 <script>
 function initQR() {
     document.querySelectorAll('canvas[data-qr]').forEach(function(c) {
@@ -311,6 +322,8 @@ function updateUI() {
     const n = selected.length;
     selCountEl.textContent = `Выбрано: ${n} из ${total}`;
     printLabel.textContent = `Печать (${n > 0 ? n : total})`;
+    const pdfLabel = document.getElementById('pdfLabel');
+    if (pdfLabel) pdfLabel.textContent = `PDF архивом (${n > 0 ? n : total})`;
     // sync checkboxes
     grid.querySelectorAll('.card-wrap').forEach(w => {
         w.querySelector('.card-cb').checked = w.classList.contains('selected');
@@ -344,6 +357,34 @@ function invertSelection() {
 
 function doPrint() {
     window.print();
+}
+
+/** Карточки, которые пойдут в работу: выбранные, а если не выбрано ничего —
+ *  все видимые после фильтра. То же правило, что и у печати. */
+function cardsForExport() {
+    const selected = Array.from(grid.querySelectorAll('.card-wrap.selected'));
+    const wraps = selected.length ? selected : visibleCards();
+    return wraps.map(w => w.querySelector('.qr-card')).filter(Boolean);
+}
+
+async function doPdfZip(btn) {
+    const cards = cardsForExport();
+    if (!cards.length) { alert('Нет карточек для выгрузки'); return; }
+    // Большая партия считается несколько минут и держит всё в памяти браузера —
+    // честно предупреждаем, а не молча подвешиваем вкладку.
+    if (cards.length > 150 &&
+        !confirm(`Будет создано ${cards.length} файлов. Это займёт несколько минут, вкладку закрывать нельзя. Продолжить?`)) {
+        return;
+    }
+    btn.disabled = true;
+    try {
+        await QrPdf.downloadCardsZip(cards, btn);
+    } catch (e) {
+        alert('Не удалось собрать архив: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        updateUI();
+    }
 }
 
 function filterCards(q) {

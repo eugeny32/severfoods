@@ -78,7 +78,16 @@ body {
     </svg>
     Распечатать карточку
 </button>
+<button class="print-btn" onclick="QrPdf.downloadCardPdf(document.querySelector('.qr-card'))"
+        style="background:#166534" title="Файл для отправки сотруднику — открывается на телефоне">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="10" y1="18" x2="14" y2="18"/>
+    </svg>
+    Скачать PDF для телефона
+</button>
 <script src="assets/js/qrious.min.js"></script>
+<script src="assets/js/jspdf.umd.min.js"></script>
+<script src="assets/js/qr-pdf.js"></script>
 <script>
 document.querySelectorAll('canvas[data-qr]').forEach(function(c) {
     var size = Math.round(c.offsetWidth) || 220;
