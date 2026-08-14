@@ -18,7 +18,7 @@ function loadEnv(dir) {
 
 if (!loadEnv(exeDir)) loadEnv(__dirname);
 
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } = require('electron');
 const db        = require('./src/db');
 const server    = require('./src/server');
 const sync      = require('./src/sync');
@@ -37,6 +37,16 @@ let tray        = null;
 // питания в самом приложении, см. public/assets/app.js). Взводится заново
 // при каждом восстановлении окна из трея.
 let kioskLocked = true;
+
+// Приложение действительно завершается — блокировки киоска больше не действуют.
+//
+// Без этого флага автообновление было невозможно в принципе: quitAndInstall()
+// вызывает app.quit(), тот шлёт окну 'close', а обработчик ниже отменял его,
+// потому что kioskLocked в рабочем режиме всегда true. Процесс продолжал жить,
+// установщик видел запущенное приложение и не мог заменить файлы — отсюда
+// «не удаётся удалить старую версию автоматически». Ручной запуск установщика
+// ломался так же: он тоже просит приложение закрыться штатным образом.
+let isQuitting = false;
 
 Menu.setApplicationMenu(null);
 
@@ -140,6 +150,7 @@ function createWindow() {
     // способом, кроме скрытого жеста. Единственный "легальный" путь наружу —
     // requestUnlock() через IPC (см. ниже), инициируемый 10 кликами в UI.
     mainWindow.on('close', (e) => {
+        if (isQuitting) return; // настоящий выход (обновление, трей, завершение сеанса)
         if (kioskLocked) { e.preventDefault(); return; }
         if (tray) { e.preventDefault(); mainWindow.hide(); }
     });
@@ -313,13 +324,46 @@ if (process.platform === 'win32') {
     } catch (e) { /* не критично, если не удалось (например, в dev-режиме) */ }
 }
 
-app.whenReady().then(async () => {
+// Только один экземпляр. После установки обновления electron-updater сам
+// запускает приложение заново, а оно к тому же прописано в автозапуск — без
+// этой блокировки на точке могли оказаться два процесса, дерущихся за порт
+// 3847 и за файл локальной базы. Запуск вынесен в startApp() и вызывается
+// ТОЛЬКО при захваченной блокировке: иначе вторая копия успела бы дойти до
+// server.start(), упереться в занятый порт и показать оператору сообщение об
+// ошибке вместо того, чтобы тихо уйти.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!gotSingleInstanceLock) {
+    app.quit();
+} else {
+    app.on('second-instance', () => {
+        // Вторую копию запускать не даём, но окно первой показываем — иначе
+        // оператору покажется, что запуск просто ничего не сделал.
+        if (mainWindow && !mainWindow.isDestroyed()) restoreKiosk();
+        else if (setupWindow) setupWindow.focus();
+    });
+    startApp();
+}
+
+function startApp() {
+  return app.whenReady().then(async () => {
     if (needsSetup()) {
         // First launch or missing token — show setup before main app
         createSetupWindow();
     } else {
         await db.init();
-        await server.start(PORT);
+        // Занятый порт означает, что рядом уже работает другая копия. Раньше
+        // ошибка отсюда просто «терялась» в необработанном промисе, и
+        // приложение поднималось вообще без окна — оператор видел пустой экран.
+        try {
+            await server.start(PORT);
+        } catch (e) {
+            dialog.showErrorBox('СеверФудс',
+                `Не удалось занять порт ${PORT}: ${e.message}\n\n` +
+                'Скорее всего приложение уже запущено. Закройте вторую копию и запустите снова.');
+            app.exit(1);
+            return;
+        }
         sync.init();
         updater.init();
         tailscale.autoJoinFromEnv().catch(() => {}); // тихо, не блокирует запуск
@@ -329,6 +373,25 @@ app.whenReady().then(async () => {
         // это был бы обход блокировки в обход скрытого жеста. Трей появляется
         // только после unlockAndMinimize().
     }
+  });
+}
+
+// Единая точка настоящего выхода. Срабатывает раньше 'close' у окна при любом
+// пути завершения: установка обновления, «Выход» из трея, завершение сеанса
+// Windows. Именно здесь снимаются все блокировки киоска — иначе выход был бы
+// отменён и установщик не смог бы заменить файлы приложения.
+app.on('before-quit', () => {
+    isQuitting  = true;
+    kioskLocked = false;
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        applyTopMost(false);          // окно не должно висеть поверх установщика
+        try { mainWindow.setKiosk(false); } catch (_) {}
+    }
+    if (tray) { tray.destroy(); tray = null; } // иначе сработает ветка hide() в 'close'
+
+    try { osk.hide(); } catch (_) {}   // экранная клавиатура не должна пережить приложение
+    try { server.stop(); } catch (_) {} // освобождаем порт для новой копии
 });
 
 app.on('window-all-closed', () => {});

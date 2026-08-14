@@ -23,12 +23,29 @@
     ReadRegStr $2 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "DisplayName"
     ${If} $2 == "SeverFoods"
       DetailPrint "Найдена предыдущая установка SeverFoods (Program Files) — удаляем перед обновлением..."
-      ReadRegStr $4 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "QuietUninstallString"
-      ${If} $4 == ""
-        ReadRegStr $4 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "UninstallString"
-      ${EndIf}
+      ReadRegStr $4 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "UninstallString"
+      ReadRegStr $3 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\$1" "InstallLocation"
+
       ${If} $4 != ""
-        ExecWait '$4 /S _?=$TEMP' $5
+        ${If} $3 != ""
+          ; _?= задаёт деинсталлятору его каталог установки И заставляет
+          ; ExecWait реально дождаться завершения (без этого параметра
+          ; деинсталлятор копирует себя во временную папку и сразу возвращает
+          ; управление). Раньше здесь стояло _?=$TEMP — деинсталлятор считал
+          ; своим каталогом %TEMP% и чистил его, а установка в Program Files
+          ; оставалась на месте.
+          ExecWait '$4 /S _?=$3' $5
+          DetailPrint "Деинсталлятор вернул код: $5"
+          ; С параметром _?= деинсталлятор себя не удаляет — убираем остатки.
+          Delete "$3\Uninstall SeverFoods.exe"
+          RMDir "$3"
+        ${Else}
+          ; Каталог в реестре не записан — запускаем как есть. Дождаться
+          ; завершения в этом случае нельзя, поэтому даём немного времени.
+          DetailPrint "InstallLocation не найден — удаление без ожидания"
+          Exec '$4 /S'
+          Sleep 5000
+        ${EndIf}
       ${EndIf}
     ${EndIf}
 

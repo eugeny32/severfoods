@@ -25,11 +25,24 @@ app.use('/api/tailscale',   tailscaleRouter);
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, '../public/index.html')));
 
+let _srv = null;
+
 function start(port) {
     return new Promise((resolve, reject) => {
-        const srv = app.listen(port, '127.0.0.1', () => { console.log(`[server] :${port}`); resolve(srv); });
+        const srv = app.listen(port, '127.0.0.1', () => { console.log(`[server] :${port}`); _srv = srv; resolve(srv); });
         srv.on('error', reject);
     });
 }
 
-module.exports = { start };
+/**
+ * Освобождает порт при выходе. Нужно при обновлении: установщик сразу
+ * запускает новую копию приложения, и если старый слушающий сокет ещё висит,
+ * она не сможет занять 3847 и поднимется без интерфейса.
+ */
+function stop() {
+    if (!_srv) return;
+    try { _srv.close(); } catch (_) {}
+    _srv = null;
+}
+
+module.exports = { start, stop };
