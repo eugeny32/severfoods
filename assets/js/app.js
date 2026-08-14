@@ -1747,7 +1747,9 @@ async function loadRemotePoints() {
         wrap.innerHTML = data.points.map(p => {
             const dot = p.online ? '#16a34a' : '#94a3b8';
             const statusText = p.online ? 'на связи' : `не на связи (был ${remoteFmtAgo(p.seconds_ago)})`;
-            const safePointName = (p.point_name || '').replace(/'/g, "\\'");
+            // Имя уходит внутрь onclick="…'имя'…": апостроф закрыл бы строку JS,
+            // кавычка — сам атрибут. Экранируем оба.
+            const safePointName = (p.point_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
             const buttons = Object.entries(REMOTE_COMMAND_LABELS).map(([cmd, [label, icon]]) => `
                 <button type="button" class="btn-sm" title="${escHtml(label)}" ${p.online ? '' : 'disabled style="opacity:.35;cursor:not-allowed"'}
                     onclick="queueRemoteCommand('${p.device_id}', '${cmd}', this)">
@@ -1757,6 +1759,12 @@ async function loadRemotePoints() {
                 <button type="button" class="btn-sm" title="Установить Tailscale (VPN-сеть для полноценного удалённого доступа — RDP и т.п.)" ${p.online ? '' : 'disabled style="opacity:.35;cursor:not-allowed"'}
                     onclick="queueTailscaleInstall('${p.device_id}', '${safePointName}', this)">
                     <i class="fas fa-network-wired"></i>
+                </button>
+            ` + `
+                <button type="button" class="btn-sm" style="color:#dc2626;margin-left:8px;border-left:1px solid var(--border);padding-left:10px${p.online ? ';opacity:.35;cursor:not-allowed' : ''}"
+                    title="${p.online ? 'Точка на связи — удалять нечего' : 'Убрать из списка неиспользуемую точку'}" ${p.online ? 'disabled' : ''}
+                    onclick="deleteRemotePoint('${p.device_id}', '${safePointName}')">
+                    <i class="fas fa-trash"></i>
                 </button>
             `;
             return `
@@ -1798,6 +1806,32 @@ async function queueRemoteCommand(deviceId, command, btnEl) {
     } catch (e) {
         alert('Ошибка сети');
         if (btnEl) btnEl.disabled = false;
+    }
+}
+
+/**
+ * Убирает из списка точку, которая больше не используется: переустановленный
+ * компьютер, заменённое железо, разовый запуск на чужой машине. Каждая
+ * установка получает свой идентификатор и остаётся в списке навсегда, поэтому
+ * без чистки он зарастает мёртвыми строками.
+ *
+ * Точку, которая на связи, сервер удалить не даст — она вернулась бы в список
+ * через полминуты.
+ */
+async function deleteRemotePoint(deviceId, pointName) {
+    if (!confirm(`Убрать точку «${pointName || deviceId}» из списка?\n\nЗаписи питания и настройки при этом не трогаются — удаляется только строка мониторинга. Если приложение на этом компьютере ещё запущено, точка вернётся в список сама.`)) return;
+
+    try {
+        const res = await fetch('api/remote_access.php?action=delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ device_id: deviceId }),
+        });
+        const data = await res.json();
+        if (!data.success) { alert(data.message || 'Ошибка'); return; }
+        loadRemotePoints();
+    } catch (e) {
+        alert('Ошибка сети');
     }
 }
 

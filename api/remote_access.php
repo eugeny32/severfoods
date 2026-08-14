@@ -35,6 +35,7 @@ switch ($action) {
     case 'list':            doList();           break;
     case 'queue_command':   Csrf::guard(); doQueueCommand();   break;
     case 'command_history': doCommandHistory();  break;
+    case 'delete':          Csrf::guard(); doDelete();          break;
     default:
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Неизвестное действие']);
@@ -120,6 +121,57 @@ function doQueueCommand(): void
     )->execute([$deviceId, $command, $payload !== null ? json_encode($payload, JSON_UNESCAPED_UNICODE) : null, $operatorName]);
 
     logAction('remote_command', "Команда «{$command}» поставлена для устройства {$deviceId}");
+
+    echo json_encode(['success' => true]);
+}
+
+/**
+ * Убирает из списка неиспользуемую точку: переустановленный компьютер,
+ * заменённое железо, разовый запуск на чужой машине. Каждая установка
+ * получает свой device_id и остаётся в списке навсегда, поэтому без чистки
+ * он со временем зарастает мёртвыми строками.
+ *
+ * Удаляем и очередь команд этого устройства — иначе она осталась бы висеть
+ * без владельца.
+ *
+ * Точку, которая сейчас на связи, удалить нельзя: она пришлёт heartbeat в
+ * ближайшие полминуты и появится снова. Молча «удалить» такую строку значило
+ * бы обмануть администратора.
+ */
+function doDelete(): void
+{
+    global $pdo;
+    $data     = json_decode(file_get_contents('php://input'), true) ?? [];
+    $deviceId = trim($data['device_id'] ?? '');
+    if ($deviceId === '') {
+        echo json_encode(['success' => false, 'message' => 'Не указано устройство']);
+        return;
+    }
+
+    $stmt = $pdo->prepare(
+        "SELECT point_name, TIMESTAMPDIFF(SECOND, last_seen_at, UTC_TIMESTAMP()) AS seconds_ago
+         FROM offline_presence WHERE device_id = ?"
+    );
+    $stmt->execute([$deviceId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$row) {
+        echo json_encode(['success' => false, 'message' => 'Точка не найдена']);
+        return;
+    }
+    if ($row['seconds_ago'] !== null && (int)$row['seconds_ago'] <= ONLINE_THRESHOLD_SEC) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Точка сейчас на связи — она вернётся в список при следующем сеансе. Удалять имеет смысл только те, что больше не используются.',
+        ]);
+        return;
+    }
+
+    $pdo->prepare("DELETE FROM offline_commands WHERE device_id = ?")->execute([$deviceId]);
+    $pdo->prepare("DELETE FROM offline_presence WHERE device_id = ?")->execute([$deviceId]);
+
+    $name = $row['point_name'] !== null && $row['point_name'] !== '' ? $row['point_name'] : $deviceId;
+    logAction('remote_device_delete', "Удалена неиспользуемая точка: {$name} ({$deviceId})");
 
     echo json_encode(['success' => true]);
 }
