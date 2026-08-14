@@ -7,6 +7,10 @@ on:
         description: 'Закоммитить готовый APK в offline/dist/android/'
         type: boolean
         default: true
+      allow_unsigned:
+        description: 'Разрешить тестовую (debug) сборку, если ключ подписи недоступен'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -74,13 +78,46 @@ jobs:
       - name: Decode signing keystore
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASS:   ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS:    ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS:     ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ALLOW_UNSIGNED: ${{ inputs.allow_unsigned }}
         run: |
-          if [ -z "$KEYSTORE_B64" ]; then
-            echo "Ключ подписи не задан — будет собран неподписанный APK"
+          # Печатаем только длины — значения секретов в журнал не попадают.
+          echo "Видимость секретов (0 = не задан):"
+          echo "  ANDROID_KEYSTORE_BASE64:   ${#KEYSTORE_B64}"
+          echo "  ANDROID_KEYSTORE_PASSWORD: ${#STORE_PASS}"
+          echo "  ANDROID_KEY_ALIAS:         ${#KEY_ALIAS}"
+          echo "  ANDROID_KEY_PASSWORD:      ${#KEY_PASS}"
+
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | tr -d '\r\n' | base64 -d > "$RUNNER_TEMP/severfoods.jks"
+            if [ ! -s "$RUNNER_TEMP/severfoods.jks" ]; then
+              echo "::error::Секрет ANDROID_KEYSTORE_BASE64 задан, но не декодируется в файл. Проверьте, что скопировано ВСЁ содержимое severfoods.jks.b64 целиком и без переносов строк."
+              exit 1
+            fi
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/severfoods.jks" >> "$GITHUB_ENV"
+            echo "Ключ подписи получен, собираем боевую сборку."
             exit 0
           fi
-          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/severfoods.jks"
-          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/severfoods.jks" >> "$GITHUB_ENV"
+
+          # Раньше здесь молча собиралась debug-версия. Это опасно тем, что
+          # выглядит как успех: APK появляется, workflow зелёный, а установить
+          # им обновление на планшеты невозможно. Теперь без ключа сборка
+          # падает — если тестовая всё же нужна, её просят явно.
+          if [ "$ALLOW_UNSIGNED" = "true" ]; then
+            echo "::warning::Ключ подписи недоступен — собирается ТЕСТОВАЯ (debug) сборка по явному запросу. Обновить ею установленное приложение будет нельзя."
+            exit 0
+          fi
+
+          echo "::error::Секрет ANDROID_KEYSTORE_BASE64 пуст — сборке он не виден, поэтому боевой APK собрать нельзя."
+          echo "Проверьте, что секреты добавлены именно сюда:"
+          echo "  Settings → Secrets and variables → ACTIONS → вкладка Secrets → Repository secrets"
+          echo "Частые ошибки: добавлено во вкладку Variables вместо Secrets;"
+          echo "добавлено в раздел Codespaces или Dependabot (это другие хранилища, Actions их не видит);"
+          echo "опечатка в имени — оно должно быть ровно ANDROID_KEYSTORE_BASE64."
+          echo "Если нужна именно тестовая сборка, перезапустите с галочкой «Разрешить тестовую (debug) сборку»."
+          exit 1
 
       # Без ключа подписи release-сборка даёт НЕУСТАНАВЛИВАЕМЫЙ APK: Android
       # отказывается ставить приложение без подписи вообще. Чтобы порт можно
