@@ -30,11 +30,22 @@ $apkDir  = __DIR__ . '/offline/dist/android/';
 $apk     = null;
 $apkVer  = [0,0,0];
 if (is_dir($apkDir)) {
+    // Боевая сборка всегда важнее тестовой, даже если номер версии одинаковый.
+    // Без явного приоритета при равных версиях побеждал бы первый по алфавиту,
+    // а "SeverFoods-1.7.1-test.apk" сортируется РАНЬШЕ "SeverFoods-1.7.1.apk"
+    // (дефис младше точки) — страница предлагала бы тестовый APK, который
+    // потом нельзя обновить.
+    $apkIsBest = false; // подписана ли уже выбранная сборка
     foreach (glob($apkDir . '*.apk') as $f) {
-        if (preg_match('/(\d+)\.(\d+)\.(\d+)/', basename($f), $m)) {
-            $v = [(int)$m[1], (int)$m[2], (int)$m[3]];
-            if ($v > $apkVer) { $apkVer = $v; $apk = $f; }
-        }
+        if (!preg_match('/(\d+)\.(\d+)\.(\d+)/', basename($f), $m)) continue;
+        $v      = [(int)$m[1], (int)$m[2], (int)$m[3]];
+        $isTest = str_contains(basename($f), '-test');
+
+        if ($apk === null) { $take = true; }
+        elseif ($apkIsBest !== !$isTest) { $take = !$isTest; } // боевая вытесняет тестовую
+        else { $take = $v > $apkVer; }                         // при равном статусе — по версии
+
+        if ($take) { $apkVer = $v; $apk = $f; $apkIsBest = !$isTest; }
     }
 }
 $hasApk      = $apk !== null;
