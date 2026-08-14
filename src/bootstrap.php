@@ -40,7 +40,28 @@ define('DB_NAME',     env('DB_NAME',     ''));
 define('DB_USER',     env('DB_USER',     ''));
 define('DB_PASS',     env('DB_PASS',     ''));
 define('APP_NAME',    env('APP_NAME',    'Система питания'));
-define('APP_VERSION', env('APP_VERSION', '2.1.0'));
+// Версия веб-части берётся из файла VERSION в корне проекта, а НЕ из .env.
+// Приоритет намеренно такой: .env живёт на сервере своей жизнью и правится
+// руками, поэтому вписанный туда когда-то номер намертво устарел (на странице
+// входа годами показывалось «v1.3.3»). Файл VERSION заливается вместе с кодом,
+// то есть обновляется сам собой. .env оставлен запасным вариантом на случай,
+// если файла нет.
+define('APP_VERSION_FILE', dirname(__DIR__) . '/VERSION');
+define('APP_VERSION', (static function (): string {
+    $v = @file_get_contents(APP_VERSION_FILE);
+    $v = $v === false ? '' : trim($v);
+    return $v !== '' ? $v : env('APP_VERSION', '2.1.0');
+})());
+
+/** Дата последней заливки файлов на сервер — по времени изменения VERSION.
+ *  Номер версии обновляется, только если о нём вспомнить; дата меняется сама
+ *  при каждой заливке, поэтому на вопрос «что сейчас на сервере» отвечает
+ *  надёжнее. Пустая строка, если файла нет. */
+function appVersionDate(): string
+{
+    $ts = @filemtime(APP_VERSION_FILE);
+    return $ts ? date('d.m.Y', $ts) : '';
+}
 define('SITE_URL',    env('SITE_URL',    '/'));
 define('TIMEZONE',    env('TIMEZONE',    'Europe/Moscow'));
 

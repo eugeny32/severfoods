@@ -266,7 +266,9 @@ body::after{content:'';position:fixed;inset:0;
     </div>
 
     <a href="login.php" class="back-link"><i class="fas fa-arrow-left"></i> Вернуться в основную систему</a>
-    <div class="version">v<?= APP_VERSION ?> · <?= htmlspecialchars(APP_NAME) ?></div>
+    <div class="version">v<?= APP_VERSION ?> · <?= htmlspecialchars(APP_NAME) ?><?php
+        if ($d = appVersionDate()) echo ' · от ' . $d;
+    ?></div>
 </div>
 
 <script src="assets/js/qr-input.js"></script>
