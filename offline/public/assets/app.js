@@ -1117,7 +1117,11 @@ function applyTheme(t) {
     localStorage.setItem('theme', t);
 }
 function initTheme() {
-    applyTheme(localStorage.getItem('theme') || 'light');
+    // По умолчанию — тёмная: терминал раздачи стоит рядом с людьми и часто
+    // работает в полумраке, светлый экран во весь монитор слепит. Тот же
+    // выбор продублирован атрибутом data-theme в index.html, чтобы страница
+    // не успела мигнуть светлой темой до загрузки этого скрипта.
+    applyTheme(localStorage.getItem('theme') || 'dark');
 }
 initTheme();
 
@@ -1151,7 +1155,7 @@ function renderSettings() {
     const role    = currentUser?.role;
     const isAdmin = ['admin','super_admin'].includes(role);
     const isSA    = role === 'super_admin';
-    const curTheme = localStorage.getItem('theme') || 'light';
+    const curTheme = localStorage.getItem('theme') || 'dark';
 
     const wrap = document.getElementById('settingsContent');
     wrap.innerHTML = '';

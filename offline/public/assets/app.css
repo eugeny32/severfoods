@@ -27,9 +27,14 @@
     --border:    #e2e8f0;
     --sidebar-bg:#17212b;
     --table-hover: #f8fafc;
+    /* Системные элементы — полосы прокрутки и выпадашки у input type="time" в
+       редакторе расписания — рисуются браузером, а не нашим CSS. Без этого
+       свойства в тёмной теме они оставались белыми. */
+    color-scheme: light;
 }
 
 [data-theme="dark"] {
+    color-scheme: dark;
     --bg-app:    #0f1923;
     --bg-page:   #0f1923;
     --bg-card:   #1e2a35;
