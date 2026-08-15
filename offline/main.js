@@ -446,6 +446,7 @@ app.on('before-quit', () => {
 
     try { osk.hide(); } catch (_) {}   // экранная клавиатура не должна пережить приложение
     try { server.stop(); } catch (_) {} // освобождаем порт для новой копии
+    try { globalShortcut.unregisterAll(); } catch (_) {} // иначе сочетание останется занятым
 });
 
 app.on('window-all-closed', () => {});
