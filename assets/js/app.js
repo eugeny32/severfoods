@@ -1761,7 +1761,7 @@ async function loadRemotePoints() {
                     <i class="fas fa-network-wired"></i>
                 </button>
             ` + `
-                <button type="button" class="btn-sm" style="color:#dc2626;margin-left:8px;border-left:1px solid var(--border);padding-left:10px${p.online ? ';opacity:.35;cursor:not-allowed' : ''}"
+                <button type="button" class="btn-sm danger" style="margin-left:8px${p.online ? ';opacity:.35;cursor:not-allowed' : ''}"
                     title="${p.online ? 'Точка на связи — удалять нечего' : 'Убрать из списка неиспользуемую точку'}" ${p.online ? 'disabled' : ''}
                     onclick="deleteRemotePoint('${p.device_id}', '${safePointName}')">
                     <i class="fas fa-trash"></i>
