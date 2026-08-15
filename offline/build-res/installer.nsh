@@ -12,7 +12,42 @@
 ; "SeverFoods" и тихо запускаем её деинсталлятор — миграция происходит
 ; автоматически, без ручных действий пользователя. База данных в
 ; %APPDATA%\SeverFoods\ не трогается (deleteAppDataOnUninstall: false).
+; Сохранить настройки точки до того, как установщик снесёт старую версию.
+;
+; Токен синхронизации и адрес сервера годами лежали в .env рядом с exe, а
+; каталог установки при обновлении удаляется целиком. Точка теряла настройки и
+; после обновления открывала окно первичной настройки вместо работы. Начиная с
+; 1.7.5 приложение хранит .env в %APPDATA%\SeverFoods (там же база, её
+; установщик не трогает), но при ОДНОМ обновлении — том, которым приезжает
+; 1.7.5, — файл ещё лежит по-старому. Копируем его заранее: новая версия
+; подхватит настройки и продолжит работать без вмешательства оператора.
 !macro customInit
+  ; Каталог прежней установки ищем перебором записей деинсталляции: $INSTDIR на
+  ; этом шаге ещё не определён, а имя ключа electron-builder составляет из GUID,
+  ; поэтому обратиться к нему напрямую нельзя. Установка пользовательская
+  ; (perMachine: false), значит запись в HKCU.
+  ${IfNot} ${FileExists} "$APPDATA\SeverFoods\.env"
+    StrCpy $7 0
+    ${Do}
+      EnumRegKey $8 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall" $7
+      ${If} $8 == ""
+        ${Break}
+      ${EndIf}
+      ReadRegStr $9 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$8" "DisplayName"
+      ${If} $9 == "SeverFoods"
+        ReadRegStr $6 HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\$8" "InstallLocation"
+        ${If} $6 != ""
+        ${AndIf} ${FileExists} "$6\.env"
+          CreateDirectory "$APPDATA\SeverFoods"
+          CopyFiles /SILENT "$6\.env" "$APPDATA\SeverFoods\.env"
+          DetailPrint "Настройки точки сохранены в $APPDATA\SeverFoods"
+          ${Break}
+        ${EndIf}
+      ${EndIf}
+      IntOp $7 $7 + 1
+    ${Loop}
+  ${EndIf}
+
   StrCpy $0 0
   ${Do}
     EnumRegKey $1 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall" $0

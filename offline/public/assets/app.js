@@ -557,11 +557,19 @@ function attachLongPressGesture(el, onComplete) {
             document.querySelector('.logo'),
         ].filter(Boolean);
 
+        // 10 кликов — ВЫХОД ИЗ КИОСКА, долгое нажатие — клавиатура.
+        //
+        // В 1.7.0 было наоборот, и это оказалось ошибкой: операторы годами
+        // выходили из киоска десятью кликами, так же написано в инструкции.
+        // Получив вместо выхода клавиатуру, они решали, что киоск сломался.
+        // Серия из десяти кликов вдобавок надёжнее защищает от случайного
+        // срабатывания, чем удержание, — а выход из киоска и есть то
+        // действие, которое случайно происходить не должно.
         targets.forEach(el => {
             el.style.cursor = 'pointer';
             el.style.userSelect = 'none';
-            if (window.electron.oskToggle)   attachClickGesture(el, () => window.electron.oskToggle());
-            if (window.electron.kioskUnlock) attachLongPressGesture(el, () => window.electron.kioskUnlock());
+            if (window.electron.kioskUnlock) attachClickGesture(el, () => window.electron.kioskUnlock());
+            if (window.electron.oskToggle)   attachLongPressGesture(el, () => window.electron.oskToggle());
         });
     }
 

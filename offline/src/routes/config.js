@@ -6,16 +6,21 @@ const db      = require('../db');
 const tz      = require('../tz');
 const guard   = require('../auth_guard');
 
-const ENV_PATH = path.join(require('electron').app.getPath('userData'), '../../../.env');
-// Fallback for dev: look next to main.js
-const ENV_PATHS = [
-    path.join(process.cwd(), '.env'),
-    path.join(__dirname, '../../.env'),
-];
-
+/**
+ * Настройки лежат там же, где локальная база — в userData (см. main.js).
+ *
+ * Раньше здесь был собственный перебор каталогов, начинавшийся с
+ * process.cwd(). При запуске из ярлыка или из автозапуска это НЕ каталог
+ * приложения, поэтому сохранение токена могло записать файл совсем не туда,
+ * откуда его читает main.js: настройка «сохранялась», а после перезапуска не
+ * применялась. Теперь путь один на всё приложение.
+ */
 function findEnvPath() {
-    for (const p of ENV_PATHS) { try { if (fs.existsSync(p)) return p; } catch(_){} }
-    return ENV_PATHS[0];
+    try {
+        return path.join(require('electron').app.getPath('userData'), '.env');
+    } catch (_) {
+        return path.join(__dirname, '../../.env'); // режим разработки, без Electron
+    }
 }
 
 function readEnv() {
@@ -44,7 +49,11 @@ function writeEnvKey(key, value) {
         return line;
     });
     if (!found) updated.push(`${key}=${value}`);
+    fs.mkdirSync(path.dirname(envPath), { recursive: true });
     fs.writeFileSync(envPath, updated.filter((l,i,a) => l || i < a.length-1).join('\n'), 'utf8');
+    // Значение должно примениться сразу, не дожидаясь перезапуска: sync.js и
+    // routes/auth.js читают process.env заново на каждый запрос.
+    process.env[key] = value;
 }
 
 // GET /api/config — состав ответа зависит от роли.

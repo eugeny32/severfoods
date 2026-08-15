@@ -1,14 +1,24 @@
-// Load .env before any other module reads process.env
+// Настройки (.env) читаются раньше всех остальных модулей — они смотрят в
+// process.env уже при загрузке.
 const fs   = require('fs');
 const path = require('path');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, globalShortcut } = require('electron');
 
-// In packaged app __dirname is inside asar; exe directory is the install root
-const exeDir = path.dirname(process.execPath);
-const envPath = path.join(exeDir, '.env');
+// ГДЕ ЛЕЖАТ НАСТРОЙКИ.
+//
+// Раньше .env лежал рядом с exe, в каталоге установки. Установщик при
+// обновлении сносит этот каталог целиком — и точка теряла токен и адрес
+// сервера: вместо рабочего окна открывалось окно первичной настройки, а
+// синхронизация не запускалась вовсе. Каталог userData (там же локальная база)
+// обновление переживает — deleteAppDataOnUninstall: false, — поэтому настройки
+// переехали туда же. Старый путь остаётся только для разовой миграции.
+const exeDir      = path.dirname(process.execPath);
+const legacyEnv   = path.join(exeDir, '.env');
+const settingsDir = app.getPath('userData');
+const envPath     = path.join(settingsDir, '.env');
 
-function loadEnv(dir) {
-    const p = path.join(dir, '.env');
-    if (!fs.existsSync(p)) return false;
+function loadEnvFile(p) {
+    if (!p || !fs.existsSync(p)) return false;
     fs.readFileSync(p, 'utf8').split(/\r?\n/).forEach(line => {
         const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
         if (m) process.env[m[1]] = m[2].trim();
@@ -16,9 +26,21 @@ function loadEnv(dir) {
     return true;
 }
 
-if (!loadEnv(exeDir)) loadEnv(__dirname);
+/** Разовый перенос настроек из каталога установки в userData. */
+function migrateEnv() {
+    try {
+        if (fs.existsSync(envPath) || !fs.existsSync(legacyEnv)) return;
+        fs.mkdirSync(settingsDir, { recursive: true });
+        fs.copyFileSync(legacyEnv, envPath);
+        console.log('[env] настройки перенесены в', envPath);
+    } catch (e) {
+        console.error('[env] перенос настроек не удался:', e.message);
+    }
+}
 
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } = require('electron');
+migrateEnv();
+// Порядок: новое место → старое (если миграция не удалась) → каталог разработки.
+if (!loadEnvFile(envPath) && !loadEnvFile(legacyEnv)) loadEnvFile(path.join(__dirname, '.env'));
 const db        = require('./src/db');
 const server    = require('./src/server');
 const sync      = require('./src/sync');
@@ -86,10 +108,10 @@ function writeEnvFile(vars) {
     const content  = Object.entries(merged)
         .map(([k, v]) => `${k}=${v}`)
         .join('\r\n') + '\r\n';
-    // Write to exe directory (writable in production), fallback to __dirname in dev
     const target = process.env.NODE_ENV === 'development'
         ? path.join(__dirname, '.env')
         : envPath;
+    fs.mkdirSync(path.dirname(target), { recursive: true }); // при первом запуске каталога может не быть
     fs.writeFileSync(target, content, 'utf8');
     // Reload into process.env immediately
     Object.entries(merged).forEach(([k, v]) => { process.env[k] = v; });
@@ -250,12 +272,12 @@ ipcMain.handle('update-status',    ()      => updater.getStatus());
 ipcMain.handle('update-check-now', async () => { await updater.checkNow(); return updater.getStatus(); });
 ipcMain.handle('update-install-now', ()    => { updater.installNow(); });
 
-// Скрытый жест (10 кликов по блоку типа питания) из renderer — см.
-// public/assets/app.js. Единственный штатный способ свернуть киоск на
-// рабочий стол.
+// Скрытый жест — 10 кликов по блоку типа питания или по логотипу, см.
+// public/assets/app.js. Штатный способ свернуть киоск на рабочий стол;
+// аварийный, на случай если жест не даётся, — сочетание клавиш ниже.
 ipcMain.handle('kiosk-unlock', () => { unlockAndMinimize(); return { ok: true }; });
 
-// Экранная клавиатура по секретному жесту (10 кликов по логотипу).
+// Экранная клавиатура по долгому нажатию (~3 с) на том же элементе.
 // Пока она открыта, окно снимается с "поверх всех" и обработчик blur не
 // отбирает фокус — иначе клавиатура закрылась бы сразу (см. createWindow).
 ipcMain.handle('osk-toggle', async () => {
@@ -299,6 +321,7 @@ ipcMain.handle('setup-finish', async () => {
         updater.init();
         tailscale.autoJoinFromEnv().catch(() => {}); // тихо, не блокирует запуск
         createWindow();
+        registerKioskEscape();
     } else {
         restoreKiosk();
         sync.runSync();
@@ -368,12 +391,43 @@ function startApp() {
         updater.init();
         tailscale.autoJoinFromEnv().catch(() => {}); // тихо, не блокирует запуск
         createWindow();
+        registerKioskEscape();
         // Трей НЕ создаём здесь намеренно — пока приложение заблокировано
         // (kioskLocked), тея-иконки с пунктом "Выход" быть не должно, иначе
         // это был бы обход блокировки в обход скрытого жеста. Трей появляется
         // только после unlockAndMinimize().
     }
   });
+}
+
+// Сбой в необязательной функции не должен ронять терминал раздачи.
+//
+// Без этого обработчика любая ошибка в основном процессе выводит на весь экран
+// системное окно «A JavaScript error occurred», которое на киоске нечем
+// закрыть. Так и случилось с экранной клавиатурой: неудачный запуск TabTip
+// приходил асинхронным событием, обработчика не было, и приложение вставало
+// колом (см. src/osk.js). Пишем в журнал и продолжаем работу — раздача важнее.
+process.on('uncaughtException', (e) => {
+    console.error('[fatal] необработанная ошибка:', e && e.stack ? e.stack : e);
+});
+process.on('unhandledRejection', (e) => {
+    console.error('[fatal] необработанный отказ промиса:', e && e.stack ? e.stack : e);
+});
+
+// Аварийный выход из киоска, не зависящий ни от жеста, ни от связи.
+//
+// Штатный путь — 10 кликов; удалённая команда unlock_kiosk требует связи с
+// сервером, а именно её и не бывает в аварии. Сочетание клавиш работает
+// всегда, пока окно приложения активно.
+function registerKioskEscape() {
+    try {
+        globalShortcut.register('Control+Alt+Shift+K', () => {
+            console.log('[kiosk] аварийная разблокировка сочетанием клавиш');
+            unlockAndMinimize();
+        });
+    } catch (e) {
+        console.error('[kiosk] не удалось назначить аварийное сочетание:', e.message);
+    }
 }
 
 // Единая точка настоящего выхода. Срабатывает раньше 'close' у окна при любом

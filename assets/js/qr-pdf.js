@@ -170,6 +170,7 @@
         const used  = Object.create(null);
         const label = btnEl ? btnEl.innerHTML : null;
 
+        try {
         for (let i = 0; i < cards.length; i++) {
             let name = pdfFileName(cards[i]);
             if (used[name]) {
@@ -194,8 +195,11 @@
         document.body.appendChild(a);
         a.click();
         setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-
-        if (btnEl) btnEl.innerHTML = label;
+        } finally {
+            // Подпись восстанавливается в любом случае: при ошибке посреди
+            // партии на кнопке иначе навсегда осталось бы «Готовлю… N из M».
+            if (btnEl && label !== null) btnEl.innerHTML = label;
+        }
     }
 
     global.QrPdf = { downloadCardPdf, downloadCardsZip, pdfFileName, cardToCanvas };

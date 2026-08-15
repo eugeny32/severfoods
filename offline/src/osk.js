@@ -38,6 +38,19 @@ function show() {
             // detached + unref: клавиатура живёт своей жизнью, не завершается
             // вместе с нашим процессом и не блокирует его.
             const child = spawn(TABTIP, [], { detached: true, stdio: 'ignore' });
+
+            // ОБЯЗАТЕЛЬНО. spawn сообщает о неудаче запуска не исключением, а
+            // асинхронным событием 'error' — try/catch вокруг него бесполезен.
+            // Без этого обработчика Node роняет весь основной процесс, и
+            // оператор на точке видит окно «A JavaScript error occurred in the
+            // main process» вместо клавиатуры. Так и происходило: файл TabTip
+            // на месте (isAvailable проходит), но запуск может не удаться —
+            // например, Windows 11 не даёт запускать его напрямую.
+            child.on('error', (e) => {
+                _open = false;
+                console.error('[osk] не удалось запустить клавиатуру:', e.message);
+            });
+
             child.unref();
             _open = true;
             resolve({ ok: true });
