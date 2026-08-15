@@ -65,6 +65,7 @@ core = f'''<script>window.SF_APP_VERSION = "{version}"; window.SF_BUILD_DATE = "
 <script src="core/update.js"></script>
 <script src="core/sync.js"></script>
 <script src="core/api.js"></script>
+<script src="core/status.js"></script>
 <script src="core/boot.js"></script>'''
 
 if '<script src="assets/app.js"></script>' not in html:

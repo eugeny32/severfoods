@@ -171,6 +171,14 @@
                     <span class="mt-auto-icon" id="mealTypeIcon"></span>
                     <span class="mt-auto-label" id="mealTypeLabel">Определяется…</span>
                 </div>
+                <!-- Заряд и сеть. На планшете системная строка состояния скрыта
+                     полноэкранным режимом, поэтому эти сведения показываем сами.
+                     Блок скрыт, пока его не включит core/status.js — в
+                     Windows-версии он не появляется. -->
+                <div class="device-status" id="deviceStatus" style="display:none">
+                    <span class="ds-item" id="dsBattery" title="Заряд батареи"></span>
+                    <span class="ds-item" id="dsNetwork" title="Подключение к сети"></span>
+                </div>
             </div>
 
             <!-- QR input — сканирование работает независимо от фокуса, поле нужно только для ручного ввода -->

@@ -179,6 +179,16 @@ body {
 .mt-auto-icon { font-size:16px; }
 .mt-auto-label { font-size:12px; font-weight:700; color:var(--text-accent); }
 
+/* Заряд и сеть — рядом с типом питания. Нужны на планшете, где системная
+   строка состояния скрыта полноэкранным режимом (см. android/core/status.js).
+   Оформление намеренно повторяет блок типа питания, чтобы шапка читалась
+   единым рядом. */
+.device-status { display:flex; align-items:center; gap:10px; background:var(--bg-card); border:1.5px solid var(--border); border-radius:9px; padding:5px 12px; }
+.ds-item { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; color:var(--text-accent); white-space:nowrap; }
+.ds-item i { font-size:14px; }
+.ds-warn { color:#dc2626; }   /* мало заряда / нет сети */
+.ds-ok   { color:#16a34a; }   /* заряжается */
+
 .qr-field-wrap { background:var(--bg-card); border:1.5px solid var(--border); border-radius:11px; padding:12px 14px; }
 .qr-label-row { display:flex; align-items:center; gap:8px; margin-bottom:7px; flex-wrap:wrap; }
 .qr-label-text { font-size:11px; font-weight:700; color:var(--text-sub); text-transform:uppercase; letter-spacing:.5px; }
