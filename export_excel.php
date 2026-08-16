@@ -24,15 +24,30 @@ $is_super     = ($user_role === 'super_admin');
 $assigned_pid = $_SESSION['assigned_point_id'] ?? null;
 if (!$is_super && $assigned_pid) $point_id = $assigned_pid;
 
-// Регион — см. src/regions.php. Только для супер-администратора, только
-// чтение; при ошибке доступа к чужой БД тихо остаёмся на своём регионе.
+// Регион — см. src/regions.php. Только для супер-администратора, только чтение.
+//
+// При ошибке доступа к чужой базе выгрузка ПРЕРЫВАЕТСЯ. Раньше здесь был тихий
+// откат на свой регион: человек запрашивал Нерюнгри, получал файл с данными
+// Кызыла и никак не мог об этом узнать — в отчётах на такой случай есть баннер,
+// а в скачанном файле не остаётся ничего. Молча подменять данные нельзя.
 $available_regions = $is_super ? getRegions() : [];
 $region = currentRegionKey();
 if ($is_super && isset($_GET['region']) && isset($available_regions[$_GET['region']])) {
     $region = $_GET['region'];
 }
 if ($region !== currentRegionKey()) {
-    try { $pdo = getRegionalPdo($region, $pdo); } catch (Throwable $e) { $region = currentRegionKey(); }
+    try {
+        $pdo = getRegionalPdo($region, $pdo);
+    } catch (Throwable $e) {
+        http_response_code(503);
+        header('Content-Type: text/html; charset=UTF-8');
+        $label = $available_regions[$region]['label'] ?? $region;
+        exit('<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Регион недоступен</title></head><body>'
+            . '<h1>Не удалось получить данные региона «' . htmlspecialchars($label) . '»</h1>'
+            . '<p>Выгрузка остановлена, чтобы не отдать файл с данными другого региона. '
+            . 'Попробуйте позже или сообщите администратору.</p>'
+            . '<p><a href="javascript:history.back()">Вернуться к отчёту</a></p></body></html>');
+    }
 }
 
 if ($report_type === 'dry_rations') {

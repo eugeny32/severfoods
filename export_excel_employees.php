@@ -18,15 +18,27 @@ $is_super     = ($user_role === 'super_admin');
 $assigned_pid = $_SESSION['assigned_point_id'] ?? null;
 if (!$is_super && $assigned_pid) $point_id = $assigned_pid;
 
-// Регион — см. src/regions.php. Только для супер-администратора, только
-// чтение; при ошибке доступа к чужой БД тихо остаёмся на своём регионе.
+// Регион — см. src/regions.php. Только для супер-администратора, только чтение.
+// При ошибке доступа выгрузка прерывается, а не подменяется своим регионом —
+// см. подробный комментарий в export_excel.php.
 $available_regions = $is_super ? getRegions() : [];
 $region = currentRegionKey();
 if ($is_super && isset($_GET['region']) && isset($available_regions[$_GET['region']])) {
     $region = $_GET['region'];
 }
 if ($region !== currentRegionKey()) {
-    try { $pdo = getRegionalPdo($region, $pdo); } catch (Throwable $e) { $region = currentRegionKey(); }
+    try {
+        $pdo = getRegionalPdo($region, $pdo);
+    } catch (Throwable $e) {
+        http_response_code(503);
+        header('Content-Type: text/html; charset=UTF-8');
+        $label = $available_regions[$region]['label'] ?? $region;
+        exit('<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Регион недоступен</title></head><body>'
+            . '<h1>Не удалось получить данные региона «' . htmlspecialchars($label) . '»</h1>'
+            . '<p>Выгрузка остановлена, чтобы не отдать файл с данными другого региона. '
+            . 'Попробуйте позже или сообщите администратору.</p>'
+            . '<p><a href="javascript:history.back()">Вернуться к отчёту</a></p></body></html>');
+    }
 }
 
 $scannedLocal = "CONVERT_TZ(ml.scanned_at, '+00:00', COALESCE(mpt.tz_offset, '" . APP_TZ_OFFSET . "'))";
