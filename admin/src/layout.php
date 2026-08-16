@@ -16,7 +16,9 @@ function adminHead(string $title, string $active = ''): void
         'reports'  => ['Отчёты',     'reports.php'],
         'employees'=> ['Сотрудники', 'employees.php'],
         'points'   => ['Точки',      'points.php'],
+        'monitor'  => ['На связи',   'monitor.php'],
         'regions'  => ['Регионы',    'regions.php'],
+        'provision'=> ['Новый регион','provision.php'],
         'customers'=> ['Заказчики',  'customers.php'],
         'audit'    => ['Журнал',     'audit.php'],
     ];
