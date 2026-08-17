@@ -4,7 +4,7 @@ require_once __DIR__ . '/../functions.php';
 
 // Раньше хватало любой сессии: оператор мог по ?id= получить историю питания
 // ЛЮБОГО сотрудника любой организации. Теперь — только администраторы и
-// только по своей организации (см. canAccessEmployeeCard).
+// карточка супер-администратора закрыта для обычного админа (canAccessEmployeeCard).
 if (!isset($_SESSION['user_id'])) { http_response_code(401); die(json_encode(['error'=>'Unauthorized'])); }
 if (empty($_SESSION['is_admin'])) { http_response_code(403); die(json_encode(['error'=>'Forbidden'])); }
 

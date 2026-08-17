@@ -6,7 +6,7 @@ header('Content-Type: application/json');
 
 // Раньше хватало любой сессии: оператор мог создать или удалить сухпай
 // ЛЮБОМУ сотруднику любой организации, причём без CSRF-защиты. Теперь —
-// только администраторы и только по своей организации (проверка карточки
+// только администраторы; карточка супер-администратора закрыта (проверка
 // ниже, после определения employee_id для конкретного метода).
 if (!isset($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['ok'=>false,'error'=>'Unauthorized']); exit; }
 if (empty($_SESSION['is_admin']))  { http_response_code(403); echo json_encode(['ok'=>false,'error'=>'Forbidden']); exit; }

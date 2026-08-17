@@ -781,7 +781,6 @@ function openAddModal() {
     $('editId').value = '';
     $('empIsActive').checked = true;
     fillOrgDatalist();
-    applyOrgFieldLock();
     openModal('empModal');
 }
 
@@ -789,26 +788,6 @@ function fillOrgDatalist() {
     const dl = document.getElementById('orgDatalist');
     if (!dl || !window.ORG_LIST) return;
     dl.innerHTML = window.ORG_LIST.map(o => `<option value="${o.replace(/"/g,'&quot;')}">`).join('');
-}
-
-// Обычный админ предприятия работает только со своей организацией — поле
-// заблокировано и уже проставлено сервером в window.myOrganization; сам
-// выбор недоступен ни при добавлении, ни при редактировании (сервер это
-// в любом случае перепроверяет — см. add_employee.php/update_employee.php,
-// это только для ясности интерфейса).
-function applyOrgFieldLock() {
-    const el = $('empOrg');
-    if (!el) return;
-    if (!window.isSuperAdmin && window.myOrganization) {
-        el.value = window.myOrganization;
-        el.readOnly = true;
-        el.style.background = 'var(--bg-deep, #f1f5f9)';
-        el.title = 'Вы можете добавлять/редактировать сотрудников только своей организации';
-    } else {
-        el.readOnly = false;
-        el.style.background = '';
-        el.title = '';
-    }
 }
 
 function openEditModal(id) {
@@ -820,7 +799,7 @@ function openEditModal(id) {
         $('empFullName').value  = emp.full_name || '';
         $('empBirthDate').value = emp.birth_date || '';
         $('empOrg').value       = emp.organization || '';
-        applyOrgFieldLock();
+        fillOrgDatalist();
         $('empDept').value      = emp.department || '';
         $('empPos').value       = emp.position || '';
         $('empVjg').value       = emp.vjg_type || '';

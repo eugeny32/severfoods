@@ -18,15 +18,6 @@ if ($assigned_point_id) {
     $assigned_point_name = $ap['point_name'] ?? null;
 }
 
-// Обычный админ предприятия видит/добавляет/редактирует только сотрудников
-// своей организации (совпадающей с его собственной карточкой) — см.
-// add_employee.php/update_employee.php. Значение используется в интерфейсе,
-// чтобы заранее заблокировать поле "Организация", а не только на сервере.
-$my_organization = null;
-if ($is_admin && !$is_super_admin) {
-    $my_organization = trim(getEmployeeById($pdo, (int)($_SESSION['user_id'] ?? 0))['organization'] ?? '');
-}
-
 // Выход
 if (isset($_GET['logout'])) logout();
 
@@ -1120,7 +1111,6 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal, $is_admin) {
 (function(){
     window.isAdmin          = <?= json_encode($is_admin) ?>;
     window.isSuperAdmin     = <?= json_encode($is_super_admin) ?>;
-    window.myOrganization   = <?= json_encode($my_organization) ?>;
     window.allEmployeesData = <?= json_encode($allEmployeesJson, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.orgStats         = <?= json_encode($orgStats,         JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.points           = <?= json_encode($points,           JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
