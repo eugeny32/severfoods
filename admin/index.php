@@ -70,7 +70,11 @@ adminHead('Обзор', 'index');
 <?php foreach ($stats as $key => $s): $r = $s['region']; ?>
 <tr>
     <td><strong><?= adminEsc($r['label']) ?></strong><br><span class="muted"><?= adminEsc($key) ?></span></td>
-    <td class="muted"><?= adminEsc($r['domain']) ?></td>
+    <td class="muted">
+        <?php $url = adminRegionUrl($r); ?>
+        <?php if ($url): ?><a href="<?= adminEsc($url) ?>" target="_blank" rel="noopener"><?= adminEsc($r['domain']) ?> ↗</a>
+        <?php else: ?><?= adminEsc($r['domain']) ?><?php endif; ?>
+    </td>
     <td class="muted"><?= adminEsc($r['customer_name'] ?? '—') ?></td>
     <?php if ($s['ok']): ?>
         <td><?= $s['employees'] ?></td>

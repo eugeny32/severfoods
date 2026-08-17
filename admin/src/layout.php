@@ -15,6 +15,7 @@ function adminHead(string $title, string $active = ''): void
         'index'    => ['Обзор',      'index.php'],
         'reports'  => ['Отчёты',     'reports.php'],
         'employees'=> ['Сотрудники', 'employees.php'],
+        'global'   => ['Единый доступ','global_user.php'],
         'points'   => ['Точки',      'points.php'],
         'monitor'  => ['На связи',   'monitor.php'],
         'regions'  => ['Регионы',    'regions.php'],
@@ -22,6 +23,20 @@ function adminHead(string $title, string $active = ''): void
         'customers'=> ['Заказчики',  'customers.php'],
         'audit'    => ['Журнал',     'audit.php'],
     ];
+    // Ссылки на площадки. Реестр читается прямо здесь: панель со ссылками
+    // нужна на каждой странице, а тащить список через все вызовы adminHead()
+    // означало бы править каждую страницу ради одного и того же.
+    // Недоступный реестр не должен ронять страницу — тогда просто нет панели.
+    $siteLinks = [];
+    try {
+        global $pdo;
+        if (isset($pdo) && $pdo instanceof PDO) {
+            foreach (adminRegions($pdo, true) as $r) {
+                $url = adminRegionUrl($r);
+                if ($url !== '') $siteLinks[] = ['label' => (string)$r['label'], 'url' => $url];
+            }
+        }
+    } catch (Throwable $e) { /* панель со ссылками необязательна */ }
     ?><!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -69,6 +84,12 @@ label{display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:5
 .msg-ok{background:#f0fdf4;border:1.5px solid #bbf7d0;color:#166534}
 .msg-warn{background:#fff7ed;border:1.5px solid #fed7aa;color:#92400e}
 .regbox{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.sites{background:#00224a;color:#fff;padding:9px 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+       font-size:13px;border-top:1px solid rgba(255,255,255,.08)}
+.sites .cap{color:rgba(255,255,255,.55);font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:11px}
+.sites a{color:#fff;text-decoration:none;border:1px solid rgba(255,255,255,.28);border-radius:20px;
+         padding:5px 13px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.sites a:hover{background:rgba(255,255,255,.12)}
 .regbox label{text-transform:none;letter-spacing:0;font-size:14px;font-weight:600;color:#0f172a;display:flex;align-items:center;gap:6px;margin:0;cursor:pointer}
 </style>
 </head>
@@ -85,6 +106,15 @@ label{display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:5
         <a href="logout.php">Выйти</a>
     </div>
 </header>
+<?php if ($siteLinks): ?>
+<div class="sites">
+    <span class="cap">Площадки</span>
+    <?php foreach ($siteLinks as $s): ?>
+        <a href="<?= adminEsc($s['url']) ?>" target="_blank" rel="noopener">
+            <?= adminEsc($s['label']) ?> ↗</a>
+    <?php endforeach; ?>
+</div>
+<?php endif; ?>
 <main>
 <?php
 }
