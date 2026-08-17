@@ -80,22 +80,59 @@ function adminRegionPdo(PDO $adminPdo, array $region): PDO
     $key = $region['region_key'];
     if (isset($cache[$key])) return $cache[$key];
 
+    // Имя базы проверяем и здесь. Раньше оно уходило в строку подключения как
+    // есть, и незаполненный заполнитель из заготовки реестра доходил до MySQL,
+    // возвращая «Access denied» — сообщение, по которому невозможно понять,
+    // что на самом деле надо просто вписать имя базы.
+    adminQuoteDb((string)$region['db_name']);
+
     $host = $region['db_host'] ?: ADMIN_DB_HOST;
     $user = $region['db_user'] ?: ADMIN_DB_USER;
     $pass = $region['db_pass'] !== null && $region['db_pass'] !== '' ? $region['db_pass'] : ADMIN_DB_PASS;
 
-    $pdo = new PDO(
-        "mysql:host={$host};dbname={$region['db_name']};charset=utf8mb4",
-        $user,
-        $pass,
-        [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES   => false,
-        ]
-    );
+    try {
+        $pdo = new PDO(
+            "mysql:host={$host};dbname={$region['db_name']};charset=utf8mb4",
+            $user,
+            $pass,
+            [
+                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES   => false,
+            ]
+        );
+    } catch (PDOException $e) {
+        throw new RuntimeException(adminDbErrorHint($e, (string)$region['db_name'], $user), 0, $e);
+    }
     $pdo->exec("SET time_zone = '+00:00'");
     return $cache[$key] = $pdo;
+}
+
+/**
+ * Понятное объяснение вместо сырой ошибки MySQL.
+ *
+ * Отказ в доступе (1044/1045) — не поломка кода, а незаданные права на
+ * хостинге, и человеку нужно сказать именно это, иначе он будет искать ошибку
+ * в программе.
+ */
+function adminDbErrorHint(Throwable $e, string $dbName, string $user): string
+{
+    $m = $e->getMessage();
+
+    if (str_contains($m, '1044') || str_contains($m, 'Access denied') && str_contains($m, 'to database')) {
+        return "Пользователю «{$user}» не выданы права на базу «{$dbName}». "
+             . 'Это настройка хостинга, а не программы: в панели управления базами данных '
+             . 'привяжите этого пользователя к базе с полными правами. '
+             . 'Сводные отчёты по всем регионам работают только тогда, когда один пользователь '
+             . 'видит все базы.';
+    }
+    if (str_contains($m, '1045')) {
+        return "Неверный пароль пользователя «{$user}» для базы «{$dbName}».";
+    }
+    if (str_contains($m, '1049')) {
+        return "База «{$dbName}» не существует. Проверьте имя в реестре регионов.";
+    }
+    return $m;
 }
 
 /**

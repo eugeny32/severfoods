@@ -89,12 +89,14 @@ $customers = $pdo->query('SELECT id, name FROM customers WHERE is_active = 1 ORD
 
 // Проверка доступности: тот же способ, каким будут ходить сводные отчёты.
 $health = [];
+$noAccess = 0;
 foreach ($regions as $key => $r) {
     try {
         $pdo->query('SELECT 1 FROM ' . adminQuoteDb($r['db_name']) . '.meal_logs LIMIT 1');
         $health[$key] = '';
     } catch (Throwable $e) {
-        $health[$key] = $e->getMessage();
+        $health[$key] = adminDbErrorHint($e, (string)$r['db_name'], ADMIN_DB_USER);
+        if (str_contains($e->getMessage(), '1044')) $noAccess++;
     }
 }
 
@@ -109,6 +111,20 @@ adminHead('Регионы', 'regions');
 
 <?php if ($msg): ?><div class="msg msg-ok"><?= adminEsc($msg) ?></div><?php endif; ?>
 <?php if ($err): ?><div class="msg msg-err"><?= adminEsc($err) ?></div><?php endif; ?>
+
+<?php if ($noAccess): ?>
+<div class="msg msg-err">
+    <strong>Пользователю базы не выданы права на <?= $noAccess ?> регион(а).</strong>
+    Это настройка хостинга, а не программы. В панели управления базами данных найдите
+    пользователя <code><?= adminEsc(ADMIN_DB_USER) ?></code> и привяжите его к каждой базе
+    региона с полными правами.
+    <br><br>
+    Пока прав нет, сводные отчёты по этим регионам строиться не будут: запрос через границы
+    баз выполняется одним соединением, и оно должно видеть все базы сразу.
+    Если выдать общие права нельзя, укажите отдельные реквизиты доступа в карточке
+    региона — но тогда он выпадет из сводного отчёта, и смотреть его придётся отдельно.
+</div>
+<?php endif; ?>
 
 <div class="card">
 <table>
