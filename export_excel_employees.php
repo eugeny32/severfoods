@@ -18,6 +18,9 @@ $is_super     = ($user_role === 'super_admin');
 $assigned_pid = $_SESSION['assigned_point_id'] ?? null;
 if (!$is_super && $assigned_pid) $point_id = $assigned_pid;
 
+// Тот же фильтр по организациям, что и на экране отчёта (см. reports.php).
+$selected_orgs = selectedOrganizations($pdo, $_GET['orgs'] ?? null);
+
 // Регион — см. src/regions.php. Только для супер-администратора, только чтение.
 // При ошибке доступа выгрузка прерывается, а не подменяется своим регионом —
 // см. подробный комментарий в export_excel.php.
@@ -56,6 +59,8 @@ $sql = "SELECT e.id, e.full_name, e.organization, e.department,
 $params = [':s' => $start_date, ':e' => $end_date];
 if ($meal_type !== 'all') { $sql .= " AND ml.meal_type = :mt";      $params[':mt']  = $meal_type; }
 if ($point_id)            { $sql .= " AND ml.meal_point_id = :pid"; $params[':pid'] = $point_id; }
+[$orgSql, $orgParams] = orgFilterSql($selected_orgs);
+$sql .= $orgSql; $params += $orgParams;
 $sql .= " GROUP BY e.id, e.full_name, e.organization, e.department ORDER BY e.organization, e.full_name";
 
 $stmt = $pdo->prepare($sql);
@@ -63,6 +68,7 @@ $stmt->execute($params);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Dry rations per employee in the period
+[$orgSqlDry, $orgParamsDry] = orgFilterSql($selected_orgs, 'e.organization', 'dorg');
 $dryByEmp = [];
 $dryDetails = [];
 try {
@@ -73,10 +79,10 @@ try {
          FROM dry_rations dr
          JOIN employees e ON dr.employee_id = e.id
          LEFT JOIN employees op ON dr.created_by = op.id
-         WHERE dr.ration_date BETWEEN :s AND :e
+         WHERE dr.ration_date BETWEEN :s AND :e" . $orgSqlDry . "
          ORDER BY e.organization, e.full_name, dr.ration_date"
     );
-    $stmtDry->execute([':s' => $start_date, ':e' => $end_date]);
+    $stmtDry->execute([':s' => $start_date, ':e' => $end_date] + $orgParamsDry);
     $dryDetails = $stmtDry->fetchAll(PDO::FETCH_ASSOC);
     foreach ($dryDetails as $d) {
         if ($d['status'] === 'active') {

@@ -24,6 +24,12 @@ $is_super     = ($user_role === 'super_admin');
 $assigned_pid = $_SESSION['assigned_point_id'] ?? null;
 if (!$is_super && $assigned_pid) $point_id = $assigned_pid;
 
+// Тот же фильтр по организациям, что и на экране отчёта (см. reports.php).
+// Условие собирается общим помощником: если бы оно здесь отличалось, в файле
+// оказался бы не тот набор строк, что видел человек, — и заметили бы это
+// нескоро.
+$selected_orgs = selectedOrganizations($pdo, $_GET['orgs'] ?? null);
+
 // Регион — см. src/regions.php. Только для супер-администратора, только чтение.
 //
 // При ошибке доступа к чужой базе выгрузка ПРЕРЫВАЕТСЯ. Раньше здесь был тихий
@@ -61,6 +67,8 @@ if ($report_type === 'dry_rations') {
                WHERE dr.ration_date BETWEEN :s AND :e";
     $paramsDry = [':s' => $start_date, ':e' => $end_date];
     if ($dry_type !== 'all') { $sqlDry .= " AND dr.ration_type = :rt"; $paramsDry[':rt'] = $dry_type; }
+    [$orgSqlDry, $orgParamsDry] = orgFilterSql($selected_orgs, 'e.organization', 'dorg');
+    $sqlDry .= $orgSqlDry; $paramsDry += $orgParamsDry;
     $sqlDry .= " ORDER BY dr.ration_date DESC, e.full_name";
     $stmtDry = $pdo->prepare($sqlDry);
     $stmtDry->execute($paramsDry);
@@ -135,6 +143,8 @@ $sql = "SELECT ml.scanned_at, $scannedLocal AS scanned_local, e.full_name, e.org
 $params = [':s' => $start_date, ':e' => $end_date];
 if ($meal_type !== 'all') { $sql .= " AND ml.meal_type = :mt";  $params[':mt']  = $meal_type; }
 if ($point_id)            { $sql .= " AND ml.meal_point_id = :pid"; $params[':pid'] = $point_id; }
+[$orgSql, $orgParams] = orgFilterSql($selected_orgs);
+$sql .= $orgSql; $params += $orgParams;
 $sql .= " ORDER BY ml.scanned_at DESC";
 
 $stmt = $pdo->prepare($sql);

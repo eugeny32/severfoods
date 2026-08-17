@@ -467,6 +467,75 @@ function logAction(string $action, ?string $details = null): void
     }
 }
 
+// ─── Фильтр отчётов по организациям ───────────────────
+
+/**
+ * Список организаций для фильтра отчётов.
+ *
+ * Берётся из карточек сотрудников — отдельного справочника организаций в
+ * системе нет. Чат-аккаунты исключаются: это не сотрудники предприятий.
+ *
+ * @return string[]
+ */
+function getOrganizationList(PDO $pdo): array
+{
+    try {
+        $rows = $pdo->query(
+            "SELECT DISTINCT TRIM(organization) AS o
+             FROM employees
+             WHERE organization IS NOT NULL AND TRIM(organization) <> ''
+               AND NOT (COALESCE(chat_access,0) = 1 AND role IS NULL)
+             ORDER BY o"
+        )->fetchAll(PDO::FETCH_COLUMN);
+        return array_values(array_filter($rows));
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+/**
+ * Условие «организация входит в выбранные» для отчётов.
+ *
+ * Один помощник на все запросы отчёта и обе выгрузки в Excel: условие
+ * применяется в четырёх местах, и если бы оно разъехалось, на экране и в файле
+ * оказались бы разные наборы строк — ошибка, которую замечают позже всего.
+ *
+ * Пустой выбор означает «все организации»: так отчёт открывается сразу, без
+ * лишнего щелчка, и ведёт себя как раньше.
+ *
+ * @param string[] $orgs   выбранные организации
+ * @param string   $column выражение с организацией (обычно e.organization)
+ * @param string   $prefix префикс имён параметров — чтобы не столкнуться в одном запросе
+ * @return array{0:string,1:array} кусок SQL (может быть пустым) и параметры
+ */
+function orgFilterSql(array $orgs, string $column = 'e.organization', string $prefix = 'org'): array
+{
+    $orgs = array_values(array_filter(array_map('trim', $orgs), fn($o) => $o !== ''));
+    if (!$orgs) return ['', []];
+
+    $names  = [];
+    $params = [];
+    foreach ($orgs as $i => $o) {
+        $key = ":{$prefix}{$i}";
+        $names[]       = $key;
+        $params[$key]  = $o;
+    }
+    return [" AND TRIM({$column}) IN (" . implode(',', $names) . ")", $params];
+}
+
+/**
+ * Организации, выбранные в запросе. Значения сверяются со списком реально
+ * существующих — иначе в фильтр попадёт что угодно из адресной строки.
+ *
+ * @return string[]
+ */
+function selectedOrganizations(PDO $pdo, $raw): array
+{
+    if (!is_array($raw)) return [];
+    $known = getOrganizationList($pdo);
+    return array_values(array_intersect(array_map('trim', $raw), $known));
+}
+
 // ─── Дистрибутивы приложения ──────────────────────────
 
 /**

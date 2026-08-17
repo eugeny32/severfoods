@@ -42,6 +42,17 @@ if ($region !== currentRegionKey()) {
     }
 }
 
+// Организации для фильтра. Считываются ПОСЛЕ выбора региона: у каждого
+// региона свой набор организаций, и список должен соответствовать той базе,
+// по которой строится отчёт.
+$org_list     = getOrganizationList($pdo);
+$selected_orgs = selectedOrganizations($pdo, $_GET['orgs'] ?? null);
+// Тот же выбор надо донести до выгрузок в Excel — иначе на экране одни
+// организации, а в файле все.
+$orgQuery = $selected_orgs
+    ? '&' . http_build_query(['orgs' => $selected_orgs])
+    : '';
+
 // Доступные точки
 $points = [];
 if ($is_super_admin) {
@@ -74,6 +85,8 @@ if ($filter_point_id)     { $sql .= " AND ml.meal_point_id = :pid"; $params[':pi
 if ($unassigned_only)     { $sql .= " AND ml.meal_point_id IS NULL"; }
 if ($source === 'scanner') { $sql .= " AND (ml.scanner_ip IS NULL OR ml.scanner_ip NOT IN ('bulk','manual','offline'))"; }
 elseif ($source !== 'all') { $sql .= " AND ml.scanner_ip = :src"; $params[':src'] = $source; }
+[$orgSql, $orgParams] = orgFilterSql($selected_orgs);
+$sql .= $orgSql; $params += $orgParams;
 $sql .= " ORDER BY ml.scanned_at DESC";
 
 $stmt = $pdo->prepare($sql); $stmt->execute($params);
@@ -146,6 +159,8 @@ if ($meal_type !== 'all')  { $sqlEmp .= " AND ml.meal_type = :mt";        $param
 if ($filter_point_id)      { $sqlEmp .= " AND ml.meal_point_id = :pid";   $paramsEmp[':pid'] = $filter_point_id; }
 if ($source === 'scanner') { $sqlEmp .= " AND (ml.scanner_ip IS NULL OR ml.scanner_ip NOT IN ('bulk','manual','offline'))"; }
 elseif ($source !== 'all') { $sqlEmp .= " AND ml.scanner_ip = :src"; $paramsEmp[':src'] = $source; }
+[$orgSqlEmp, $orgParamsEmp] = orgFilterSql($selected_orgs, 'e.organization', 'eorg');
+$sqlEmp .= $orgSqlEmp; $paramsEmp += $orgParamsEmp;
 $sqlEmp .= " GROUP BY e.id, e.full_name, e.organization, e.department
              ORDER BY e.organization, e.full_name";
 $stmtEmp = $pdo->prepare($sqlEmp);
@@ -172,6 +187,8 @@ if ($report_type === 'dry_rations') {
                    WHERE dr.ration_date BETWEEN :start AND :end";
         $paramsDry = [':start' => $start_date, ':end' => $end_date];
         if ($dry_type !== 'all') { $sqlDry .= " AND dr.ration_type = :rt"; $paramsDry[':rt'] = $dry_type; }
+        [$orgSqlDry, $orgParamsDry] = orgFilterSql($selected_orgs, 'e.organization', 'dorg');
+        $sqlDry .= $orgSqlDry; $paramsDry += $orgParamsDry;
         $sqlDry .= " ORDER BY dr.ration_date DESC, e.full_name";
         $stmtDry = $pdo->prepare($sqlDry);
         $stmtDry->execute($paramsDry);
@@ -237,6 +254,29 @@ arsort($by_point); arsort($by_org);
     display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
 }
 .filter-bar .form-group { flex: 1; min-width: 130px; }
+
+/* Фильтр по организациям — чипы с чекбоксами. Список бывает длинным,
+   поэтому он переносится по строкам и ограничен по высоте прокруткой. */
+.org-filter {
+    display: flex; flex-wrap: wrap; gap: 7px;
+    max-height: 120px; overflow-y: auto;
+    padding: 8px; border: 1.5px solid var(--border); border-radius: 8px;
+    background: var(--bg);
+}
+.org-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 11px; border-radius: 20px; cursor: pointer;
+    background: #fff; border: 1.5px solid var(--border);
+    font-size: 12.5px; font-weight: 600; color: var(--text-2);
+    white-space: nowrap; user-select: none; margin: 0;
+}
+.org-chip:hover { border-color: var(--blue-400); }
+.org-chip input { cursor: pointer; margin: 0; accent-color: var(--blue-700); }
+.org-chip:has(input:checked) {
+    background: var(--blue-50, #eff6ff);
+    border-color: var(--blue-700, #003366);
+    color: var(--blue-800, #003366);
+}
 .split2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
 @media (max-width: 700px) { .split2 { grid-template-columns: 1fr; } }
 .by-list { display: flex; flex-direction: column; gap: 6px; }
@@ -350,14 +390,36 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
         <label for="outOfScheduleOnly" style="margin:0;white-space:nowrap" title="Записи, чьё местное время не попадает в расписание столовой на точке для этого типа питания (или расписание вовсе не настроено)">Только вне графика столовой</label>
     </div>
     <?php endif; ?>
+    <?php if ($org_list): ?>
+    <div class="form-group" style="flex-basis:100%;min-width:100%">
+        <label><i class="fas fa-building"></i> Организации
+            <span style="font-weight:400;color:#64748b">— ничего не отмечено означает все</span>
+        </label>
+        <div class="org-filter">
+            <?php foreach ($org_list as $o): ?>
+            <label class="org-chip">
+                <input type="checkbox" name="orgs[]" value="<?= htmlspecialchars($o, ENT_QUOTES) ?>"
+                       <?= in_array($o, $selected_orgs, true) ? 'checked' : '' ?>>
+                <span><?= htmlspecialchars($o) ?></span>
+            </label>
+            <?php endforeach; ?>
+        </div>
+        <?php if ($selected_orgs): ?>
+        <div style="margin-top:6px">
+            <a href="?<?= htmlspecialchars(http_build_query(array_diff_key($_GET, ['orgs' => 1])), ENT_QUOTES) ?>"
+               style="font-size:12px;color:#64748b">Снять выбор со всех</a>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
     <div class="form-group" style="min-width:auto">
         <label>&nbsp;</label>
         <div style="display:flex;gap:8px">
             <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Применить</button>
-            <a href="export_excel.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&report_type=<?= $report_type ?>&meal_type=<?= $meal_type ?>&dry_type=<?= $dry_type ?>&region=<?= urlencode($region) ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
+            <a href="export_excel.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&report_type=<?= $report_type ?>&meal_type=<?= $meal_type ?>&dry_type=<?= $dry_type ?>&region=<?= urlencode($region) ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?><?= $orgQuery ?>"
                class="btn btn-success" style="background:#1d6f42"><i class="fas fa-table"></i> Excel (детали)</a>
             <?php if ($report_type !== 'dry_rations'): ?>
-            <a href="export_excel_employees.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?>&region=<?= urlencode($region) ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
+            <a href="export_excel_employees.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?>&region=<?= urlencode($region) ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?><?= $orgQuery ?>"
                class="btn btn-success" style="background:#15803d"><i class="fas fa-users"></i> Excel (сотрудники)</a>
             <?php endif; ?>
         </div>
