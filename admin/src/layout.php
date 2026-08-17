@@ -1,5 +1,12 @@
 <?php
-/** Общая обёртка страниц админки: шапка, меню, подвал. */
+/**
+ * Общая обёртка страниц админки: шапка, меню, подвал.
+ *
+ * Оформление вынесено в assets/admin.css и повторяет порталы: тот же синий
+ * #003366, янтарный акцент, шрифт Onest и иконки Font Awesome. Раньше стили
+ * лежали прямо здесь одним куском — редактировать их было неудобно, а
+ * браузер не мог их закэшировать.
+ */
 
 declare(strict_types=1);
 
@@ -11,18 +18,21 @@ function adminEsc(?string $s): string
 function adminHead(string $title, string $active = ''): void
 {
     $u = adminCurrentUser();
+    // Иконка рядом с каждым пунктом: на узком экране меню разворачивается в
+    // столбец, и значок помогает найти нужное быстрее, чем чтение подписей.
     $nav = [
-        'index'    => ['Обзор',      'index.php'],
-        'reports'  => ['Отчёты',     'reports.php'],
-        'employees'=> ['Сотрудники', 'employees.php'],
-        'global'   => ['Единый доступ','global_user.php'],
-        'points'   => ['Точки',      'points.php'],
-        'monitor'  => ['На связи',   'monitor.php'],
-        'regions'  => ['Регионы',    'regions.php'],
-        'provision'=> ['Новый регион','provision.php'],
-        'customers'=> ['Заказчики',  'customers.php'],
-        'audit'    => ['Журнал',     'audit.php'],
+        'index'    => ['Обзор',        'index.php',       'fa-gauge-high'],
+        'reports'  => ['Отчёты',       'reports.php',     'fa-chart-column'],
+        'employees'=> ['Сотрудники',   'employees.php',   'fa-users'],
+        'global'   => ['Единый доступ','global_user.php', 'fa-id-card'],
+        'points'   => ['Точки',        'points.php',      'fa-utensils'],
+        'monitor'  => ['На связи',     'monitor.php',     'fa-signal'],
+        'regions'  => ['Регионы',      'regions.php',     'fa-map-location-dot'],
+        'provision'=> ['Новый регион', 'provision.php',   'fa-circle-plus'],
+        'customers'=> ['Заказчики',    'customers.php',   'fa-building'],
+        'audit'    => ['Журнал',       'audit.php',       'fa-clock-rotate-left'],
     ];
+
     // Ссылки на площадки. Реестр читается прямо здесь: панель со ссылками
     // нужна на каждой странице, а тащить список через все вызовы adminHead()
     // означало бы править каждую страницу ради одного и того же.
@@ -41,78 +51,58 @@ function adminHead(string $title, string $active = ''): void
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#003366">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title><?= adminEsc($title) ?> · <?= adminEsc(ADMIN_TITLE) ?></title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,'Segoe UI',sans-serif;background:#f1f5f9;color:#0f172a;min-height:100vh}
-header{background:#003366;color:#fff;padding:0 24px;display:flex;align-items:center;gap:28px;flex-wrap:wrap}
-header .brand{font-size:17px;font-weight:800;padding:16px 0;white-space:nowrap}
-header nav{display:flex;gap:4px;flex:1;flex-wrap:wrap}
-header nav a{color:rgba(255,255,255,.75);text-decoration:none;font-size:14px;font-weight:600;padding:18px 14px;border-bottom:3px solid transparent}
-header nav a:hover{color:#fff}
-header nav a.on{color:#fff;border-bottom-color:#4f9cf9}
-header .me{font-size:13px;color:rgba(255,255,255,.7);display:flex;align-items:center;gap:12px}
-header .me a{color:#fff;text-decoration:none;border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:6px 12px;font-weight:600}
-main{max-width:1400px;margin:24px auto;padding:0 24px 60px}
-h1{font-size:23px;font-weight:700;margin-bottom:18px}
-h2{font-size:17px;font-weight:700;margin:24px 0 12px}
-.card{background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:20px;margin-bottom:18px}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th,td{text-align:left;padding:9px 10px;border-bottom:1px solid #e2e8f0;vertical-align:top}
-th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;font-weight:700}
-tr:last-child td{border-bottom:none}
-.muted{color:#64748b;font-size:13px}
-.pill{display:inline-block;border-radius:20px;padding:2px 10px;font-size:12px;font-weight:700}
-.pill-ok{background:#dcfce7;color:#166534}
-.pill-off{background:#fee2e2;color:#991b1b}
-.pill-reg{background:#e0f2fe;color:#075985}
-.btn{display:inline-flex;align-items:center;gap:7px;background:#003366;color:#fff;border:none;border-radius:9px;
-     padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;font-family:inherit}
-.btn:hover{background:#00438a}
-.btn-sec{background:#fff;color:#0f172a;border:1.5px solid #cbd5e1}
-.btn-sec:hover{background:#f8fafc}
-.btn-danger{background:#dc2626}
-.btn-danger:hover{background:#b91c1c}
-input[type=text],input[type=password],input[type=date],input[type=number],select,textarea{
-  padding:9px 12px;border:1.5px solid #cbd5e1;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:#0f172a}
-label{display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:5px;text-transform:uppercase;letter-spacing:.03em}
-.field{margin-bottom:14px}
-.grid{display:grid;gap:14px}
-.msg{border-radius:9px;padding:12px 16px;margin-bottom:16px;font-size:14px}
-.msg-err{background:#fef2f2;border:1.5px solid #fecaca;color:#991b1b}
-.msg-ok{background:#f0fdf4;border:1.5px solid #bbf7d0;color:#166534}
-.msg-warn{background:#fff7ed;border:1.5px solid #fed7aa;color:#92400e}
-.regbox{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
-.sites{background:#00224a;color:#fff;padding:9px 24px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-       font-size:13px;border-top:1px solid rgba(255,255,255,.08)}
-.sites .cap{color:rgba(255,255,255,.55);font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-size:11px}
-.sites a{color:#fff;text-decoration:none;border:1px solid rgba(255,255,255,.28);border-radius:20px;
-         padding:5px 13px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
-.sites a:hover{background:rgba(255,255,255,.12)}
-.regbox label{text-transform:none;letter-spacing:0;font-size:14px;font-weight:600;color:#0f172a;display:flex;align-items:center;gap:6px;margin:0;cursor:pointer}
-</style>
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/admin.css?v=2">
 </head>
 <body>
-<header>
-    <div class="brand"><?= adminEsc(ADMIN_TITLE) ?></div>
-    <nav>
-        <?php foreach ($nav as $key => [$label, $href]): ?>
-            <a href="<?= $href ?>" class="<?= $key === $active ? 'on' : '' ?>"><?= adminEsc($label) ?></a>
-        <?php endforeach; ?>
-    </nav>
-    <div class="me">
-        <span><?= adminEsc($u['full_name'] ?? '') ?><?= ($u['role'] ?? '') === 'viewer' ? ' · только чтение' : '' ?></span>
-        <a href="logout.php">Выйти</a>
+<header class="hdr">
+    <div class="hdr-top">
+        <button class="hdr-burger" type="button" id="navToggle"
+                aria-label="Меню" aria-expanded="false" aria-controls="mainNav">
+            <i class="fas fa-bars"></i>
+        </button>
+        <img src="logo.png" alt="" class="hdr-logo" onerror="this.style.display='none'">
+        <div class="hdr-name">
+            <?= adminEsc(ADMIN_TITLE) ?>
+            <small>Центр управления регионами</small>
+        </div>
+        <div class="hdr-spacer"></div>
+        <div class="hdr-me">
+            <span class="who">
+                <i class="fas fa-user-shield"></i>
+                <?= adminEsc($u['full_name'] ?? '') ?><?= ($u['role'] ?? '') === 'viewer' ? ' · только чтение' : '' ?>
+            </span>
+            <a class="hdr-out" href="logout.php"><i class="fas fa-right-from-bracket"></i> Выйти</a>
+        </div>
     </div>
+    <nav class="nav" id="mainNav">
+        <div class="nav-inner">
+            <?php foreach ($nav as $key => [$label, $href, $icon]): ?>
+                <a href="<?= $href ?>" class="<?= $key === $active ? 'on' : '' ?>">
+                    <i class="fas <?= $icon ?>"></i><?= adminEsc($label) ?></a>
+            <?php endforeach; ?>
+        </div>
+    </nav>
 </header>
 <?php if ($siteLinks): ?>
 <div class="sites">
-    <span class="cap">Площадки</span>
-    <?php foreach ($siteLinks as $s): ?>
-        <a href="<?= adminEsc($s['url']) ?>" target="_blank" rel="noopener">
-            <?= adminEsc($s['label']) ?> ↗</a>
-    <?php endforeach; ?>
+    <div class="sites-inner">
+        <span class="cap"><i class="fas fa-location-dot"></i> Площадки</span>
+        <?php foreach ($siteLinks as $s): ?>
+            <a href="<?= adminEsc($s['url']) ?>" target="_blank" rel="noopener">
+                <?= adminEsc($s['label']) ?> <i class="fas fa-arrow-up-right-from-square"></i></a>
+        <?php endforeach; ?>
+    </div>
 </div>
 <?php endif; ?>
 <main>
@@ -121,5 +111,65 @@ label{display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:5
 
 function adminFoot(): void
 {
-    echo "</main>\n</body>\n</html>\n";
+    ?>
+</main>
+<script>
+// Меню на узком экране
+(function () {
+    var btn = document.getElementById('navToggle');
+    var nav = document.getElementById('mainNav');
+    if (!btn || !nav) return;
+    btn.addEventListener('click', function () {
+        var open = nav.classList.toggle('open');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.querySelector('i').className = open ? 'fas fa-xmark' : 'fas fa-bars';
+    });
+})();
+
+// Таблицы для телефона.
+//
+// На узком экране широкая таблица либо уезжает за край, либо сжимается до
+// нечитаемого. Здесь каждая ячейка получает подпись своего столбца, и CSS
+// (@media max-width:860px) раскладывает строку карточкой «подпись — значение».
+// Делается это одним местом для всех страниц: иначе пришлось бы дописывать
+// data-label в каждую ячейку каждой таблицы и не забывать про новые.
+(function () {
+    document.querySelectorAll('table').forEach(function (t) {
+        var headRow = t.querySelector('tr');
+        if (!headRow) return;
+        var heads = [].map.call(headRow.querySelectorAll('th'), function (th) {
+            return th.textContent.trim();
+        });
+        if (!heads.length) return;          // таблица без шапки — оставляем как есть
+
+        t.classList.add('stack');
+        // Строку заголовков прячем целиком: сами th скрыты стилем, но пустая
+        // строка иначе осталась бы пустой карточкой сверху таблицы.
+        headRow.classList.add('hdrow');
+        [].forEach.call(t.rows, function (row) {
+            if (row === headRow) return;
+            var i = 0;
+            [].forEach.call(row.cells, function (cell) {
+                if (!cell.hasAttribute('data-label')) {
+                    // Ячейка, растянутая на несколько столбцов, не относится ни
+                    // к одному из них (обычно это сообщение об ошибке на всю
+                    // строку) — подпись столбца ввела бы в заблуждение.
+                    cell.setAttribute('data-label', cell.colSpan > 1 ? '' : (heads[i] || ''));
+                }
+                i += cell.colSpan || 1;
+            });
+        });
+
+        if (!t.parentElement.classList.contains('table-wrap')) {
+            var wrap = document.createElement('div');
+            wrap.className = 'table-wrap';
+            t.parentNode.insertBefore(wrap, t);
+            wrap.appendChild(t);
+        }
+    });
+})();
+</script>
+</body>
+</html>
+<?php
 }

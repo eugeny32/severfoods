@@ -67,7 +67,7 @@ $qs = fn(array $over = []) => http_build_query(array_merge([
 
 adminHead('Отчёты', 'reports');
 ?>
-<h1>Сводные отчёты</h1>
+<h1><i class="fas fa-chart-column"></i> Сводные отчёты</h1>
 
 <?php if (!$allRegions): ?>
     <div class="msg msg-warn">Реестр регионов пуст — добавьте регионы на странице «Регионы».</div>
@@ -125,11 +125,11 @@ adminHead('Отчёты', 'reports');
                    value="<?= adminEsc($filters['search']) ?>"></div>
     </div>
 
-    <button class="btn" type="submit">Показать</button>
+    <button class="btn" type="submit"><i class="fas fa-magnifying-glass"></i> Показать</button>
     <a class="btn btn-sec" href="?<?= adminEsc($qs(['type' => $type === 'meals' ? 'rations' : 'meals'])) ?>">
         <?= $type === 'meals' ? 'Сухпаи и выездное' : 'Журнал питания' ?>
     </a>
-    <a class="btn btn-sec" href="export_excel.php?<?= adminEsc($qs()) ?>">Выгрузить в Excel</a>
+    <a class="btn btn-sec" href="export_excel.php?<?= adminEsc($qs()) ?>"><i class="fas fa-file-excel"></i> Выгрузить в Excel</a>
 </form>
 
 <?php if ($error): ?>

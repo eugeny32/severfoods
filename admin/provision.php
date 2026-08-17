@@ -143,7 +143,7 @@ $customers = $pdo->query('SELECT id, name FROM customers WHERE is_active = 1 ORD
 
 adminHead('Новый регион', 'provision');
 ?>
-<h1>Добавление региона</h1>
+<h1><i class="fas fa-circle-plus"></i> Добавление региона</h1>
 
 <?php if ($err): ?><div class="msg msg-err"><?= adminEsc($err) ?></div><?php endif; ?>
 
@@ -181,7 +181,7 @@ adminHead('Новый регион', 'provision');
         <p style="font-family:monospace;font-size:18px;font-weight:700"><?= adminEsc($firstQr) ?></p>
     </div>
 
-    <p><a class="btn" href="regions.php">К списку регионов</a></p>
+    <p><a class="btn" href="regions.php"><i class="fas fa-arrow-left"></i> К списку регионов</a></p>
 
 <?php else: ?>
 
@@ -224,7 +224,7 @@ adminHead('Новый регион', 'provision');
             <input type="text" name="admin_name" required style="width:100%" placeholder="Иванов Иван"></div>
     </div>
 
-    <button class="btn" type="submit">Развернуть регион</button>
+    <button class="btn" type="submit"><i class="fas fa-circle-plus"></i> Развернуть регион</button>
 </form>
 
 <?php endif; adminFoot();

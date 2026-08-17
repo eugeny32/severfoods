@@ -50,7 +50,7 @@ $broken = array_filter($stats, fn($s) => !$s['ok']);
 
 adminHead('Обзор', 'index');
 ?>
-<h1>Обзор регионов</h1>
+<h1><i class="fas fa-gauge-high"></i> Обзор регионов</h1>
 
 <?php if ($broken): ?>
 <div class="msg msg-err">
@@ -72,7 +72,7 @@ adminHead('Обзор', 'index');
     <td><strong><?= adminEsc($r['label']) ?></strong><br><span class="muted"><?= adminEsc($key) ?></span></td>
     <td class="muted">
         <?php $url = adminRegionUrl($r); ?>
-        <?php if ($url): ?><a href="<?= adminEsc($url) ?>" target="_blank" rel="noopener"><?= adminEsc($r['domain']) ?> ↗</a>
+        <?php if ($url): ?><a href="<?= adminEsc($url) ?>" target="_blank" rel="noopener"><?= adminEsc($r['domain']) ?> <i class="fas fa-arrow-up-right-from-square" style="font-size:10px;opacity:.6"></i></a>
         <?php else: ?><?= adminEsc($r['domain']) ?><?php endif; ?>
     </td>
     <td class="muted"><?= adminEsc($r['customer_name'] ?? '—') ?></td>

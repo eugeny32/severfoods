@@ -57,7 +57,7 @@ if (isset($_GET['edit'])) {
 
 adminHead('Заказчики', 'customers');
 ?>
-<h1>Заказчики</h1>
+<h1><i class="fas fa-building"></i> Заказчики</h1>
 
 <?php if ($msg): ?><div class="msg msg-ok"><?= adminEsc($msg) ?></div><?php endif; ?>
 <?php if ($err): ?><div class="msg msg-err"><?= adminEsc($err) ?></div><?php endif; ?>
@@ -79,7 +79,7 @@ adminHead('Заказчики', 'customers');
     <td class="muted"><?= adminEsc($c['contract_no'] ?? '—') ?>
         <?php if ($c['contract_date']): ?><br><?= adminEsc($c['contract_date']) ?><?php endif; ?></td>
     <td><?= (int)$c['regions_count'] ?></td>
-    <td><?php if (adminIsOwner()): ?><a class="btn btn-sec" href="?edit=<?= (int)$c['id'] ?>">Править</a><?php endif; ?></td>
+    <td><?php if (adminIsOwner()): ?><a class="btn btn-sec" href="?edit=<?= (int)$c['id'] ?>"><i class="fas fa-pen"></i> Править</a><?php endif; ?></td>
 </tr>
 <?php endforeach; ?>
 <?php if (!$customers): ?><tr><td colspan="6" class="muted">Заказчиков пока нет.</td></tr><?php endif; ?>
@@ -114,7 +114,7 @@ adminHead('Заказчики', 'customers');
         </label>
     </div>
     <button class="btn" type="submit"><?= $edit ? 'Сохранить' : 'Добавить' ?></button>
-    <?php if ($edit): ?><a class="btn btn-sec" href="customers.php">Отмена</a><?php endif; ?>
+    <?php if ($edit): ?><a class="btn btn-sec" href="customers.php"><i class="fas fa-xmark"></i> Отмена</a><?php endif; ?>
 </form>
 <?php endif; ?>
 

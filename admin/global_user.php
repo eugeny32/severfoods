@@ -155,7 +155,7 @@ if ($form['qr_code'] !== '' && preg_match('/^[A-Za-z0-9_\-]{4,100}$/', $form['qr
 
 adminHead('Единый доступ', 'global');
 ?>
-<h1>Единый пользователь для всех площадок</h1>
+<h1><i class="fas fa-id-card"></i> Единый пользователь для всех площадок</h1>
 
 <?php if ($msg): ?><div class="msg msg-ok"><?= adminEsc($msg) ?></div><?php endif; ?>
 <?php if ($err): ?><div class="msg msg-err"><?= adminEsc($err) ?></div><?php endif; ?>
@@ -199,7 +199,7 @@ adminHead('Единый доступ', 'global');
         <input type="text" name="qr" style="width:100%" value="<?= adminEsc($form['qr_code']) ?>"
                placeholder="EMP_1781069014_35643de852d5">
     </div>
-    <button class="btn" type="submit">Проверить</button>
+    <button class="btn" type="submit"><i class="fas fa-magnifying-glass"></i> Проверить</button>
 </form>
 
 <?php if ($state): ?>
@@ -225,7 +225,7 @@ adminHead('Единый доступ', 'global');
     <?php else: ?>
         <td colspan="3" class="muted">Карта в этом регионе не заведена</td>
     <?php endif; ?>
-    <td><?php if ($url): ?><a class="btn btn-sec" href="<?= adminEsc($url) ?>" target="_blank" rel="noopener">Войти ↗</a><?php endif; ?></td>
+    <td><?php if ($url): ?><a class="btn btn-sec" href="<?= adminEsc($url) ?>" target="_blank" rel="noopener"><i class="fas fa-arrow-up-right-from-square"></i> Войти</a><?php endif; ?></td>
 </tr>
 <?php endforeach; ?>
 </table>
@@ -275,7 +275,7 @@ adminHead('Единый доступ', 'global');
         действует на всех точках своего региона.
     </p>
 
-    <button class="btn" type="submit">Записать во все регионы</button>
+    <button class="btn" type="submit"><i class="fas fa-cloud-arrow-up"></i> Записать во все регионы</button>
 </form>
 <?php else: ?>
 <p class="muted">Изменения доступны только владельцу учётной записи.</p>

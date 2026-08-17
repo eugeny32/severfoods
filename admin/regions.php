@@ -107,7 +107,7 @@ if (isset($_GET['edit'])) {
 
 adminHead('Регионы', 'regions');
 ?>
-<h1>Регионы</h1>
+<h1><i class="fas fa-map-location-dot"></i> Регионы</h1>
 
 <?php if ($msg): ?><div class="msg msg-ok"><?= adminEsc($msg) ?></div><?php endif; ?>
 <?php if ($err): ?><div class="msg msg-err"><?= adminEsc($err) ?></div><?php endif; ?>
@@ -134,7 +134,7 @@ adminHead('Регионы', 'regions');
     <td><strong><?= adminEsc($r['label']) ?></strong><br><span class="muted"><?= adminEsc($key) ?></span></td>
     <td class="muted">
         <?php $url = adminRegionUrl($r); ?>
-        <?php if ($url): ?><a href="<?= adminEsc($url) ?>" target="_blank" rel="noopener"><?= adminEsc($r['domain']) ?> ↗</a>
+        <?php if ($url): ?><a href="<?= adminEsc($url) ?>" target="_blank" rel="noopener"><?= adminEsc($r['domain']) ?> <i class="fas fa-arrow-up-right-from-square" style="font-size:10px;opacity:.6"></i></a>
         <?php else: ?><?= adminEsc($r['domain']) ?><?php endif; ?>
     </td>
     <td class="muted"><code><?= adminEsc($r['db_name']) ?></code></td>
@@ -145,17 +145,17 @@ adminHead('Регионы', 'regions');
             <span class="pill pill-ok">читается</span>
         <?php else: ?>
             <span class="pill pill-off">ошибка</span>
-            <div class="muted" style="max-width:320px"><?= adminEsc($health[$key]) ?></div>
+            <div class="muted" style="max-width:min(320px,100%)"><?= adminEsc($health[$key]) ?></div>
         <?php endif; ?>
         <?php if (!(int)$r['is_active']): ?> <span class="pill pill-off">выключен</span><?php endif; ?>
     </td>
     <td>
         <?php if (adminIsOwner()): ?>
-        <a class="btn btn-sec" href="?edit=<?= (int)$r['id'] ?>">Править</a>
+        <a class="btn btn-sec" href="?edit=<?= (int)$r['id'] ?>"><i class="fas fa-pen"></i> Править</a>
         <form method="post" style="display:inline" onsubmit="return confirm('Убрать регион из реестра? База данных и все её записи останутся нетронутыми.')">
             <input type="hidden" name="action" value="delete">
             <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
-            <button class="btn btn-danger" type="submit">Убрать</button>
+            <button class="btn btn-danger" type="submit"><i class="fas fa-trash"></i> Убрать</button>
         </form>
         <?php endif; ?>
     </td>
@@ -222,7 +222,7 @@ adminHead('Регионы', 'regions');
     </div>
 
     <button class="btn" type="submit"><?= $edit ? 'Сохранить' : 'Добавить' ?></button>
-    <?php if ($edit): ?><a class="btn btn-sec" href="regions.php">Отмена</a><?php endif; ?>
+    <?php if ($edit): ?><a class="btn btn-sec" href="regions.php"><i class="fas fa-xmark"></i> Отмена</a><?php endif; ?>
 </form>
 <?php endif; ?>
 

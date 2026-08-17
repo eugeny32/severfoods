@@ -67,22 +67,38 @@ if (!$locked && $_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Установка · <?= adminEsc(ADMIN_TITLE) ?></title>
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/admin.css?v=2">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,'Segoe UI',sans-serif;background:#f1f5f9;color:#0f172a;padding:40px 20px}
-.box{max-width:560px;margin:0 auto;background:#fff;border-radius:16px;padding:32px;box-shadow:0 4px 20px rgba(0,0,0,.08)}
-h1{font-size:22px;margin-bottom:8px}
-p.sub{color:#64748b;font-size:14px;margin-bottom:24px;line-height:1.5}
-label{display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:5px;text-transform:uppercase}
-input{width:100%;height:44px;padding:0 13px;border:1.5px solid #cbd5e1;border-radius:8px;
-      font-size:15px;margin-bottom:15px;font-family:inherit}
-button{width:100%;height:46px;background:#003366;color:#fff;border:none;border-radius:9px;
-       font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
-.msg{border-radius:9px;padding:12px 16px;margin-bottom:16px;font-size:14px}
-.err{background:#fef2f2;border:1.5px solid #fecaca;color:#991b1b}
-.ok{background:#f0fdf4;border:1.5px solid #bbf7d0;color:#166534}
-.warn{background:#fff7ed;border:1.5px solid #fed7aa;color:#92400e;line-height:1.5}
-a{color:#003366}
+/* Страница установки открывается один раз и до входа, поэтому у неё нет
+   шапки и меню — только карточка по центру. Всё остальное берётся из общего
+   файла стилей. */
+body { padding: 40px 20px; }
+.box {
+    max-width: 560px; margin: 0 auto; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 30px; box-shadow: var(--shadow);
+}
+.box h1 { font-size: 22px; margin-bottom: 8px; }
+p.sub { color: var(--text-3); font-size: 14px; margin-bottom: 22px; line-height: 1.55; }
+.box input { width: 100%; margin-bottom: 15px; }
+.box button {
+    width: 100%; min-height: 48px;
+    background: linear-gradient(135deg, var(--blue-800), var(--blue-500));
+    color: #fff; border: none; border-radius: var(--radius-sm);
+    font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0,51,102,.22);
+}
+.msg { display: block; }
+.msg::before { content: none; }
+.msg.err  { background: #fef2f2; border: 1.5px solid #fecaca; color: #991b1b; }
+.msg.ok   { background: #f0fdf4; border: 1.5px solid #bbf7d0; color: #166534; }
+.msg.warn { background: #fff7ed; border: 1.5px solid #fed7aa; color: #92400e; line-height: 1.5; }
+a { color: var(--blue-700); }
 </style>
 </head>
 <body>

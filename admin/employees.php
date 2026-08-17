@@ -109,7 +109,7 @@ if (isset($_GET['edit'], $_GET['region'])) {
 
 adminHead('Сотрудники', 'employees');
 ?>
-<h1>Сотрудники</h1>
+<h1><i class="fas fa-users"></i> Сотрудники</h1>
 
 <?php if ($msg): ?><div class="msg msg-ok"><?= adminEsc($msg) ?></div><?php endif; ?>
 <?php if ($err): ?><div class="msg msg-err"><?= adminEsc($err) ?></div><?php endif; ?>
@@ -139,7 +139,7 @@ adminHead('Сотрудники', 'employees');
                 Показывать и уволенных
             </label></div>
     </div>
-    <button class="btn" type="submit">Показать</button>
+    <button class="btn" type="submit"><i class="fas fa-magnifying-glass"></i> Показать</button>
 </form>
 
 <?php if ($truncated): ?>
@@ -164,7 +164,7 @@ adminHead('Сотрудники', 'employees');
             ? '<span class="pill pill-ok">работает</span>'
             : '<span class="pill pill-off">уволен</span>' ?></td>
     <td><?php if (adminIsOwner()): ?>
-        <a class="btn btn-sec" href="?edit=<?= (int)$r['id'] ?>&region=<?= adminEsc($r['region_key']) ?>">Править</a>
+        <a class="btn btn-sec" href="?edit=<?= (int)$r['id'] ?>&region=<?= adminEsc($r['region_key']) ?>"><i class="fas fa-pen"></i> Править</a>
     <?php endif; ?></td>
 </tr>
 <?php endforeach; ?>
@@ -184,7 +184,7 @@ adminHead('Сотрудники', 'employees');
             <p><strong><?= adminEsc($allRegions[$edit['region_key']]['label'] ?? $edit['region_key']) ?></strong>
                <span class="muted">— регион у существующей записи не меняется</span></p>
         <?php else: ?>
-            <select name="region_key" required style="min-width:240px">
+            <select name="region_key" required style="min-width:240px;max-width:100%">
                 <option value="">— выберите —</option>
                 <?php foreach ($allRegions as $key => $r): ?>
                     <option value="<?= adminEsc($key) ?>"><?= adminEsc($r['label']) ?></option>
@@ -236,7 +236,7 @@ adminHead('Сотрудники', 'employees');
     </p>
 
     <button class="btn" type="submit"><?= $edit ? 'Сохранить' : 'Добавить' ?></button>
-    <?php if ($edit): ?><a class="btn btn-sec" href="employees.php">Отмена</a><?php endif; ?>
+    <?php if ($edit): ?><a class="btn btn-sec" href="employees.php"><i class="fas fa-xmark"></i> Отмена</a><?php endif; ?>
 </form>
 <?php endif; ?>
 

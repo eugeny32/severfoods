@@ -119,7 +119,7 @@ krsort($versions);
 
 adminHead('Точки на связи', 'monitor');
 ?>
-<h1>Наблюдение за точками</h1>
+<h1><i class="fas fa-signal"></i> Наблюдение за точками</h1>
 
 <?php if ($msg): ?><div class="msg msg-ok"><?= adminEsc($msg) ?></div><?php endif; ?>
 <?php if ($err): ?><div class="msg msg-err"><?= adminEsc($err) ?></div><?php endif; ?>
@@ -172,7 +172,7 @@ adminHead('Точки на связи', 'monitor');
                     <option value="<?= $k ?>"><?= adminEsc($v) ?></option>
                 <?php endforeach; ?>
             </select>
-            <button class="btn btn-sec" type="submit" <?= $d['online'] ? '' : 'disabled' ?>>Отправить</button>
+            <button class="btn btn-sec" type="submit" <?= $d['online'] ? '' : 'disabled' ?>><i class="fas fa-paper-plane"></i> Отправить</button>
         </form>
         <?php if (!$d['online']): ?>
         <form method="post" style="margin-top:6px"
@@ -180,7 +180,7 @@ adminHead('Точки на связи', 'monitor');
             <input type="hidden" name="action" value="forget">
             <input type="hidden" name="region_key" value="<?= adminEsc($d['region_key']) ?>">
             <input type="hidden" name="device_id" value="<?= adminEsc($d['device_id']) ?>">
-            <button class="btn btn-danger" type="submit">Убрать</button>
+            <button class="btn btn-danger" type="submit"><i class="fas fa-trash"></i> Убрать</button>
         </form>
         <?php endif; ?>
     <?php endif; ?>

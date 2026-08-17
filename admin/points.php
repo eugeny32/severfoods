@@ -91,7 +91,7 @@ if (isset($_GET['edit'], $_GET['region'])) {
 
 adminHead('Точки', 'points');
 ?>
-<h1>Точки питания</h1>
+<h1><i class="fas fa-utensils"></i> Точки питания</h1>
 
 <?php if ($msg): ?><div class="msg msg-ok"><?= adminEsc($msg) ?></div><?php endif; ?>
 <?php if ($err): ?><div class="msg msg-err"><?= adminEsc($err) ?></div><?php endif; ?>
@@ -116,7 +116,7 @@ adminHead('Точки', 'points');
             ? '<span class="pill pill-ok">работает</span>'
             : '<span class="pill pill-off">выключена</span>' ?></td>
     <td><?php if (adminIsOwner()): ?>
-        <a class="btn btn-sec" href="?edit=<?= (int)$r['id'] ?>&region=<?= adminEsc($r['region_key']) ?>">Править</a>
+        <a class="btn btn-sec" href="?edit=<?= (int)$r['id'] ?>&region=<?= adminEsc($r['region_key']) ?>"><i class="fas fa-pen"></i> Править</a>
     <?php endif; ?></td>
 </tr>
 <?php endforeach; ?>
@@ -136,7 +136,7 @@ adminHead('Точки', 'points');
             <p><strong><?= adminEsc($allRegions[$edit['region_key']]['label'] ?? $edit['region_key']) ?></strong>
                <span class="muted">— регион у существующей точки не меняется</span></p>
         <?php else: ?>
-            <select name="region_key" required style="min-width:240px">
+            <select name="region_key" required style="min-width:240px;max-width:100%">
                 <option value="">— выберите —</option>
                 <?php foreach ($allRegions as $key => $r): ?>
                     <option value="<?= adminEsc($key) ?>"><?= adminEsc($r['label']) ?></option>
@@ -177,7 +177,7 @@ adminHead('Точки', 'points');
     </p>
 
     <button class="btn" type="submit"><?= $edit ? 'Сохранить' : 'Добавить' ?></button>
-    <?php if ($edit): ?><a class="btn btn-sec" href="points.php">Отмена</a><?php endif; ?>
+    <?php if ($edit): ?><a class="btn btn-sec" href="points.php"><i class="fas fa-xmark"></i> Отмена</a><?php endif; ?>
 </form>
 <?php endif; ?>
 

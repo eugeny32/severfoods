@@ -37,7 +37,7 @@ $actionLabels = [
 
 adminHead('Журнал', 'audit');
 ?>
-<h1>Журнал действий <span class="muted">(<?= $total ?>)</span></h1>
+<h1><i class="fas fa-clock-rotate-left"></i> Журнал действий <span class="muted">(<?= $total ?>)</span></h1>
 
 <div class="card">
 <table>
@@ -58,9 +58,9 @@ adminHead('Журнал', 'audit');
 
 <?php if ($pages > 1): ?>
 <div class="card" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <?php if ($page > 1): ?><a class="btn btn-sec" href="?page=<?= $page - 1 ?>">← Назад</a><?php endif; ?>
+    <?php if ($page > 1): ?><a class="btn btn-sec" href="?page=<?= $page - 1 ?>"><i class="fas fa-chevron-left"></i> Назад</a><?php endif; ?>
     <span class="muted">Страница <?= $page ?> из <?= $pages ?></span>
-    <?php if ($page < $pages): ?><a class="btn btn-sec" href="?page=<?= $page + 1 ?>">Вперёд →</a><?php endif; ?>
+    <?php if ($page < $pages): ?><a class="btn btn-sec" href="?page=<?= $page + 1 ?>">Вперёд <i class="fas fa-chevron-right"></i></a><?php endif; ?>
 </div>
 <?php endif; ?>
 
