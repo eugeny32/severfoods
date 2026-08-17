@@ -25,19 +25,11 @@ $is_super     = $current_role === 'super_admin';
 $full_name    = trim($data['full_name']    ?? '');
 $birth_date   = $data['birth_date']        ?? null;
 // Организацию свободно указывает только супер-администратор. Обычный
-// админ предприятия может добавлять сотрудников ТОЛЬКО в свою же
-// организацию (ту, что указана в его собственной карточке) — сколько бы
-// он ни прислал в запросе, подставляется его собственная.
-if ($is_super) {
-    $organization = trim($data['organization'] ?? '');
-} else {
-    $me = getEmployeeById($pdo, (int)($_SESSION['user_id'] ?? 0));
-    $organization = trim($me['organization'] ?? '');
-    if ($organization === '') {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'У вашей учётной записи не указана организация — обратитесь к супер-администратору']); exit;
-    }
-}
+// Организация берётся из запроса: администратор может заводить сотрудников
+// любой организации. Раньше здесь подставлялась его собственная, и добавить
+// человека в другую организацию было невозможно — на площадках, где
+// администратор ведёт несколько подрядчиков, это остановило работу.
+$organization = trim($data['organization'] ?? '');
 $department   = trim($data['department']   ?? '');
 $position     = trim($data['position']     ?? '');
 $vjg_type     = trim($data['vjg_type']     ?? '');

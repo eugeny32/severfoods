@@ -4,7 +4,7 @@
  * Требует авторизации.
  */
 require_once dirname(__DIR__) . '/config.php';
-require_once dirname(__DIR__) . '/functions.php'; // currentUserOrganization()
+require_once dirname(__DIR__) . '/functions.php';
 
 header('Content-Type: application/json');
 
@@ -16,8 +16,7 @@ if (!isset($_SESSION['user_id'])) {
 
 // qr_code намеренно исключён — это чувствительные данные для доступа.
 // Дата рождения и цена питания — тоже персональные данные и оператору для
-// работы не нужны, поэтому отдаются только администраторам, и только по
-// своей организации (супер-администратору — по всем).
+// работы не нужны, поэтому отдаются только администраторам.
 $isAdmin = !empty($_SESSION['is_admin']);
 $isSuper = ($_SESSION['role'] ?? '') === 'super_admin';
 
@@ -30,12 +29,10 @@ $fields = $isAdmin
 $sql    = "SELECT {$fields} FROM employees WHERE is_active = 1";
 $params = [];
 
-if ($isAdmin && !$isSuper) {
-    $myOrg = currentUserOrganization($pdo);
-    if ($myOrg === '') { echo json_encode([]); exit; }
-    $sql .= " AND TRIM(organization) = ?";
-    $params[] = $myOrg;
-}
+// Ограничения по организации здесь нет намеренно: администраторы обслуживают
+// несколько организаций сразу, и фильтр по своей лишал их работы. Защита
+// карточек супер-администраторов действует отдельно, при открытии карточки
+// (canAccessEmployeeCard в src/functions.php).
 
 $sql .= " ORDER BY full_name";
 $stmt = $pdo->prepare($sql);
