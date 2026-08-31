@@ -75,6 +75,8 @@ $pointTzForType  = $pointIdForType ? getPointTz($pdo, $pointIdForType) : SERVER_
 $scanTs          = intdiv($scannedAt, 1000);
 $localTimeAtScan = gmdate('H:i:s', $scanTs + offsetToMinutes($pointTzForType) * 60);
 $meal_type       = normalizeMealType($meal_type, $localTimeAtScan);
+$meal_type       = applyNightWindow($pdo, $meal_type, $pointIdForType, $localTimeAtScan,
+                                    (int)gmdate('N', $scanTs + offsetToMinutes($pointTzForType) * 60));
 $localDate       = gmdate('Y-m-d', $scanTs + offsetToMinutes($pointTzForType) * 60);
 
 // Лок + единая проверка дублей — этот эндпоинт раньше вставлял записи без

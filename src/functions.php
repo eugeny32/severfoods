@@ -83,6 +83,42 @@ function matchSchedule(array $schedules, string $localTime, int $weekday): ?arra
     return null;
 }
 
+/**
+ * Проход в ночное окно точки — ночной, даже если приложение прислало другой тип.
+ *
+ * Приложение на точке само определяет тип по своему расписанию, но окно,
+ * переходящее через полночь, оно сопоставить не умеет: в версиях по 1.7.6
+ * включительно проверка выглядит как «время >= начала И время <= конца», а для
+ * окна 23:00–06:00 это не выполняется никогда. Такой проход уезжает в завтрак
+ * или ужин по запасному правилу, и ночное питание на точках с оффлайн-
+ * приложением не появилось бы вовсе до переустановки на всех участках.
+ *
+ * Поэтому сервер добирает только этот случай: если местное время прохода
+ * попадает в НОЧНОЕ окно расписания его точки, тип становится ночным.
+ * Остальные типы не трогаем — их приложение определяет верно, а ручной пропуск
+ * на точке вообще выбирается оператором осознанно.
+ */
+function applyNightWindow(PDO $pdo, string $mealType, ?int $pointId, string $localTime, int $weekday): string
+{
+    if ($mealType === 'night' || !$pointId) return $mealType;
+
+    static $cache = [];
+    $ck = spl_object_id($pdo) . ':' . $pointId;
+    if (!isset($cache[$ck])) {
+        try {
+            $st = $pdo->prepare(
+                "SELECT start_time, end_time, days_of_week, meal_type FROM meal_point_schedules
+                 WHERE meal_point_id = ? AND meal_type = 'night' AND is_active = 1"
+            );
+            $st->execute([$pointId]);
+            $cache[$ck] = $st->fetchAll();
+        } catch (PDOException $e) { $cache[$ck] = []; }
+    }
+    if (!$cache[$ck]) return $mealType;
+
+    return matchSchedule($cache[$ck], $localTime, $weekday) ? 'night' : $mealType;
+}
+
 function getCurrentMealType(?PDO $pdo = null, $meal_point_id = null): string
 {
     // Местное время считаем по часовому поясу КОНКРЕТНОЙ точки (если она известна),

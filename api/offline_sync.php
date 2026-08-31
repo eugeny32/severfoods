@@ -228,8 +228,15 @@ function doCheckMeal(): void
     // по которому считается "сегодня" (см. ту же проверку в doPush).
     if ($pointId && !getMealPointById($pdo, $pointId)) $pointId = null;
 
-    // Тип приходит от точки как есть, включая 'night': ночное питание —
-    // полноценный приём, и проверка «уже питался» ищет именно его.
+    // Тип приходит от точки как есть, включая 'night'. Но приложение на точке
+    // не умеет сопоставлять окно через полночь и в ночные часы спрашивает про
+    // ужин/завтрак — а запись лежит уже как ночная. Приводим вопрос к тому же
+    // виду, что и запись (см. applyNightWindow), иначе проверка «уже питался»
+    // ночью всегда отвечала бы «нет» и человек получил бы питание дважды.
+    $tzForCheck = $pointId ? getPointTz($pdo, $pointId) : SERVER_TZ_OFFSET;
+    $nowLocal   = time() + offsetToMinutes($tzForCheck) * 60;
+    $mealType   = applyNightWindow($pdo, $mealType, $pointId,
+                                   gmdate('H:i:s', $nowLocal), (int)gmdate('N', $nowLocal));
 
     $existing = hasExistingMealLog($pdo, $empId, $mealType, $pointId);
 
@@ -422,6 +429,11 @@ function doPush(): void
         $localTimeAtScan = gmdate('H:i:s', $ts + offsetToMinutes($pointTzForType) * 60);
         $mealType = normalizeMealType($mealType, $localTimeAtScan);
         $day = gmdate('Y-m-d', $ts + offsetToMinutes($pointTzForType) * 60);
+        // Ночное окно приложение на точке сопоставить не умеет (см.
+        // applyNightWindow) — добираем на сервере, иначе ночное питание
+        // появилось бы только после переустановки на всех точках.
+        $mealType = applyNightWindow($pdo, $mealType, $pointId, $localTimeAtScan,
+                                     (int)gmdate('N', $ts + offsetToMinutes($pointTzForType) * 60));
 
         // Лок на время проверки+вставки — исключает дубль при повторной
         // отправке того же батча из-за обрыва связи или при синхронизации
