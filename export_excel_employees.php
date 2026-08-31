@@ -24,7 +24,7 @@ $selected_orgs = selectedOrganizations($pdo, $_GET['orgs'] ?? null);
 // Регион — см. src/regions.php. Только для супер-администратора, только чтение.
 // При ошибке доступа выгрузка прерывается, а не подменяется своим регионом —
 // см. подробный комментарий в export_excel.php.
-$available_regions = $is_super ? getRegions() : [];
+$available_regions = ($is_super && crossRegionEnabled()) ? getRegions() : [];
 $region = currentRegionKey();
 if ($is_super && isset($_GET['region']) && isset($available_regions[$_GET['region']])) {
     $region = $_GET['region'];

@@ -27,7 +27,7 @@ $dry_type = in_array($_GET['dry_type'] ?? '', ['dry_ration','field','all']) ? $_
 // Выбор региона — ТОЛЬКО для супер-администратора и ТОЛЬКО для чтения
 // отчётов (см. src/regions.php). Обычные админы/операторы всегда видят
 // исключительно свой регион — переключателя для них нет вообще.
-$available_regions = $is_super_admin ? getRegions() : [];
+$available_regions = ($is_super_admin && crossRegionEnabled()) ? getRegions() : [];
 $region       = currentRegionKey();
 $region_error = null;
 if ($is_super_admin && isset($_GET['region']) && isset($available_regions[$_GET['region']])) {
@@ -121,17 +121,9 @@ foreach ($logs as &$log) {
     $localDate = substr($log['scanned_local'], 0, 10);
     $localTime = substr($log['scanned_local'], 11, 8);
     $weekday   = date('N', strtotime($localDate));
-    $matched = false;
-    foreach ($scheds as $s) {
-        if (strpos(',' . $s['days_of_week'] . ',', ',' . $weekday . ',') === false) continue;
-        $start = $s['start_time']; $end = $s['end_time'];
-        if ($end < $start) {
-            if ($localTime >= $start || $localTime < $end) { $matched = true; break; }
-        } else {
-            if ($localTime >= $start && $localTime < $end) { $matched = true; break; }
-        }
-    }
-    $log['out_of_schedule'] = !$matched;
+    // Правило совпадения — общее с определением текущего типа питания
+    // (matchSchedule в src/functions.php), включая окна через полночь.
+    $log['out_of_schedule'] = matchSchedule($scheds, $localTime, (int)$weekday) === null;
 }
 unset($log);
 

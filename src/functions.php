@@ -32,16 +32,55 @@ function getMealTypeIcon(string $type): string
 // ─── Расписание и текущий приём пищи ─────────────────
 
 /**
- * 'night' больше не используется как самостоятельный тип приёма пищи в базе —
- * ночные проходы переклассифицируются в ближайший осмысленный тип по местному
- * времени точки (до полудня — завтрак, после — ужин). Единая точка применения
- * гарантирует, что новые 'night'-записи в meal_logs никогда не появятся,
- * независимо от того, как настроено расписание точки.
+ * Тип приёма пищи из расписания точки — как есть.
+ *
+ * Раньше 'night' здесь принудительно переводился в завтрак/ужин: ночного
+ * питания в системе не было, и такие окна расписания считались ошибкой.
+ * Теперь ночное питание — полноценный приём наравне с остальными: если на
+ * точке заведено окно с типом «Ночное», проход в это окно так и записывается,
+ * попадает в статистику ночного питания и в фильтр отчёта.
+ *
+ * Функция оставлена единой точкой применения: правило определения типа по
+ * местному времени точки живёт в одном месте, а не размазано по четырём
+ * эндпоинтам (сканирование, оффлайн-синхронизация, sync_log, миграции).
  */
 function normalizeMealType(string $type, string $localTime): string
 {
-    if ($type !== 'night') return $type;
-    return $localTime < '12:00:00' ? 'breakfast' : 'dinner';
+    return $type;
+}
+
+/**
+ * Какое окно расписания действует в данный момент местного времени точки.
+ *
+ * Вынесено отдельной функцией, потому что это же правило нужно отчёту (бейдж
+ * «вне графика») — раньше оно было переписано там вторым экземпляром и могло
+ * разъехаться с этим.
+ *
+ * Окно, у которого время окончания меньше времени начала, переходит через
+ * полночь (типично для ночного питания). После полуночи такое окно принадлежит
+ * ПРЕДЫДУЩЕМУ дню недели: смена «Пн 23:00–06:00» продолжается во вторник, и
+ * проход в 00:30 вторника обязан попасть в понедельничное окно.
+ *
+ * @param array  $schedules строки meal_point_schedules (start_time, end_time, days_of_week, meal_type)
+ * @param string $localTime местное время точки, 'HH:MM:SS'
+ * @param int    $weekday   день недели местного времени, 1=Пн … 7=Вс
+ * @return array|null подошедшее окно или null
+ */
+function matchSchedule(array $schedules, string $localTime, int $weekday): ?array
+{
+    $prevDay = $weekday == 1 ? 7 : $weekday - 1;
+    foreach ($schedules as $s) {
+        $days  = ',' . ($s['days_of_week'] ?? '') . ',';
+        $today = strpos($days, ',' . $weekday . ',') !== false;
+        $yday  = strpos($days, ',' . $prevDay . ',') !== false;
+        if ($s['end_time'] < $s['start_time']) {
+            if ($today && $localTime >= $s['start_time']) return $s;
+            if ($yday  && $localTime <  $s['end_time'])   return $s;
+        } elseif ($today) {
+            if ($localTime >= $s['start_time'] && $localTime < $s['end_time']) return $s;
+        }
+    }
+    return null;
 }
 
 function getCurrentMealType(?PDO $pdo = null, $meal_point_id = null): string
@@ -58,30 +97,25 @@ function getCurrentMealType(?PDO $pdo = null, $meal_point_id = null): string
         if ($current_time >= '07:00:00' && $current_time < '11:00:00') return 'breakfast';
         if ($current_time >= '12:00:00' && $current_time < '15:00:00') return 'lunch';
         if ($current_time >= '18:00:00' && $current_time < '21:00:00') return 'dinner';
-        if ($current_time >= '23:00:00') return 'dinner';
-        if ($current_time <  '06:00:00') return 'breakfast';
+        // Ночное питание — такой же приём, как остальные. Окно переходит через
+        // полночь, поэтому проверяется двумя условиями.
+        if ($current_time >= '23:00:00' || $current_time < '06:00:00') return 'night';
         return 'none';
     }
 
+    // Расписания берём за текущий и предыдущий день недели: окно, переходящее
+    // через полночь, после полуночи относится к предыдущему дню (см. matchSchedule).
+    $prev_day = $current_day == 1 ? 7 : $current_day - 1;
     $stmt = $pdo->prepare(
         "SELECT * FROM meal_point_schedules
          WHERE meal_point_id = ? AND is_active = 1
-           AND FIND_IN_SET(?, days_of_week) > 0
+           AND (FIND_IN_SET(?, days_of_week) > 0 OR FIND_IN_SET(?, days_of_week) > 0)
          ORDER BY sort_order"
     );
-    $stmt->execute([$meal_point_id, $current_day]);
+    $stmt->execute([$meal_point_id, $current_day, $prev_day]);
 
-    foreach ($stmt->fetchAll() as $s) {
-        $start = $s['start_time'];
-        $end   = $s['end_time'];
-        // Поддержка ночного расписания (переход через полночь)
-        if ($end < $start) {
-            if ($current_time >= $start || $current_time < $end) return normalizeMealType($s['meal_type'], $current_time);
-        } else {
-            if ($current_time >= $start && $current_time < $end) return normalizeMealType($s['meal_type'], $current_time);
-        }
-    }
-    return 'none';
+    $hit = matchSchedule($stmt->fetchAll(), $current_time, (int)$current_day);
+    return $hit ? normalizeMealType($hit['meal_type'], $current_time) : 'none';
 }
 
 function getNextMealInfo(PDO $pdo, $meal_point_id): array

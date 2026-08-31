@@ -36,7 +36,7 @@ $selected_orgs = selectedOrganizations($pdo, $_GET['orgs'] ?? null);
 // откат на свой регион: человек запрашивал Нерюнгри, получал файл с данными
 // Кызыла и никак не мог об этом узнать — в отчётах на такой случай есть баннер,
 // а в скачанном файле не остаётся ничего. Молча подменять данные нельзя.
-$available_regions = $is_super ? getRegions() : [];
+$available_regions = ($is_super && crossRegionEnabled()) ? getRegions() : [];
 $region = currentRegionKey();
 if ($is_super && isset($_GET['region']) && isset($available_regions[$_GET['region']])) {
     $region = $_GET['region'];

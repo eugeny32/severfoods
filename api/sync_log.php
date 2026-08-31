@@ -67,7 +67,8 @@ if ($pointIdForType && !getMealPointById($pdo, $pointIdForType)) {
     $pointIdForType = null;
 }
 
-// 'night' в базе не хранится — переклассифицируем по местному времени точки.
+// Местное время точки: по нему определяется тип приёма (см. normalizeMealType)
+// и граница суток при дедупликации.
 // Часовой пояс без точки — фиксированный серверный (SERVER_TZ_OFFSET), не
 // APP_TZ_OFFSET: у этого эндпоинта нет браузера/cookie.
 $pointTzForType  = $pointIdForType ? getPointTz($pdo, $pointIdForType) : SERVER_TZ_OFFSET;

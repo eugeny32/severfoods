@@ -7,9 +7,8 @@
  * ситуации вида «завтрак 08.07.2026 в 19:00» → становится «завтрак
  * 08.07.2026 в 07:00» (или иное время начала завтрака на конкретной точке).
  *
- * Тип 'night' сначала переклассифицируется в breakfast/dinner по местному
- * времени (см. normalizeMealType()), как и в normalize_night_records.php,
- * а затем тоже получает время начала соответствующего периода.
+ * Ночное питание обрабатывается наравне с остальными типами: тип сохраняется,
+ * а время переносится на начало ночного окна точки (по умолчанию 23:00).
  *
  * Записи реального сканирования и синхронизации с оффлайн-приложением
  * НЕ трогаются — ни время, ни тип питания.
@@ -50,11 +49,12 @@ try {
          WHERE meal_point_id = ? AND meal_type = ? AND is_active = 1
          ORDER BY sort_order LIMIT 1"
     );
-    $defaultStart = ['breakfast' => '07:00:00', 'lunch' => '12:00:00', 'dinner' => '18:00:00'];
+    $defaultStart = ['breakfast' => '07:00:00', 'lunch' => '12:00:00', 'dinner' => '18:00:00',
+                     'night' => '23:00:00'];
 
     $retimed  = 0;
     $unchanged = 0;
-    $byType   = ['breakfast' => 0, 'lunch' => 0, 'dinner' => 0];
+    $byType   = ['breakfast' => 0, 'lunch' => 0, 'dinner' => 0, 'night' => 0];
 
     if (!$dryRun) $pdo->beginTransaction();
     foreach ($rows as $r) {
@@ -63,7 +63,7 @@ try {
         $localTime = gmdate('H:i:s', $ts + offsetToMinutes($tz) * 60);
         $localDate = gmdate('Y-m-d', $ts + offsetToMinutes($tz) * 60);
 
-        $newType = $r['meal_type'] === 'night' ? normalizeMealType('night', $localTime) : $r['meal_type'];
+        $newType = $r['meal_type'];  // 'night' сохраняется — это полноценный приём пищи
         if (!isset($defaultStart[$newType])) continue; // на случай неизвестного типа — не трогаем
 
         $startTime = $defaultStart[$newType];

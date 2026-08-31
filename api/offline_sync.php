@@ -228,12 +228,8 @@ function doCheckMeal(): void
     // по которому считается "сегодня" (см. ту же проверку в doPush).
     if ($pointId && !getMealPointById($pdo, $pointId)) $pointId = null;
 
-    // 'night' в базе не хранится — приводим к тому же типу, что и при записи,
-    // иначе проверка искала бы несуществующий тип и всегда возвращала "нет".
-    if ($mealType === 'night') {
-        $tz = $pointId ? getPointTz($pdo, $pointId) : SERVER_TZ_OFFSET;
-        $mealType = normalizeMealType('night', gmdate('H:i:s', time() + offsetToMinutes($tz) * 60));
-    }
+    // Тип приходит от точки как есть, включая 'night': ночное питание —
+    // полноценный приём, и проверка «уже питался» ищет именно его.
 
     $existing = hasExistingMealLog($pdo, $empId, $mealType, $pointId);
 
@@ -416,8 +412,8 @@ function doPush(): void
             if (!$point) $pointId = null;
         }
 
-        // 'night' в базе не хранится — переклассифицируем по местному времени точки
-        // (до полудня — завтрак, после — ужин), см. normalizeMealType().
+        // Местное время точки нужно и для типа приёма (см. normalizeMealType),
+        // и для границы суток при дедупликации.
         // Если точки нет/невалидна — фиксированный серверный часовой пояс
         // (SERVER_TZ_OFFSET), НЕ APP_TZ_OFFSET: у офлайн-синхронизации нет
         // браузера/cookie, так что APP_TZ_OFFSET здесь всегда был бы жёстко
