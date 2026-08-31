@@ -49,25 +49,15 @@ jobs:
         id: pkg
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
-      # Иконка приложения делается из общего логотипа — в среде разработки нет
-      # графических утилит, поэтому она собирается здесь, при сборке.
+      # Иконки собираются из логотипа тем же скриптом, что и локально, —
+      # см. android/make-icons.py. Раньше здесь был отдельный кусок кода,
+      # который просто масштабировал offline/public/assets/img/icon.png и
+      # затирал подготовленные иконки: в APK уезжал не тот значок, который
+      # лежит в репозитории, и понять это можно было только вскрыв APK.
       - name: Generate launcher icons
         run: |
           python3 -m pip install --quiet pillow
-          python3 - <<'PY'
-          from PIL import Image
-          import os
-          src = Image.open('../offline/public/assets/img/icon.png').convert('RGBA')
-          sizes = {'mdpi': 48, 'hdpi': 72, 'xhdpi': 96, 'xxhdpi': 144, 'xxxhdpi': 192}
-          for dpi, px in sizes.items():
-              d = f'android/app/src/main/res/mipmap-{dpi}'
-              os.makedirs(d, exist_ok=True)
-              img = src.resize((px, px), Image.LANCZOS)
-              img.save(f'{d}/ic_launcher.png')
-              img.save(f'{d}/ic_launcher_round.png')
-              img.save(f'{d}/ic_launcher_foreground.png')
-          print('иконки готовы')
-          PY
+          python3 make-icons.py
 
       - name: Sync Capacitor
         run: npx cap sync android
