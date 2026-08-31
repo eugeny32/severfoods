@@ -22,7 +22,7 @@ let loginCamInterval = null;
 
 let chatLoaded = false;
 
-const MEAL_LABELS = { breakfast:'Завтрак', lunch:'Обед', dinner:'Ужин', night:'Ночной' };
+const MEAL_LABELS = { breakfast:'Завтрак', lunch:'Обед', dinner:'Ужин', night:'Ночное' };
 
 // ── USB QR Scanner Input ───────────────────────────────────
 const RU_TO_EN = {
