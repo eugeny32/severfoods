@@ -448,38 +448,79 @@ function navigateTo(page) {
 const MEAL_ICONS = { breakfast:'☀️', lunch:'🌞', dinner:'🌙', night:'⭐' };
 
 function getMealTypeBySchedule() {
-    const pts = typeof db !== 'undefined' ? [] : null; // client side — use cached
-    // Use currentUser point
     const ptId = currentUser?.selected_point_id || currentUser?.assigned_point_id || null;
     if (!ptId || !window._mealPoints) return guessMealTypeByTime();
 
     const pt = window._mealPoints.find(p => p.id === ptId);
     if (!pt?.schedules?.length) return guessMealTypeByTime();
 
-    const now = new Date();
-    const hhmm = now.getHours() * 60 + now.getMinutes();
-    const dayIdx = now.getDay(); // 0=Sun,1=Mon...
+    const hit = matchSchedule(pt.schedules, pointLocalTime(), pointLocalWeekday());
+    return hit ? hit.meal_type : guessMealTypeByTime();
+}
 
-    for (const s of pt.schedules) {
-        const days = s.days_of_week ? s.days_of_week.split(',').map(Number) : [1,2,3,4,5,6,0];
-        if (!days.includes(dayIdx)) continue;
-        const [sh,sm] = s.start_time.split(':').map(Number);
-        const [eh,em] = s.end_time.split(':').map(Number);
-        const start = sh * 60 + sm, end = eh * 60 + em;
-        if (hhmm >= start && hhmm <= end) return s.meal_type;
+/** Местное время ТОЧКИ ('ЧЧ:ММ:СС') — по настроенному часовому поясу, не по часам ПК. */
+function pointLocalTime() {
+    const d = new Date(Date.now() + tzOffsetMinutes(TZ_OFFSET) * 60000);
+    const p2 = n => String(n).padStart(2, '0');
+    return `${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}:${p2(d.getUTCSeconds())}`;
+}
+
+/** День недели местного времени точки: 1=Пн … 7=Вс — как в базе (days_of_week). */
+function pointLocalWeekday() {
+    const d = new Date(Date.now() + tzOffsetMinutes(TZ_OFFSET) * 60000);
+    return d.getUTCDay() === 0 ? 7 : d.getUTCDay();
+}
+
+/**
+ * Какое окно расписания действует сейчас. Полный аналог matchSchedule() из
+ * src/functions.php на сервере — правило обязано быть одним и тем же, иначе
+ * точка покажет один тип питания, а в отчёте окажется другой.
+ *
+ * До версии 1.7.6 здесь было «время >= начала И время <= конца», из-за чего
+ * ночное окно 23:00–06:00 не совпадало НИКОГДА, а дни недели считались от
+ * воскресенья (0), тогда как в базе воскресенье — 7: воскресные окна
+ * игнорировались целиком.
+ *
+ * Окно, у которого конец меньше начала, переходит через полночь и после
+ * полуночи принадлежит ПРЕДЫДУЩЕМУ дню недели: смена «Пн 23:00–06:00»
+ * продолжается во вторник.
+ */
+function matchSchedule(schedules, localTime, weekday) {
+    const t = hhmmss(localTime);
+    const prevDay = weekday === 1 ? 7 : weekday - 1;
+    for (const s of schedules) {
+        const days  = ',' + (s.days_of_week || '') + ',';
+        const today = days.indexOf(',' + weekday + ',') !== -1;
+        const yday  = days.indexOf(',' + prevDay + ',') !== -1;
+        const start = hhmmss(s.start_time), end = hhmmss(s.end_time);
+        if (end < start) {
+            if (today && t >= start) return s;
+            if (yday  && t <  end)   return s;
+        } else if (today) {
+            if (t >= start && t < end) return s;
+        }
     }
-    return guessMealTypeByTime();
+    return null;
+}
+
+/** Время к виду ЧЧ:ММ:СС — в расписании оно может быть и без секунд. */
+function hhmmss(v) {
+    const parts = String(v || '').split(':');
+    while (parts.length < 3) parts.push('00');
+    return parts.map(x => String(x).padStart(2, '0')).join(':');
 }
 
 function guessMealTypeByTime() {
-    // 'night' как отдельный тип не используется — сервер при синхронизации всё
-    // равно переклассифицирует его в завтрак/ужин по местному времени точки,
-    // поэтому здесь сразу выбираем ближайший осмысленный тип.
-    const h = new Date().getHours();
-    if (h >= 6  && h < 11) return 'breakfast';
-    if (h >= 11 && h < 16) return 'lunch';
-    if (h < 6) return 'breakfast';
-    return 'dinner';
+    // Запасное правило, когда расписание точки не заведено. Те же окна, что и
+    // на сервере в getCurrentMealType() без точки, включая ночное.
+    const t = pointLocalTime();
+    if (t >= '07:00:00' && t < '11:00:00') return 'breakfast';
+    if (t >= '12:00:00' && t < '15:00:00') return 'lunch';
+    if (t >= '18:00:00' && t < '21:00:00') return 'dinner';
+    if (t >= '23:00:00' || t < '06:00:00') return 'night';
+    // Вне всех окон тип всё равно нужен — берём ближайший осмысленный,
+    // иначе оператор не сможет провести человека вообще.
+    return t < '12:00:00' ? 'breakfast' : 'dinner';
 }
 
 function updateMealTypeAuto() {
