@@ -127,6 +127,15 @@ body.flash-error   { animation: flashError   .5s ease; }
 .chip.meal.none   { background: rgba(255,255,255,.06); opacity: .7; }
 .chip.role-admin  { background: rgba(245,158,11,.25); border-color: rgba(245,158,11,.3); color: #fde68a; }
 .chip.point       { background: rgba(59,141,224,.2); border-color: rgba(59,141,224,.3); }
+/* Часы точки питания: название — время — текущий приём пищи в одной «таблетке».
+   Название показывается, только когда точек несколько: у оператора она одна и
+   подписывать нечего. */
+.chip.point-clock { background: rgba(59,141,224,.18); border-color: rgba(59,141,224,.28); }
+.chip.point-clock .pc-name { font-weight: 600; opacity: .75; font-variant-numeric: normal; }
+.chip.point-clock .pc-time { font-weight: 700; }
+.chip.point-clock .pc-meal { font-weight: 600; opacity: .9; font-variant-numeric: normal;
+                             padding-left: 6px; margin-left: 2px;
+                             border-left: 1px solid rgba(255,255,255,.18); }
 .header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 .btn-logout {
     display: inline-flex; align-items: center; gap: 6px;

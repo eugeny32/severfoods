@@ -47,10 +47,31 @@ $current_meal_name = getMealTypeName($current_meal);
 // Часовой пояс, по которому показываются часы и тип питания в шапке: пояс
 // точки, а если точка не выбрана — фиксированный серверный (SERVER_TZ_OFFSET),
 // но НЕ часовой пояс браузера: он у каждого свой и к столовой отношения не имеет.
-$point_tz_offset   = $effective_point_id ? getPointTz($pdo, $effective_point_id) : SERVER_TZ_OFFSET;
-$point_tz_label    = '';
-if ($effective_point_id && ($pt = getMealPointById($pdo, $effective_point_id))) {
-    $point_tz_label = (string)($pt['point_name'] ?? '');
+// Часы в шапке показывают время ТОЧЕК ПИТАНИЯ, а не устройства, с которого
+// смотрят. Оператор привязан к одной точке — её и показываем. Администратор
+// точке не привязан и отвечает сразу за несколько, поэтому он видит часы
+// каждой активной точки, подписанные её названием: иначе непонятно, чьё это
+// время, и «19:04» ни о чём не говорит.
+//
+// Часовой пояс берётся из карточки точки (meal_points.tz_offset). Если он там
+// не заполнен, времени точки взяться неоткуда — показываем серверное и
+// говорим об этом прямо, а не подсовываем молча чужое время: именно так
+// выглядела бы «ничего не изменилось».
+$clock_points = [];
+foreach ($effective_point_id
+            ? array_filter([getMealPointById($pdo, (int)$effective_point_id)])
+            : getMealPoints($pdo, true) as $cp) {
+    $tzSet = !empty($cp['tz_offset']) && preg_match('/^[+-]\d{2}:\d{2}$/', (string)$cp['tz_offset']);
+    $mt    = getCurrentMealType($pdo, (int)$cp['id']);
+    $clock_points[] = [
+        'id'        => (int)$cp['id'],
+        'name'      => (string)$cp['point_name'],
+        'tz'        => $tzSet ? (string)$cp['tz_offset'] : SERVER_TZ_OFFSET,
+        'tz_set'    => (bool)$tzSet,
+        'meal_type' => $mt,
+        'meal_name' => getMealTypeName($mt),
+        'meal_icon' => getMealTypeIcon($mt),
+    ];
 }
 $schedule_today    = $effective_point_id ? getPointScheduleInfo($pdo, $effective_point_id) : [];
 
@@ -194,10 +215,26 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal, $is_admin) {
             onerror="this.style.display='none'">
         <div class="header-divider"></div>
         <div class="header-chips">
-            <span class="chip time" id="headerTime"></span>
-            <span class="chip meal <?= $current_meal !== 'none' ? 'active' : 'none' ?>" id="headerMeal">
-                <?= getMealTypeIcon($current_meal) ?> <?= $current_meal_name ?>
-            </span>
+            <?php if ($clock_points): ?>
+                <?php foreach ($clock_points as $cp): ?>
+                <span class="chip time point-clock" data-point="<?= (int)$cp['id'] ?>"
+                      data-tz="<?= htmlspecialchars($cp['tz']) ?>"
+                      title="Время точки «<?= htmlspecialchars($cp['name']) ?>» (UTC<?= htmlspecialchars($cp['tz']) ?>)<?= $cp['tz_set'] ? '' : ' — часовой пояс точки не задан, показано серверное время' ?>">
+                    <?php if (count($clock_points) > 1): ?>
+                    <span class="pc-name"><?= htmlspecialchars($cp['name']) ?></span>
+                    <?php endif; ?>
+                    <span class="pc-time">--:--:--</span>
+                    <span class="pc-meal"><?= $cp['meal_icon'] ?> <?= htmlspecialchars($cp['meal_name']) ?></span>
+                    <?php if (!$cp['tz_set']): ?><i class="fas fa-triangle-exclamation" style="color:var(--warning)"></i><?php endif; ?>
+                </span>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <span class="chip time" id="headerTime" data-tz="<?= htmlspecialchars(SERVER_TZ_OFFSET) ?>"
+                      title="Точек питания нет — показано время сервера (UTC<?= htmlspecialchars(SERVER_TZ_OFFSET) ?>)"></span>
+                <span class="chip meal <?= $current_meal !== 'none' ? 'active' : 'none' ?>" id="headerMeal">
+                    <?= getMealTypeIcon($current_meal) ?> <?= $current_meal_name ?>
+                </span>
+            <?php endif; ?>
             <?php if ($is_admin): ?>
             <span class="chip role-admin"><i class="fas fa-crown"></i> <?= htmlspecialchars($user_name) ?></span>
             <?php else: ?>
@@ -1127,8 +1164,8 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal, $is_admin) {
     // Часы и тип питания в шапке показывают время ТОЧКИ, а не компьютера, за
     // которым сидит человек: администратор в Москве, открывая площадку Кызыла,
     // должен видеть, что там сейчас идёт ужин, а не гадать по своим часам.
-    window.POINT_TZ_OFFSET  = <?= json_encode($point_tz_offset) ?>;
-    window.POINT_TZ_LABEL   = <?= json_encode($point_tz_label, JSON_UNESCAPED_UNICODE) ?>;
+    window.POINT_CLOCKS     = <?= json_encode($clock_points, JSON_UNESCAPED_UNICODE) ?>;
+    window.SERVER_TZ_OFFSET = <?= json_encode(SERVER_TZ_OFFSET) ?>;
     window.ORG_LIST         = <?= json_encode(array_column($pdo->query("SELECT DISTINCT TRIM(organization) as o FROM employees WHERE organization!='' AND NOT (COALESCE(chat_access,0)=1 AND role IS NULL) ORDER BY o")->fetchAll(), 'o'), JSON_UNESCAPED_UNICODE) ?>;
 })();
 

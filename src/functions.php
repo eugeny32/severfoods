@@ -13,7 +13,7 @@ function getMealTypeName(string $type): string
         'breakfast' => 'Завтрак',
         'lunch'     => 'Обед',
         'dinner'    => 'Ужин',
-        'night'     => 'Ночное питание',
+        'night'     => 'Ночное',
         'none'      => 'Вне приёма пищи',
     ][$type] ?? 'Неизвестно';
 }

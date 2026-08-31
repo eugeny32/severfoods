@@ -38,11 +38,10 @@ function escHtml(s) {
 }
 
 // ── Clock ─────────────────────────────────────────────
-// Часы показывают время ТОЧКИ ПИТАНИЯ, а не компьютера: смещение приходит с
-// сервера (window.POINT_TZ_OFFSET — пояс точки либо серверный по умолчанию).
-// Часовой пояс браузера сознательно не используется: у администратора он свой
-// и к расписанию столовой отношения не имеет. Если смещение почему-то не
-// пришло — показываем время машины, это лучше пустой шапки.
+// Часы показывают время ТОЧЕК ПИТАНИЯ, а не устройства, с которого смотрят:
+// смещение каждой точки приходит с сервера в data-tz (meal_points.tz_offset,
+// либо серверное, если у точки пояс не заполнен). Часовой пояс браузера не
+// используется нигде — он у каждого свой и к столовой отношения не имеет.
 function tzOffsetMinutes(off) {
     const m = /^([+-])(\d{2}):(\d{2})$/.exec(off || '');
     if (!m) return null;
@@ -50,26 +49,26 @@ function tzOffsetMinutes(off) {
     return m[1] === '-' ? -v : v;
 }
 
-function pointNow() {
-    const off = tzOffsetMinutes(window.POINT_TZ_OFFSET);
-    if (off === null) return { date: new Date(), utc: false };
-    // Сдвигаем UTC на смещение точки и форматируем как UTC — так результат не
+/** Время по заданному смещению, в формате ЧЧ:ММ:СС. */
+function timeAtOffset(off) {
+    const min = tzOffsetMinutes(off);
+    // Сдвигаем UTC на смещение точки и форматируем как UTC — результат не
     // зависит от пояса машины вообще.
-    return { date: new Date(Date.now() + off * 60000), utc: true };
+    const d = new Date(Date.now() + (min === null ? 0 : min * 60000));
+    return d.toLocaleTimeString('ru-RU', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        timeZone: min === null ? undefined : 'UTC',
+    });
 }
 
 function updateClock() {
-    const el = $('headerTime');
-    if (!el) return;
-    const { date, utc } = pointNow();
-    el.textContent = date.toLocaleTimeString('ru-RU', {
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        timeZone: utc ? 'UTC' : undefined,
+    document.querySelectorAll('.point-clock').forEach(chip => {
+        const el = chip.querySelector('.pc-time');
+        if (el) el.textContent = timeAtOffset(chip.dataset.tz);
     });
-    if (utc && window.POINT_TZ_OFFSET) {
-        el.title = 'Время точки питания' + (window.POINT_TZ_LABEL ? ' «' + window.POINT_TZ_LABEL + '»' : '')
-                 + ' (UTC' + window.POINT_TZ_OFFSET + ')';
-    }
+    // Запасной вариант, когда точек питания нет вовсе.
+    const solo = $('headerTime');
+    if (solo) solo.textContent = timeAtOffset(solo.dataset.tz || window.SERVER_TZ_OFFSET);
 }
 setInterval(updateClock, 1000);
 updateClock();
@@ -284,7 +283,16 @@ function refreshStats() {
                 chip.classList.toggle('none',   data.meal_type === 'none');
             }
         }
-        if (data.tz_offset) window.POINT_TZ_OFFSET = data.tz_offset;
+        // Тип питания по каждой точке считает сервер по её расписанию и поясу:
+        // страница может быть открыта часами, и завтрак должен смениться
+        // обедом сам, без перезагрузки.
+        (data.clocks || []).forEach(c => {
+            const chip = document.querySelector('.point-clock[data-point="' + c.id + '"]');
+            if (!chip) return;
+            if (c.tz) chip.dataset.tz = c.tz;
+            const m = chip.querySelector('.pc-meal');
+            if (m) m.innerHTML = (c.meal_icon || '') + ' ' + (c.meal_name || '');
+        });
     })
     .catch(() => {});
 }
@@ -1259,7 +1267,7 @@ function loadScheduleTab() {
                 { meal_type:'breakfast', meal_name_ru:'Завтрак',        start_time:'07:00', end_time:'10:00', days_of_week:'1,2,3,4,5,6,7', sort_order:1 },
                 { meal_type:'lunch',     meal_name_ru:'Обед',           start_time:'12:00', end_time:'15:00', days_of_week:'1,2,3,4,5,6,7', sort_order:2 },
                 { meal_type:'dinner',    meal_name_ru:'Ужин',           start_time:'18:00', end_time:'21:00', days_of_week:'1,2,3,4,5,6,7', sort_order:3 },
-                { meal_type:'night',     meal_name_ru:'Ночное питание', start_time:'23:00', end_time:'06:00', days_of_week:'1,2,3,4,5,6,7', sort_order:4 },
+                { meal_type:'night',     meal_name_ru:'Ночное', start_time:'23:00', end_time:'06:00', days_of_week:'1,2,3,4,5,6,7', sort_order:4 },
             ];
             defaults.forEach(d => addScheduleRowTab(d));
         }
