@@ -51,7 +51,14 @@ jobs:
             echo "Нет изменений в dist/ — пропускаем коммит"
           else
             git commit -m "Собрать оффлайн-установщик v${{ steps.pkg.outputs.version }} [skip ci]"
-            git push origin "HEAD:${{ github.ref_name }}"
+            # См. тот же комментарий в build-android.yml: две сборки пишут в
+            # одну ветку, и вторая получала отказ «fetch first».
+            for attempt in 1 2 3; do
+              if git push origin "HEAD:${{ github.ref_name }}"; then break; fi
+              echo "Ветка изменилась, переносим коммит поверх (попытка $attempt)"
+              git pull --rebase origin "${{ github.ref_name }}"
+              sleep 5
+            done
           fi
 
       # Артефакт — только копия для скачивания вручную. Его квота в GitHub

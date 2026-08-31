@@ -180,7 +180,16 @@ jobs:
             echo "Нет изменений — пропускаем коммит"
           else
             git commit -m "Собрать Android APK v${{ steps.pkg.outputs.version }} [skip ci]"
-            git push origin "HEAD:${{ github.ref_name }}"
+            # Сборки Windows и Android часто идут одновременно и пишут в одну
+            # ветку — та, что финиширует второй, получала отказ «fetch first» и
+            # теряла готовый файл. Подкладываем чужой коммит под свой и пробуем
+            # ещё раз.
+            for attempt in 1 2 3; do
+              if git push origin "HEAD:${{ github.ref_name }}"; then break; fi
+              echo "Ветка изменилась, переносим коммит поверх (попытка $attempt)"
+              git pull --rebase origin "${{ github.ref_name }}"
+              sleep 5
+            done
           fi
 
       # Артефакт — только копия для скачивания вручную. Его квота в GitHub
