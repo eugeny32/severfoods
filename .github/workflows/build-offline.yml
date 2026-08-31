@@ -37,16 +37,6 @@ jobs:
         shell: bash
         run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
-      - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: SeverFoods-Setup-${{ steps.pkg.outputs.version }}
-          path: |
-            offline/dist/*.exe
-            offline/dist/*.yml
-            offline/dist/*.blockmap
-          if-no-files-found: error
-
       - name: Commit installer into offline/dist
         if: ${{ inputs.commit_installer }}
         shell: bash
@@ -63,3 +53,17 @@ jobs:
             git commit -m "Собрать оффлайн-установщик v${{ steps.pkg.outputs.version }} [skip ci]"
             git push origin "HEAD:${{ github.ref_name }}"
           fi
+
+      # Артефакт — только копия для скачивания вручную. Его квота в GitHub
+      # исчерпаема, и выпуск (коммит установщика в offline/dist) не должен
+      # от неё зависеть — поэтому шаг идёт ПОСЛЕ коммита и не валит сборку.
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SeverFoods-Setup-${{ steps.pkg.outputs.version }}
+          path: |
+            offline/dist/*.exe
+            offline/dist/*.yml
+            offline/dist/*.blockmap
+          if-no-files-found: error
+        continue-on-error: true
