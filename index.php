@@ -44,6 +44,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['qr_data']) && isAjax(
 $effective_point_id = $meal_point_id ?: $assigned_point_id;
 $current_meal      = getCurrentMealType($pdo, $effective_point_id);
 $current_meal_name = getMealTypeName($current_meal);
+// Часовой пояс, по которому показываются часы и тип питания в шапке: пояс
+// точки, а если точка не выбрана — фиксированный серверный (SERVER_TZ_OFFSET),
+// но НЕ часовой пояс браузера: он у каждого свой и к столовой отношения не имеет.
+$point_tz_offset   = $effective_point_id ? getPointTz($pdo, $effective_point_id) : SERVER_TZ_OFFSET;
+$point_tz_label    = '';
+if ($effective_point_id && ($pt = getMealPointById($pdo, $effective_point_id))) {
+    $point_tz_label = (string)($pt['point_name'] ?? '');
+}
 $schedule_today    = $effective_point_id ? getPointScheduleInfo($pdo, $effective_point_id) : [];
 
 // Статистика
@@ -187,7 +195,7 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal, $is_admin) {
         <div class="header-divider"></div>
         <div class="header-chips">
             <span class="chip time" id="headerTime"></span>
-            <span class="chip meal <?= $current_meal !== 'none' ? 'active' : 'none' ?>">
+            <span class="chip meal <?= $current_meal !== 'none' ? 'active' : 'none' ?>" id="headerMeal">
                 <?= getMealTypeIcon($current_meal) ?> <?= $current_meal_name ?>
             </span>
             <?php if ($is_admin): ?>
@@ -1116,6 +1124,11 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal, $is_admin) {
     window.points           = <?= json_encode($points,           JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.mealPointId      = <?= json_encode($meal_point_id) ?>;
     window.CURRENT_MEAL     = <?= json_encode($current_meal) ?>;
+    // Часы и тип питания в шапке показывают время ТОЧКИ, а не компьютера, за
+    // которым сидит человек: администратор в Москве, открывая площадку Кызыла,
+    // должен видеть, что там сейчас идёт ужин, а не гадать по своим часам.
+    window.POINT_TZ_OFFSET  = <?= json_encode($point_tz_offset) ?>;
+    window.POINT_TZ_LABEL   = <?= json_encode($point_tz_label, JSON_UNESCAPED_UNICODE) ?>;
     window.ORG_LIST         = <?= json_encode(array_column($pdo->query("SELECT DISTINCT TRIM(organization) as o FROM employees WHERE organization!='' AND NOT (COALESCE(chat_access,0)=1 AND role IS NULL) ORDER BY o")->fetchAll(), 'o'), JSON_UNESCAPED_UNICODE) ?>;
 })();
 

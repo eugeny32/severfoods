@@ -38,11 +38,38 @@ function escHtml(s) {
 }
 
 // ── Clock ─────────────────────────────────────────────
+// Часы показывают время ТОЧКИ ПИТАНИЯ, а не компьютера: смещение приходит с
+// сервера (window.POINT_TZ_OFFSET — пояс точки либо серверный по умолчанию).
+// Часовой пояс браузера сознательно не используется: у администратора он свой
+// и к расписанию столовой отношения не имеет. Если смещение почему-то не
+// пришло — показываем время машины, это лучше пустой шапки.
+function tzOffsetMinutes(off) {
+    const m = /^([+-])(\d{2}):(\d{2})$/.exec(off || '');
+    if (!m) return null;
+    const v = parseInt(m[2], 10) * 60 + parseInt(m[3], 10);
+    return m[1] === '-' ? -v : v;
+}
+
+function pointNow() {
+    const off = tzOffsetMinutes(window.POINT_TZ_OFFSET);
+    if (off === null) return { date: new Date(), utc: false };
+    // Сдвигаем UTC на смещение точки и форматируем как UTC — так результат не
+    // зависит от пояса машины вообще.
+    return { date: new Date(Date.now() + off * 60000), utc: true };
+}
+
 function updateClock() {
     const el = $('headerTime');
     if (!el) return;
-    const now = new Date();
-    el.textContent = now.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    const { date, utc } = pointNow();
+    el.textContent = date.toLocaleTimeString('ru-RU', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        timeZone: utc ? 'UTC' : undefined,
+    });
+    if (utc && window.POINT_TZ_OFFSET) {
+        el.title = 'Время точки питания' + (window.POINT_TZ_LABEL ? ' «' + window.POINT_TZ_LABEL + '»' : '')
+                 + ' (UTC' + window.POINT_TZ_OFFSET + ')';
+    }
 }
 setInterval(updateClock, 1000);
 updateClock();
@@ -244,6 +271,20 @@ function refreshStats() {
                 }
             }
         });
+
+        // Тип питания и часовой пояс приходят от сервера, посчитанные по
+        // расписанию точки: страница может быть открыта часами, и завтрак
+        // должен смениться обедом сам, без перезагрузки.
+        if (data.meal_type) {
+            window.CURRENT_MEAL = data.meal_type;
+            const chip = $('headerMeal');
+            if (chip) {
+                chip.innerHTML = (data.meal_icon || '') + ' ' + (data.meal_name || '');
+                chip.classList.toggle('active', data.meal_type !== 'none');
+                chip.classList.toggle('none',   data.meal_type === 'none');
+            }
+        }
+        if (data.tz_offset) window.POINT_TZ_OFFSET = data.tz_offset;
     })
     .catch(() => {});
 }
@@ -1566,7 +1607,7 @@ async function normalizeNightRecords(dryRun) {
         const data = await res.json();
         if (data.success) {
             const prefix = dryRun ? 'Предпросмотр (изменения НЕ сохранены)' : 'Готово';
-            resultEl.textContent = `${prefix}: всего проверено ${data.total}, изменится — ${data.changed} (завтрак ${data.by_type.breakfast}, обед ${data.by_type.lunch}, ужин ${data.by_type.dinner}), из них время (массовая проводка) — ${data.retimed}, пропущено как «вне графика» — ${data.skipped}`;
+            resultEl.textContent = `${prefix}: всего проверено ${data.total}, изменится — ${data.changed} (завтрак ${data.by_type.breakfast}, обед ${data.by_type.lunch}, ужин ${data.by_type.dinner}, ночное ${data.by_type.night ?? 0}), из них время (массовая проводка) — ${data.retimed}, пропущено как «вне графика» — ${data.skipped}`;
         } else {
             resultEl.textContent = data.message || 'Ошибка';
         }
@@ -1588,7 +1629,7 @@ async function normalizePassTimes(dryRun) {
         const data = await res.json();
         if (data.success) {
             const prefix = dryRun ? 'Предпросмотр (изменения НЕ сохранены)' : 'Готово';
-            resultEl.textContent = `${prefix}: всего ${data.total}, изменится — ${data.retimed} (завтрак ${data.by_type.breakfast}, обед ${data.by_type.lunch}, ужин ${data.by_type.dinner}), уже корректны — ${data.unchanged}`;
+            resultEl.textContent = `${prefix}: всего ${data.total}, изменится — ${data.retimed} (завтрак ${data.by_type.breakfast}, обед ${data.by_type.lunch}, ужин ${data.by_type.dinner}, ночное ${data.by_type.night ?? 0}), уже корректны — ${data.unchanged}`;
         } else {
             resultEl.textContent = data.message || 'Ошибка';
         }

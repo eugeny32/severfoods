@@ -213,6 +213,17 @@ async function loadLoginPoints() {
     } catch (_) {}
 }
 
+// ── Автофокус в поле ввода ────────────────────────────────
+// На Windows фокус в поле QR нужен: ручной сканер печатает как клавиатура, и
+// без фокуса символы уходили бы в никуда. На Android он, наоборот, мешает —
+// системная клавиатура выезжает сама и закрывает половину экрана, хотя код
+// приходит с камеры или внешнего сканера. Android-сборка выставляет
+// window.SF_NO_AUTOFOCUS (см. android/core/boot.js).
+function autoFocusInput(el) {
+    if (window.SF_NO_AUTOFOCUS) return;
+    el?.focus();
+}
+
 // ── Login tabs ────────────────────────────────────────────
 function switchLoginTab(tab) {
     const isOp = tab === 'operator';
@@ -223,7 +234,7 @@ function switchLoginTab(tab) {
     stopLoginCam();
     setTimeout(() => {
         const inp = isOp ? document.getElementById('opQrInput') : document.getElementById('adQrInput');
-        if (inp) inp.focus();
+        autoFocusInput(inp);
     }, 50);
 }
 
@@ -350,7 +361,7 @@ function hideLoginError() { document.getElementById('loginError').style.display 
 function showLogin() {
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('mainApp').style.display = 'none';
-    setTimeout(() => document.getElementById('opQrInput')?.focus(), 100);
+    setTimeout(() => autoFocusInput(document.getElementById('opQrInput')), 100);
 }
 
 function onLogin(emp) {

@@ -22,4 +22,15 @@ if ($is_super) {
 // Убедимся что все ключи присутствуют
 $stats = array_merge(['total'=>0,'breakfast'=>0,'lunch'=>0,'dinner'=>0,'night'=>0], $stats);
 
+// Текущий приём пищи считаем ЗДЕСЬ, по расписанию и часовому поясу точки, и
+// отдаём в шапку страницы: иначе тип оставался бы тем, каким был в момент
+// открытия страницы, и смена завтрака на обед была бы видна только после
+// перезагрузки. Правило одно на всю систему — getCurrentMealType().
+$point_id   = $mp_id ?: $ap_id;
+$meal_type  = getCurrentMealType($pdo, $point_id);
+$stats['meal_type'] = $meal_type;
+$stats['meal_name'] = getMealTypeName($meal_type);
+$stats['meal_icon'] = getMealTypeIcon($meal_type);
+$stats['tz_offset'] = $point_id ? getPointTz($pdo, $point_id) : SERVER_TZ_OFFSET;
+
 echo json_encode($stats);

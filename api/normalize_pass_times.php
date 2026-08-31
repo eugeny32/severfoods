@@ -34,6 +34,10 @@ Csrf::guard();
 $data   = json_decode(file_get_contents('php://input'), true) ?? [];
 $dryRun = !empty($data['dry_run']);
 
+// Та же защита, что и в normalize_night_records.php: обрыв по лимиту времени
+// отдал бы клиенту пустой ответ и невнятную «Ошибку сети».
+set_time_limit(0);
+
 try {
     $stmt = $pdo->query(
         "SELECT ml.id, ml.scanned_at, ml.meal_type, ml.meal_point_id, ml.scanner_ip, mpt.tz_offset
@@ -41,7 +45,7 @@ try {
          LEFT JOIN meal_points mpt ON mpt.id = ml.meal_point_id
          WHERE ml.scanner_ip IN ('bulk', 'manual')"
     );
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $totalRows = 0;
 
     $upd       = $pdo->prepare("UPDATE meal_logs SET meal_type = ?, scanned_at = ? WHERE id = ?");
     $schedStmt = $pdo->prepare(
@@ -57,7 +61,8 @@ try {
     $byType   = ['breakfast' => 0, 'lunch' => 0, 'dinner' => 0, 'night' => 0];
 
     if (!$dryRun) $pdo->beginTransaction();
-    foreach ($rows as $r) {
+    while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $totalRows++;
         $tz = (!empty($r['tz_offset']) && preg_match('/^[+-]\d{2}:\d{2}$/', $r['tz_offset'])) ? $r['tz_offset'] : APP_TZ_OFFSET;
         $ts = strtotime($r['scanned_at'] . ' UTC');
         $localTime = gmdate('H:i:s', $ts + offsetToMinutes($tz) * 60);
@@ -87,13 +92,13 @@ try {
     if (!$dryRun) $pdo->commit();
 
     if (!$dryRun) {
-        logAction('normalize_pass_times', "Нормализовано время массовых/ручных записей: {$retimed} изменено (завтрак {$byType['breakfast']}, обед {$byType['lunch']}, ужин {$byType['dinner']}), {$unchanged} уже были корректны");
+        logAction('normalize_pass_times', "Нормализовано время массовых/ручных записей: {$retimed} изменено (завтрак {$byType['breakfast']}, обед {$byType['lunch']}, ужин {$byType['dinner']}, ночное {$byType['night']}), {$unchanged} уже были корректны");
     }
 
     echo json_encode([
         'success'   => true,
         'dry_run'   => $dryRun,
-        'total'     => count($rows),
+        'total'     => $totalRows,
         'retimed'   => $retimed,
         'unchanged' => $unchanged,
         'by_type'   => $byType,

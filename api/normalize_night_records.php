@@ -57,6 +57,11 @@ function defaultScheduleType(string $localTime): ?string
     return null;
 }
 
+// На точке с тысячами сотрудников таблица meal_logs — сотни тысяч строк.
+// Обрыв по лимиту времени PHP отдал бы клиенту пустой ответ, и он показал бы
+// «Ошибка сети», ничего не объяснив.
+set_time_limit(0);
+
 try {
     $stmt = $pdo->query(
         "SELECT ml.id, ml.scanned_at, ml.meal_type, ml.meal_point_id, ml.scanner_ip, mpt.tz_offset
@@ -65,7 +70,11 @@ try {
          WHERE ml.access_granted = 1
            AND ml.meal_type IN ('night', 'breakfast', 'lunch', 'dinner')"
     );
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Перебираем по одной строке, а не через fetchAll(): результат в любом
+    // случае буферизуется драйвером, но лишний PHP-массив из сотен тысяч
+    // ассоциативных массивов — это уже реальный шанс упереться в memory_limit
+    // и отдать клиенту пустой ответ вместо JSON.
+    $totalRows = 0;
 
     $upd         = $pdo->prepare("UPDATE meal_logs SET meal_type = ? WHERE id = ?");
     $updWithTime = $pdo->prepare("UPDATE meal_logs SET meal_type = ?, scanned_at = ? WHERE id = ?");
@@ -79,12 +88,13 @@ try {
 
     $pointSchedules = []; // meal_point_id => [ [start_time,end_time,days_of_week,meal_type], ... ]
 
-    $changed = ['breakfast' => 0, 'lunch' => 0, 'dinner' => 0];
+    $changed = ['breakfast' => 0, 'lunch' => 0, 'dinner' => 0, 'night' => 0];
     $retimed = 0;
     $skipped = 0; // вне графика — тип не определён однозначно
 
     if (!$dryRun) $pdo->beginTransaction();
-    foreach ($rows as $r) {
+    while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $totalRows++;
         $tz        = (!empty($r['tz_offset']) && preg_match('/^[+-]\d{2}:\d{2}$/', $r['tz_offset'])) ? $r['tz_offset'] : APP_TZ_OFFSET;
         $ts        = strtotime($r['scanned_at'] . ' UTC');
         $localTime = gmdate('H:i:s', $ts + offsetToMinutes($tz) * 60);
@@ -101,14 +111,10 @@ try {
                 $ss->execute([$r['meal_point_id']]);
                 $pointSchedules[$r['meal_point_id']] = $ss->fetchAll(PDO::FETCH_ASSOC);
             }
-            foreach ($pointSchedules[$r['meal_point_id']] as $s) {
-                if (strpos(',' . $s['days_of_week'] . ',', ',' . $weekday . ',') === false) continue;
-                $start = $s['start_time']; $end = $s['end_time'];
-                $inWindow = ($end < $start)
-                    ? ($localTime >= $start || $localTime < $end)
-                    : ($localTime >= $start && $localTime < $end);
-                if ($inWindow) { $scheduleType = $s['meal_type']; break; }
-            }
+            // Общее правило совпадения (matchSchedule в src/functions.php):
+            // окно через полночь после полуночи относится к предыдущему дню.
+            $hit = matchSchedule($pointSchedules[$r['meal_point_id']], $localTime, (int)$weekday);
+            if ($hit) $scheduleType = $hit['meal_type'];
         } else {
             $scheduleType = defaultScheduleType($localTime);
         }
@@ -140,15 +146,15 @@ try {
     }
     if (!$dryRun) $pdo->commit();
 
-    $total = $changed['breakfast'] + $changed['lunch'] + $changed['dinner'];
+    $total = array_sum($changed);
     if (!$dryRun) {
-        logAction('normalize_night_records', "Переклассифицировано записей по расписанию: {$total} (завтрак {$changed['breakfast']}, обед {$changed['lunch']}, ужин {$changed['dinner']}), из них с переносом времени (массовая проводка): {$retimed}, пропущено (вне графика): {$skipped}");
+        logAction('normalize_night_records', "Переклассифицировано записей по расписанию: {$total} (завтрак {$changed['breakfast']}, обед {$changed['lunch']}, ужин {$changed['dinner']}, ночное {$changed['night']}), из них с переносом времени (массовая проводка): {$retimed}, пропущено (вне графика): {$skipped}");
     }
 
     echo json_encode([
         'success'  => true,
         'dry_run'  => $dryRun,
-        'total'    => count($rows),
+        'total'    => $totalRows,
         'changed'  => $total,
         'by_type'  => $changed,
         'retimed'  => $retimed,
