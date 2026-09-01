@@ -138,8 +138,15 @@ if ($out_of_schedule_only) {
 // записи внутри одного приёма пищи (например, скан + случайно не удалённая
 // ручная проводка) считаются одним приёмом, а не раздувают статистику
 // (та же логика, что и в getTodayStats()).
+// Разбивка по типам считается тем же способом, что и общее число приёмов:
+// внутри одного типа за один день — один приём, сколько бы строк ни было
+// (скан плюс не удалённая ручная проводка не должны удваивать счёт).
 $sqlEmp = "SELECT e.id, e.full_name, e.organization, e.department,
                   COUNT(DISTINCT CONCAT(ml.meal_type,'_',DATE($scannedLocal))) as meals,
+                  COUNT(DISTINCT CASE WHEN ml.meal_type='breakfast' THEN DATE($scannedLocal) END) as breakfast,
+                  COUNT(DISTINCT CASE WHEN ml.meal_type='lunch'     THEN DATE($scannedLocal) END) as lunch,
+                  COUNT(DISTINCT CASE WHEN ml.meal_type='dinner'    THEN DATE($scannedLocal) END) as dinner,
+                  COUNT(DISTINCT CASE WHEN ml.meal_type='night'     THEN DATE($scannedLocal) END) as night,
                   COUNT(DISTINCT DATE($scannedLocal)) as days
            FROM meal_logs ml
            JOIN employees e ON ml.employee_id = e.id
@@ -680,7 +687,7 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
             Сводный отчёт по сотрудникам (<?= count($empStats) ?> чел.)
         </div>
-        <a href="export_excel_employees.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?>&region=<?= urlencode($region) ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?>"
+        <a href="export_excel_employees.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?>&region=<?= urlencode($region) ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?><?= $orgQuery ?>"
            class="btn btn-success" style="background:#15803d;padding:6px 14px;font-size:12px;text-decoration:none;border-radius:7px;color:#fff;font-weight:600">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
             Excel
@@ -693,11 +700,20 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
     <?php foreach ($empByOrg as $org => $rows):
         $orgMeals = array_sum(array_column($rows, 'meals'));
         $orgDays  = array_sum(array_column($rows, 'days'));
+        $orgByType = [];
+        foreach (['breakfast','lunch','dinner','night'] as $mt) {
+            $orgByType[$mt] = array_sum(array_column($rows, $mt));
+        }
     ?>
     <div style="margin-bottom:24px">
         <div style="background:var(--bg-input,#f1f5f9);padding:8px 16px;border-radius:8px;margin-bottom:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
             <span style="font-size:13px;font-weight:700;color:var(--text-main)"><?= htmlspecialchars($org ?: '—') ?></span>
-            <span style="font-size:11px;color:var(--text-3);margin-left:auto"><?= count($rows) ?> сотр. · <?= $orgMeals ?> приёмов · <?= $orgDays ?> дней</span>
+            <span style="font-size:11px;color:var(--text-3);margin-left:auto">
+                <?= count($rows) ?> сотр. ·
+                завтр. <?= $orgByType['breakfast'] ?> · обед <?= $orgByType['lunch'] ?> ·
+                ужин <?= $orgByType['dinner'] ?> · ночн. <?= $orgByType['night'] ?> ·
+                <?= $orgMeals ?> приёмов · <?= $orgDays ?> дней
+            </span>
         </div>
         <div class="report-table-wrap">
             <table class="report-table">
@@ -706,6 +722,10 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
                         <th style="width:40px">#</th>
                         <th class="sortable">ФИО<span class="sort-icon"></span></th>
                         <th class="sortable">Подразделение<span class="sort-icon"></span></th>
+                        <th class="sortable" style="text-align:center" title="Завтраки">Завтр.<span class="sort-icon"></span></th>
+                        <th class="sortable" style="text-align:center" title="Обеды">Обеды<span class="sort-icon"></span></th>
+                        <th class="sortable" style="text-align:center" title="Ужины">Ужины<span class="sort-icon"></span></th>
+                        <th class="sortable" style="text-align:center" title="Ночное питание">Ночн.<span class="sort-icon"></span></th>
                         <th class="sortable" style="text-align:center">Приёмов пищи<span class="sort-icon"></span></th>
                         <th class="sortable" style="text-align:center">Дней в столовой<span class="sort-icon"></span></th>
                     </tr>
@@ -716,6 +736,9 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
                         <td style="color:var(--text-3);font-size:12px"><?= $i+1 ?></td>
                         <td style="font-weight:600"><?= htmlspecialchars($r['full_name']) ?></td>
                         <td style="color:var(--text-3)"><?= htmlspecialchars($r['department'] ?: '—') ?></td>
+                        <?php foreach (['breakfast','lunch','dinner','night'] as $mt): ?>
+                        <td style="text-align:center;font-variant-numeric:tabular-nums;<?= $r[$mt] ? '' : 'color:var(--text-4,#94a3b8)' ?>"><?= $r[$mt] ?: '—' ?></td>
+                        <?php endforeach; ?>
                         <td style="text-align:center;font-weight:700;font-variant-numeric:tabular-nums"><?= $r['meals'] ?></td>
                         <td style="text-align:center;font-weight:700;font-variant-numeric:tabular-nums;color:var(--blue-700,#003366)"><?= $r['days'] ?></td>
                     </tr>
@@ -724,6 +747,9 @@ $dryField     = count(array_filter($dryLogs, fn($r) => $r['ration_type'] === 'fi
                 <tfoot>
                     <tr style="background:var(--bg-input,#f8fafc)">
                         <td colspan="3" style="font-weight:700;font-size:12px;padding:8px 12px">Итого по организации</td>
+                        <?php foreach (['breakfast','lunch','dinner','night'] as $mt): ?>
+                        <td style="text-align:center;font-weight:700;font-variant-numeric:tabular-nums"><?= $orgByType[$mt] ?></td>
+                        <?php endforeach; ?>
                         <td style="text-align:center;font-weight:800"><?= $orgMeals ?></td>
                         <td style="text-align:center;font-weight:800;color:var(--blue-700,#003366)"><?= $orgDays ?></td>
                     </tr>

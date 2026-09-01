@@ -48,8 +48,14 @@ $scannedLocal = "CONVERT_TZ(ml.scanned_at, '+00:00', COALESCE(mpt.tz_offset, '" 
 // COUNT(DISTINCT ...) по типу+дате — дублирующиеся записи внутри одного
 // приёма пищи считаются одним приёмом, а не раздувают выгрузку (см. также
 // reports.php: тот же принцип для сводки в веб-интерфейсе).
+// Разбивка по типам — тем же способом, что и общее число приёмов: внутри
+// одного типа за день считается один приём, сколько бы строк ни было.
 $sql = "SELECT e.id, e.full_name, e.organization, e.department,
                COUNT(DISTINCT CONCAT(ml.meal_type,'_',DATE($scannedLocal))) as meals,
+               COUNT(DISTINCT CASE WHEN ml.meal_type='breakfast' THEN DATE($scannedLocal) END) as breakfast,
+               COUNT(DISTINCT CASE WHEN ml.meal_type='lunch'     THEN DATE($scannedLocal) END) as lunch,
+               COUNT(DISTINCT CASE WHEN ml.meal_type='dinner'    THEN DATE($scannedLocal) END) as dinner,
+               COUNT(DISTINCT CASE WHEN ml.meal_type='night'     THEN DATE($scannedLocal) END) as night,
                COUNT(DISTINCT DATE($scannedLocal)) as days
         FROM meal_logs ml
         JOIN employees e ON ml.employee_id = e.id
@@ -140,7 +146,7 @@ echo '</Styles>' . "\n";
 echo '<Worksheet ss:Name="Сотрудники">' . "\n";
 echo '<Table>' . "\n";
 
-$widths = [180, 200, 170, 90, 90, 90];
+$widths = [180, 200, 170, 70, 70, 70, 70, 90, 90, 90];
 foreach ($widths as $w) {
     echo '<Column ss:Width="' . $w . '"/>' . "\n";
 }
@@ -149,32 +155,40 @@ foreach ($widths as $w) {
 $title = 'Сводный отчёт по сотрудникам: ' . $start_date . ' — ' . $end_date
        . ($meal_type !== 'all' ? ' / ' . getMealTypeName($meal_type) : '');
 echo '<Row ss:Height="28">' . "\n";
-echo '<Cell ss:StyleID="s_title" ss:MergeAcross="5"><Data ss:Type="String">' . ec($title) . '</Data></Cell>' . "\n";
+echo '<Cell ss:StyleID="s_title" ss:MergeAcross="9"><Data ss:Type="String">' . ec($title) . '</Data></Cell>' . "\n";
 echo '</Row>' . "\n";
 
 // Column headers
-$headers = ['Организация', 'ФИО', 'Подразделение', 'Приёмов пищи', 'Дней в столовой', 'Сух. паёк (дней)'];
+$headers = ['Организация', 'ФИО', 'Подразделение', 'Завтраки', 'Обеды', 'Ужины', 'Ночное',
+            'Приёмов пищи', 'Дней в столовой', 'Сух. паёк (дней)'];
 echo '<Row ss:Height="24">' . "\n";
 foreach ($headers as $h) {
     echo '<Cell ss:StyleID="s_head"><Data ss:Type="String">' . ec($h) . '</Data></Cell>' . "\n";
 }
 echo '</Row>' . "\n";
 
+const MEAL_COLS = ['breakfast', 'lunch', 'dinner', 'night'];
 $grandMeals = 0;
 $grandDays  = 0;
 $grandDry   = 0;
+$grandType  = array_fill_keys(MEAL_COLS, 0);
 
 foreach ($byOrg as $org => $emps) {
     $orgMeals = array_sum(array_column($emps, 'meals'));
     $orgDays  = array_sum(array_column($emps, 'days'));
     $orgDry   = array_sum(array_column($emps, 'dry_rations'));
+    $orgType  = [];
+    foreach (MEAL_COLS as $mt) {
+        $orgType[$mt] = array_sum(array_column($emps, $mt));
+        $grandType[$mt] += $orgType[$mt];
+    }
     $grandMeals += $orgMeals;
     $grandDays  += $orgDays;
     $grandDry   += $orgDry;
 
     // Org header row
     echo '<Row ss:Height="20">' . "\n";
-    echo '<Cell ss:StyleID="s_org" ss:MergeAcross="5"><Data ss:Type="String">' . ec($org) . '</Data></Cell>' . "\n";
+    echo '<Cell ss:StyleID="s_org" ss:MergeAcross="9"><Data ss:Type="String">' . ec($org) . '</Data></Cell>' . "\n";
     echo '</Row>' . "\n";
 
     foreach ($emps as $emp) {
@@ -183,6 +197,9 @@ foreach ($byOrg as $org => $emps) {
         echo '<Cell ss:StyleID="s_data"><Data ss:Type="String"></Data></Cell>' . "\n";
         echo '<Cell ss:StyleID="s_data"><Data ss:Type="String">' . ec($emp['full_name'])       . '</Data></Cell>' . "\n";
         echo '<Cell ss:StyleID="s_data"><Data ss:Type="String">' . ec($emp['department'])      . '</Data></Cell>' . "\n";
+        foreach (MEAL_COLS as $mt) {
+            echo '<Cell ss:StyleID="s_num"><Data ss:Type="Number">' . (int)$emp[$mt] . '</Data></Cell>' . "\n";
+        }
         echo '<Cell ss:StyleID="s_num"><Data ss:Type="Number">'  . (int)$emp['meals']          . '</Data></Cell>' . "\n";
         echo '<Cell ss:StyleID="s_num"><Data ss:Type="Number">'  . (int)$emp['days']           . '</Data></Cell>' . "\n";
         echo '<Cell ss:StyleID="' . $dryStyle . '"><Data ss:Type="Number">' . (int)$emp['dry_rations'] . '</Data></Cell>' . "\n";
@@ -192,6 +209,9 @@ foreach ($byOrg as $org => $emps) {
     // Org subtotal
     echo '<Row ss:Height="20">' . "\n";
     echo '<Cell ss:StyleID="s_sub" ss:MergeAcross="2"><Data ss:Type="String">Итого по ' . ec($org) . '</Data></Cell>' . "\n";
+    foreach (MEAL_COLS as $mt) {
+        echo '<Cell ss:StyleID="s_subn"><Data ss:Type="Number">' . $orgType[$mt] . '</Data></Cell>' . "\n";
+    }
     echo '<Cell ss:StyleID="s_subn"><Data ss:Type="Number">' . $orgMeals . '</Data></Cell>' . "\n";
     echo '<Cell ss:StyleID="s_subn"><Data ss:Type="Number">' . $orgDays  . '</Data></Cell>' . "\n";
     echo '<Cell ss:StyleID="s_subn"><Data ss:Type="Number">' . $orgDry   . '</Data></Cell>' . "\n";
@@ -204,6 +224,9 @@ foreach ($byOrg as $org => $emps) {
 // Grand total
 echo '<Row ss:Height="24">' . "\n";
 echo '<Cell ss:StyleID="s_total" ss:MergeAcross="2"><Data ss:Type="String">ИТОГО</Data></Cell>' . "\n";
+foreach (MEAL_COLS as $mt) {
+    echo '<Cell ss:StyleID="s_total"><Data ss:Type="Number">' . $grandType[$mt] . '</Data></Cell>' . "\n";
+}
 echo '<Cell ss:StyleID="s_total"><Data ss:Type="Number">' . $grandMeals . '</Data></Cell>' . "\n";
 echo '<Cell ss:StyleID="s_total"><Data ss:Type="Number">' . $grandDays  . '</Data></Cell>' . "\n";
 echo '<Cell ss:StyleID="s_total"><Data ss:Type="Number">' . $grandDry   . '</Data></Cell>' . "\n";
