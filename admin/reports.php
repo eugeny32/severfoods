@@ -15,7 +15,9 @@ const REPORT_LIMIT = 1000;
 
 $allRegions = adminRegions($pdo);
 $selected   = adminSelectedRegions($pdo, $_GET['regions'] ?? null);
-$type       = ($_GET['type'] ?? 'meals') === 'rations' ? 'rations' : 'meals';
+// Три вида отчёта: журнал проходов, сухпаи и сводка по сотрудникам.
+$type = in_array($_GET['type'] ?? '', ['meals', 'rations', 'employees'], true)
+    ? $_GET['type'] : 'meals';
 
 $filters = [
     'date_from' => trim((string)($_GET['date_from'] ?? gmdate('Y-m-01'))),
@@ -43,6 +45,13 @@ if ($allRegions) {
             $ss = $pdo->prepare($sSql);
             $ss->execute($sParams);
             $summary = $ss->fetchAll();
+        } elseif ($type === 'employees') {
+            // Здесь ограничение по числу строк не нужно: это уже свёрнутая
+            // сводка, в ней столько строк, сколько людей питалось.
+            [$sql, $params] = adminEmployeesQuery($selected, $filters);
+            $st = $pdo->prepare("SELECT * FROM ({$sql}) AS u ORDER BY organization, full_name");
+            $st->execute($params);
+            $rows = $st->fetchAll();
         } else {
             [$sql, $params] = adminRationsQuery($selected, $filters);
             $st = $pdo->prepare("SELECT * FROM ({$sql}) AS u ORDER BY issue_date DESC LIMIT " . (REPORT_LIMIT + 1));
@@ -50,7 +59,7 @@ if ($allRegions) {
             $rows = $st->fetchAll();
         }
 
-        if (count($rows) > REPORT_LIMIT) {
+        if ($type !== 'employees' && count($rows) > REPORT_LIMIT) {
             $truncated = true;
             array_pop($rows);
         }
@@ -95,7 +104,7 @@ adminHead('Отчёты', 'reports');
         <div class="field"><label>По дату</label>
             <input type="date" name="date_to" value="<?= adminEsc($filters['date_to']) ?>"></div>
 
-        <?php if ($type === 'meals'): ?>
+        <?php if ($type !== 'rations'): ?>
         <div class="field"><label>Приём пищи</label>
             <select name="meal_type">
                 <option value="">Все</option>
@@ -126,9 +135,12 @@ adminHead('Отчёты', 'reports');
     </div>
 
     <button class="btn" type="submit"><i class="fas fa-magnifying-glass"></i> Показать</button>
-    <a class="btn btn-sec" href="?<?= adminEsc($qs(['type' => $type === 'meals' ? 'rations' : 'meals'])) ?>">
-        <?= $type === 'meals' ? 'Сухпаи и выездное' : 'Журнал питания' ?>
-    </a>
+    <?php foreach (['meals' => 'Журнал питания', 'employees' => 'По сотрудникам',
+                    'rations' => 'Сухпаи и выездное'] as $t => $label): ?>
+        <?php if ($t !== $type): ?>
+        <a class="btn btn-sec" href="?<?= adminEsc($qs(['type' => $t])) ?>"><?= $label ?></a>
+        <?php endif; ?>
+    <?php endforeach; ?>
     <a class="btn btn-sec" href="export_excel.php?<?= adminEsc($qs()) ?>"><i class="fas fa-file-excel"></i> Выгрузить в Excel</a>
 </form>
 
@@ -168,8 +180,9 @@ adminHead('Отчёты', 'reports');
     </div>
 <?php endif; ?>
 
-<h2><?= $type === 'meals' ? 'Журнал питания' : 'Сухпаи и выездное питание' ?>
-    <span class="muted">(<?= count($rows) ?>)</span></h2>
+<h2><?= ['meals' => 'Журнал питания', 'employees' => 'Сводка по сотрудникам',
+          'rations' => 'Сухпаи и выездное питание'][$type] ?>
+    <span class="muted">(<?= count($rows) ?><?= $type === 'employees' ? ' чел.' : '' ?>)</span></h2>
 <div class="card">
 <table>
 <?php if ($type === 'meals'): ?>
@@ -187,6 +200,35 @@ adminHead('Отчёты', 'reports');
         <td class="muted"><?= adminEsc($r['operator_name'] ?? '') ?></td>
     </tr>
     <?php endforeach; ?>
+<?php elseif ($type === 'employees'): ?>
+    <tr><th>Регион</th><th>Сотрудник</th><th>Организация</th><th>Подразделение</th>
+        <th>Завтр.</th><th>Обеды</th><th>Ужины</th><th>Ночн.</th>
+        <th>Приёмов пищи</th><th>Дней в столовой</th></tr>
+    <?php
+    $tot = array_fill_keys(['breakfast','lunch','dinner','night','meals','days'], 0);
+    foreach ($rows as $r):
+        foreach ($tot as $k => $_) $tot[$k] += (int)$r[$k];
+    ?>
+    <tr>
+        <td><span class="pill pill-reg"><?= adminEsc($allRegions[$r['region_key']]['label'] ?? $r['region_key']) ?></span></td>
+        <td><?= adminEsc($r['full_name'] ?? '—') ?></td>
+        <td class="muted"><?= adminEsc($r['organization'] ?? '') ?></td>
+        <td class="muted"><?= adminEsc($r['department'] ?? '') ?></td>
+        <?php foreach (['breakfast','lunch','dinner','night'] as $mt): ?>
+        <td><?= (int)$r[$mt] ?: '—' ?></td>
+        <?php endforeach; ?>
+        <td><strong><?= (int)$r['meals'] ?></strong></td>
+        <td><strong><?= (int)$r['days'] ?></strong></td>
+    </tr>
+    <?php endforeach; ?>
+    <?php if ($rows): ?>
+    <tr>
+        <td colspan="4"><strong>Всего</strong></td>
+        <?php foreach (['breakfast','lunch','dinner','night','meals','days'] as $k): ?>
+        <td><strong><?= $tot[$k] ?></strong></td>
+        <?php endforeach; ?>
+    </tr>
+    <?php endif; ?>
 <?php else: ?>
     <tr><th>Регион</th><th>Дата выдачи</th><th>Сотрудник</th><th>Организация</th>
         <th>Подразделение</th><th>Вид</th><th>Статус</th></tr>

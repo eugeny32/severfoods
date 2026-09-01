@@ -14,7 +14,8 @@ adminRequireLogin();
 
 $allRegions = adminRegions($pdo);
 $selected   = adminSelectedRegions($pdo, $_GET['regions'] ?? null);
-$type       = ($_GET['type'] ?? 'meals') === 'rations' ? 'rations' : 'meals';
+$type = in_array($_GET['type'] ?? '', ['meals', 'rations', 'employees'], true)
+    ? $_GET['type'] : 'meals';
 
 $filters = [
     'date_from' => trim((string)($_GET['date_from'] ?? '')),
@@ -33,6 +34,9 @@ try {
     if ($type === 'meals') {
         [$sql, $params] = adminMealsQuery($selected, $filters);
         $order = 'scanned_at DESC';
+    } elseif ($type === 'employees') {
+        [$sql, $params] = adminEmployeesQuery($selected, $filters);
+        $order = 'organization, full_name';
     } else {
         [$sql, $params] = adminRationsQuery($selected, $filters);
         $order = 'issue_date DESC';
@@ -72,6 +76,32 @@ echo "\xEF\xBB\xBF"; // BOM — иначе Excel открывает кирилл
     <td><?= number_format((float)($r['price'] ?? 0), 2, ',', '') ?></td>
 </tr>
 <?php endforeach; ?>
+<?php elseif ($type === 'employees'): ?>
+<tr><th>Регион</th><th>Сотрудник</th><th>Организация</th><th>Подразделение</th>
+    <th>Завтраки</th><th>Обеды</th><th>Ужины</th><th>Ночное</th>
+    <th>Приёмов пищи</th><th>Дней в столовой</th></tr>
+<?php
+$tot = array_fill_keys(['breakfast','lunch','dinner','night','meals','days'], 0);
+foreach ($rows as $r):
+    foreach ($tot as $k => $_) $tot[$k] += (int)$r[$k];
+?>
+<tr>
+    <td><?= htmlspecialchars($regionLabel($r['region_key']), ENT_QUOTES) ?></td>
+    <td><?= htmlspecialchars((string)($r['full_name'] ?? ''), ENT_QUOTES) ?></td>
+    <td><?= htmlspecialchars((string)($r['organization'] ?? ''), ENT_QUOTES) ?></td>
+    <td><?= htmlspecialchars((string)($r['department'] ?? ''), ENT_QUOTES) ?></td>
+    <?php foreach (['breakfast','lunch','dinner','night','meals','days'] as $k): ?>
+    <td><?= (int)$r[$k] ?></td>
+    <?php endforeach; ?>
+</tr>
+<?php endforeach; ?>
+<?php if ($rows): ?>
+<tr><td colspan="4"><b>Всего</b></td>
+    <?php foreach (['breakfast','lunch','dinner','night','meals','days'] as $k): ?>
+    <td><b><?= $tot[$k] ?></b></td>
+    <?php endforeach; ?>
+</tr>
+<?php endif; ?>
 <?php else: ?>
 <tr><th>Регион</th><th>Дата выдачи</th><th>Сотрудник</th><th>Организация</th>
     <th>Подразделение</th><th>Вид</th><th>Статус</th></tr>

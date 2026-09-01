@@ -60,6 +60,7 @@ function adminMealsQuery(array $regions, array $filters, string $fallbackTz = '+
 
     $part = "SELECT {REGION} AS region_key,
                     ml.id           AS log_id,
+                    ml.employee_id,
                     ml.scanned_at,
                     CONVERT_TZ(ml.scanned_at, '+00:00', COALESCE(mp.tz_offset, '{$fallbackTz}')) AS local_at,
                     ml.meal_type,
@@ -76,6 +77,34 @@ function adminMealsQuery(array $regions, array $filters, string $fallbackTz = '+
              WHERE " . implode(' AND ', $where);
 
     return adminUnionQuery($regions, $part, $params);
+}
+
+/**
+ * Сводка по сотрудникам: сколько завтраков, обедов, ужинов и ночных приёмов у
+ * каждого и в скольких днях он появлялся в столовой.
+ *
+ * Приёмы считаются так же, как в региональном отчёте: внутри одного типа за
+ * один день — один приём, сколько бы строк в журнале ни было. Дублирующие
+ * записи (скан плюс не удалённая ручная проводка) не должны раздувать счёт,
+ * а сумма по четырём типам обязана сходиться с колонкой «Приёмов пищи».
+ *
+ * Группировка включает регион и employee_id: одинаковые id в разных базах —
+ * разные люди, складывать их нельзя.
+ */
+function adminEmployeesQuery(array $regions, array $filters, string $fallbackTz = '+03:00'): array
+{
+    [$inner, $params] = adminMealsQuery($regions, $filters, $fallbackTz);
+    $day = "DATE(local_at)";
+    $sql = "SELECT region_key, employee_id, full_name, organization, department,
+                   COUNT(DISTINCT CONCAT(meal_type, '_', {$day})) AS meals,
+                   COUNT(DISTINCT CASE WHEN meal_type = 'breakfast' THEN {$day} END) AS breakfast,
+                   COUNT(DISTINCT CASE WHEN meal_type = 'lunch'     THEN {$day} END) AS lunch,
+                   COUNT(DISTINCT CASE WHEN meal_type = 'dinner'    THEN {$day} END) AS dinner,
+                   COUNT(DISTINCT CASE WHEN meal_type = 'night'     THEN {$day} END) AS night,
+                   COUNT(DISTINCT {$day}) AS days
+            FROM ({$inner}) AS u
+            GROUP BY region_key, employee_id, full_name, organization, department";
+    return [$sql, $params];
 }
 
 /** Сводка «сколько приёмов пищи в каждом регионе по типам». */
