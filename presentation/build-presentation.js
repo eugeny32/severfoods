@@ -23,7 +23,11 @@ const MUTED  = '5B6B7F';
 const AMBER  = 'F59E0B';
 const RED    = 'DC2626';
 
-const H = 'Cambria';       // заголовки
+// Шрифты выбраны по надёжности, а не по красоте: Arial есть в любой системе,
+// Calibri поставляется с Office, а в LibreOffice подменяется метрически
+// совместимым Carlito. Cambria здесь была ошибкой: на части машин её нет, а
+// подстановка другого шрифта с иными метриками ломает вёрстку.
+const H = 'Arial';         // заголовки
 const B = 'Calibri';       // текст
 
 const pres = new pptxgen();
@@ -92,12 +96,12 @@ function cardText(s, x, y, w, head, body, headColor) {
     s.background = { color: NAVY_D };
     s.addImage({ path: `${SCR}/logo-white.png`, x: 0.9, y: 0.75, w: 2.6, h: 1.01 });
     s.addText('СеверФудс', {
-        x: 0.9, y: 2.25, w: 9.5, h: 1.1, isTextBox: true, margin: 0,
+        x: 0.9, y: 2.25, w: 6.9, h: 1.1, isTextBox: true, margin: 0,
         fontFace: H, fontSize: 54, bold: true, color: WHITE,
     });
     s.addText('Система учёта питания сотрудников на производственных площадках', {
-        x: 0.9, y: 3.35, w: 8.6, h: 0.9, isTextBox: true, margin: 0,
-        fontFace: B, fontSize: 20, color: 'A8C0DA', lineSpacingMultiple: 1.2,
+        x: 0.9, y: 3.35, w: 6.9, h: 0.95, isTextBox: true, margin: 0,
+        fontFace: B, fontSize: 19, color: 'A8C0DA', lineSpacingMultiple: 1.2,
     });
     s.addShape(pres.ShapeType.roundRect, {
         x: 0.9, y: 4.5, w: 6.4, h: 0.52, rectRadius: 0.26,
@@ -136,13 +140,13 @@ function cardText(s, x, y, w, head, body, headColor) {
     ];
     let x = 0.65;
     items.forEach(([head, body], i) => {
-        card(s, x, 1.95, 2.9, 2.85);
-        badge(s, x + 0.28, 2.18, 0.5, String(i + 1), NAVY);
-        cardText(s, x + 0.28, 2.8, 2.35, head, body);
+        card(s, x, 1.9, 2.9, 2.95);
+        badge(s, x + 0.28, 2.15, 0.56, String(i + 1), NAVY);
+        cardText(s, x + 0.28, 2.85, 2.35, head, body);
         x += 3.05;
     });
     s.addText('Система заменяет ведомость картой с QR-кодом и терминалом на раздаче.', {
-        x: 0.65, y: 5.25, w: W - 1.3, h: 0.5, isTextBox: true, margin: 0,
+        x: 0.65, y: 5.35, w: W - 1.3, h: 0.5, isTextBox: true, margin: 0,
         fontFace: B, fontSize: 16, bold: true, color: NAVY,
     });
     s.addNotes('Боли заказчика. Главная — не скорость, а невозможность доказать объём питания по организации.');
@@ -342,19 +346,19 @@ function cardText(s, x, y, w, head, body, headColor) {
     let y = 1.95, x = 0.65;
     rules.forEach(([head, body], i) => {
         if (i === 2) { y = 1.95; x = 6.95; }
-        card(s, x, y, 5.7, 1.85, i < 2 ? 'E3F5F1' : ICE);
+        card(s, x, y, 5.7, 2.15, i < 2 ? 'E3F5F1' : ICE);
         s.addText(head, {
-            x: x + 0.3, y: y + 0.25, w: 5.1, h: 0.35, isTextBox: true, margin: 0,
-            fontFace: B, fontSize: 15, bold: true, color: NAVY,
+            x: x + 0.3, y: y + 0.3, w: 5.1, h: 0.35, isTextBox: true, margin: 0,
+            fontFace: B, fontSize: 15.5, bold: true, color: NAVY,
         });
         s.addText(body, {
-            x: x + 0.3, y: y + 0.62, w: 5.15, h: 1.15, isTextBox: true, margin: 0,
-            fontFace: B, fontSize: 12, color: TEXT, lineSpacingMultiple: 1.15,
+            x: x + 0.3, y: y + 0.72, w: 5.15, h: 1.25, isTextBox: true, margin: 0,
+            fontFace: B, fontSize: 12.5, color: TEXT, lineSpacingMultiple: 1.18,
         });
-        y += 2.05;
+        y += 2.35;
     });
     s.addText('Оператор при отказе видит время, когда человек уже проходил, — спорить не о чем.', {
-        x: 0.65, y: 6.2, w: W - 1.3, h: 0.4, isTextBox: true, margin: 0,
+        x: 0.65, y: 6.68, w: W - 1.3, h: 0.38, isTextBox: true, margin: 0,
         fontFace: B, fontSize: 13.5, italic: true, color: MUTED,
     });
 }
@@ -525,28 +529,27 @@ function cardText(s, x, y, w, head, body, headColor) {
 
 /* ═══════════════ 14. Отчёты ═══════════════ */
 {
-    const s = slide('Отчётность', 'То, ради чего всё и делается: достоверный счёт по каждой организации');
-    s.addImage({ path: `${SCR}/web-report.png`, x: 0.65, y: 1.9, w: 12.0, h: 3.52, shadow: shadow() });
+    const s = slide('Отчётность',
+                    'Счёт по каждой организации и человеку · данные на снимке демонстрационные');
+    // Пропорции снимка 1.71 — держим их, иначе таблица выглядит сплющенной.
+    s.addImage({ path: `${SCR}/web-report.png`, x: 0.87, y: 1.9, w: 11.6, h: 3.88, shadow: shadow() });
     const items = [
-        ['По сотруднику', 'Завтраки, обеды, ужины, ночное, всего приёмов и сколько дней человек появлялся в столовой.'],
-        ['По организации', 'Итоги по каждому подрядчику и общий итог — основание для счёта.'],
-        ['Фильтры', 'Период, точка, тип питания, способ проводки, выбранные организации, поиск по ФИО.'],
+        ['По сотруднику', 'Завтраки, обеды, ужины, ночное, всего приёмов и дней в столовой.'],
+        ['По организации', 'Итоги по подрядчику и общий итог — основание для счёта.'],
+        ['Фильтры', 'Период, точка, тип питания, способ проводки, организации, ФИО.'],
+        ['Выгрузка в Excel', 'С теми же фильтрами, что и на экране.'],
     ];
-    let x = 0.65;
+    let x = 0.87;
     items.forEach(([head, body]) => {
         s.addText(head, {
-            x, y: 5.6, w: 3.85, h: 0.32, isTextBox: true, margin: 0,
-            fontFace: B, fontSize: 14, bold: true, color: NAVY,
+            x, y: 5.95, w: 2.9, h: 0.32, isTextBox: true, margin: 0,
+            fontFace: B, fontSize: 13.5, bold: true, color: NAVY,
         });
         s.addText(body, {
-            x, y: 5.93, w: 3.85, h: 0.75, isTextBox: true, margin: 0,
-            fontFace: B, fontSize: 11.5, color: TEXT, lineSpacingMultiple: 1.15,
+            x, y: 6.27, w: 2.9, h: 0.78, isTextBox: true, margin: 0,
+            fontFace: B, fontSize: 11, color: TEXT, lineSpacingMultiple: 1.12,
         });
-        x += 4.1;
-    });
-    s.addText('Данные на снимке экрана демонстрационные.', {
-        x: 0.65, y: 6.75, w: 6, h: 0.35, isTextBox: true, margin: 0,
-        fontFace: B, fontSize: 10.5, italic: true, color: MUTED,
+        x += 3.05;
     });
 }
 
