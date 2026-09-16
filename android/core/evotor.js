@@ -44,10 +44,15 @@
         const atLogin = loginScreen && loginScreen.style.display !== 'none';
 
         if (atLogin) {
-            const input = document.getElementById('opQrInput');
+            // Роль определяем так же, как при вводе с клавиатуры
+            // (initGlobalScanCapture в app.js): на экране входа две вкладки, и
+            // карта администратора должна открывать вход администратора.
+            const isAdminTab = document.getElementById('formAdmin')
+                && document.getElementById('formAdmin').classList.contains('active');
+            const input = document.getElementById(isAdminTab ? 'adQrInput' : 'opQrInput');
             if (input) {
                 input.value = value;
-                if (typeof doLogin === 'function') doLogin('operator');
+                if (typeof doLogin === 'function') doLogin(isAdminTab ? 'admin' : 'operator');
             }
             return;
         }

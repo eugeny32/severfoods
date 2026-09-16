@@ -1,7 +1,9 @@
 package ru.severfoods.offline;
 
+import android.Manifest;
 import android.app.ActivityManager;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
@@ -12,6 +14,10 @@ import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
+
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
 
@@ -35,6 +41,9 @@ import com.getcapacitor.BridgeActivity;
  */
 public class MainActivity extends BridgeActivity {
 
+    private static final int REQ_CAMERA = 7301;
+    private PermissionRequest pendingCameraRequest;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -56,13 +65,19 @@ public class MainActivity extends BridgeActivity {
         WebView webView = getBridge().getWebView();
         webView.addJavascriptInterface(new NativeBridge(), "SFNative");
 
-        // Разрешение на камеру внутри вебвью. Без этого getUserMedia молча
-        // отказывает, и запасное сканирование камерой не работает вовсе —
-        // системного разрешения приложению для этого НЕ достаточно.
+        // Разрешение на камеру внутри вебвью.
+        //
+        // Разрешений здесь ДВА, и их часто путают. Вебвью спрашивает своё —
+        // «можно ли странице обратиться к камере», и его мы выдаём сами. Но
+        // выдать можно только то, что есть у самого приложения, а системное
+        // разрешение на камеру, начиная с Android 6, надо ещё и запросить у
+        // пользователя в момент использования. Без этого шага getUserMedia
+        // молча отказывает, и запасное сканирование камерой не работает
+        // вообще — ни на планшете, ни на терминале.
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
-                runOnUiThread(() -> request.grant(request.getResources()));
+                runOnUiThread(() -> handleWebPermission(request));
             }
         });
 
@@ -133,6 +148,43 @@ public class MainActivity extends BridgeActivity {
             // ронять приложение: терминал должен работать и без него.
             android.util.Log.w("SeverFoods", "Экранное закрепление недоступно: " + e.getMessage());
         }
+    }
+
+    /**
+     * Запрос вебвью на доступ к камере. Если системного разрешения ещё нет —
+     * спрашиваем его у пользователя и отвечаем странице уже по результату.
+     */
+    private void handleWebPermission(PermissionRequest request) {
+        boolean wantsCamera = false;
+        for (String r : request.getResources()) {
+            if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r)) wantsCamera = true;
+        }
+
+        if (!wantsCamera
+                || ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                   == PackageManager.PERMISSION_GRANTED) {
+            request.grant(request.getResources());
+            return;
+        }
+
+        pendingCameraRequest = request;
+        ActivityCompat.requestPermissions(this,
+                new String[]{ Manifest.permission.CAMERA }, REQ_CAMERA);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQ_CAMERA || pendingCameraRequest == null) return;
+
+        boolean granted = grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+        // Отказ тоже надо сообщить явно: иначе страница будет ждать ответа
+        // вечно и камера просто не откроется без всякого объяснения.
+        if (granted) pendingCameraRequest.grant(pendingCameraRequest.getResources());
+        else         pendingCameraRequest.deny();
+        pendingCameraRequest = null;
     }
 
     private class NativeBridge {

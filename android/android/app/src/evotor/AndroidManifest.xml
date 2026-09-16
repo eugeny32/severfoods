@@ -11,8 +11,11 @@
   • Обновления приходят из Эвотор.Маркета, поэтому право ставить пакеты
     (REQUEST_INSTALL_PACKAGES) приложению не нужно — и его наличие само по
     себе вызывает вопросы при модерации.
-  • Ориентация не фиксируется: Эвотор 5 и 6 — вертикальные, 7.2/7.3 и 10 —
-    горизонтальные. Пусть решает терминал.
+  • Ориентация остаётся горизонтальной, как в планшетной сборке: целевая
+    модель — Эвотор 7.3 (экран 1024×600, горизонтальный). Если приложение
+    когда-нибудь пойдёт на вертикальные Эвотор 5 или 6, здесь понадобится
+    android:screenOrientation="fullSensor" с tools:replace — вёрстка для
+    узких экранов в интерфейсе уже есть (@media max-width:700px).
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           xmlns:tools="http://schemas.android.com/tools">
@@ -34,10 +37,7 @@
         -->
         <meta-data android:name="app_uuid" android:value="${evotorAppUuid}" />
 
-        <activity
-            android:name=".MainActivity"
-            android:screenOrientation="fullSensor"
-            tools:replace="android:screenOrientation">
+        <activity android:name=".MainActivity">
             <!--
               Категория EVOTOR обязательна: по ней терминал показывает
               приложение в своём меню. Категорию LAUNCHER оставляем — без неё
