@@ -12,7 +12,7 @@ on:
         type: boolean
         default: false
       build_evotor:
-        description: 'Собрать APK для смарт-терминала Эвотор (нужен секрет EVOTOR_APP_UUID)'
+        description: 'Собрать APK для смарт-терминала Эвотор (загружается в кабинет dev.evotor.ru вручную)'
         type: boolean
         default: true
 
