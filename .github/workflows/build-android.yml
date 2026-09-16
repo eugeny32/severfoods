@@ -40,8 +40,15 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # packages задаём явно. По умолчанию действие ставит «tools
+      # platform-tools», а пакет tools Google убрал из репозитория SDK —
+      # сборка падала на установке SDK, не дойдя до нашего кода. Сам
+      # cmdline-tools действие ставит независимо от этого списка, лицензии
+      # принимает тоже; платформу и build-tools догрузит Gradle.
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
       - name: Install dependencies
         run: npm install
