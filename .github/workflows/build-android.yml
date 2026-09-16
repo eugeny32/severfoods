@@ -123,8 +123,9 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          # Идентификатор приложения из кабинета dev.evotor.ru — попадает в
-          # манифест сборки evotor. В репозитории его нет.
+          # Идентификатор приложения из кабинета dev.evotor.ru лежит в
+          # build.gradle — он не секрет и виден в любом APK. Секрет нужен,
+          # только если надо собрать под другое приложение кабинета.
           EVOTOR_APP_UUID: ${{ secrets.EVOTOR_APP_UUID }}
         run: |
           cd android
@@ -134,9 +135,6 @@ jobs:
           TASKS="assembleTabletRelease"
           DEBUG_TASKS="assembleTabletDebug"
           if [ "${{ inputs.build_evotor }}" = "true" ]; then
-            if [ -z "${EVOTOR_APP_UUID:-}" ]; then
-              echo "::warning::Секрет EVOTOR_APP_UUID не задан. APK для Эвотора соберётся, но БЕЗ идентификатора приложения — терминал не признает его своим и в Эвотор.Маркет его не примут. UUID выдаётся в личном кабинете dev.evotor.ru."
-            fi
             TASKS="$TASKS assembleEvotorRelease"
             DEBUG_TASKS="$DEBUG_TASKS assembleEvotorDebug"
           fi
