@@ -26,6 +26,12 @@ import com.getcapacitor.BridgeActivity;
  * Мостик в интерфейс называется window.SFNative и объявлен в core/boot.js —
  * туда уходит выход из закрепления по тому же жесту, что и на Windows
  * (долгое нажатие по логотипу).
+ *
+ * Сборка для смарт-терминала Эвотор (флейвор evotor) ведёт себя иначе:
+ * терминал принадлежит кассиру, а не нам. Экран не захватывается, системные
+ * панели не прячутся — человек обязан в любой момент вернуться в меню
+ * Эвотора. Зато подключается встроенный сканер терминала, который на планшете
+ * не нужен. Различия собраны в EvotorIntegration и флаге BuildConfig.EVOTOR.
  */
 public class MainActivity extends BridgeActivity {
 
@@ -45,7 +51,7 @@ public class MainActivity extends BridgeActivity {
             getWindow().getAttributes().layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
         }
-        hideSystemBars();
+        if (!BuildConfig.EVOTOR) hideSystemBars();
 
         WebView webView = getBridge().getWebView();
         webView.addJavascriptInterface(new NativeBridge(), "SFNative");
@@ -60,15 +66,31 @@ public class MainActivity extends BridgeActivity {
             }
         });
 
-        pinScreen();
+        if (BuildConfig.EVOTOR) {
+            EvotorIntegration.attach(this, webView);
+        } else {
+            pinScreen();
+        }
     }
 
     /** Возвращаем закрепление, если оператор вышел и вернулся в приложение. */
     @Override
     public void onResume() {
         super.onResume();
+        if (BuildConfig.EVOTOR) {
+            // Подписка живёт, только пока экран активен: иначе мы ловили бы
+            // чужие сканы, пока кассир работает в другом приложении.
+            EvotorIntegration.attach(this, getBridge().getWebView());
+            return;
+        }
         pinScreen();
         hideSystemBars();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (BuildConfig.EVOTOR) EvotorIntegration.detach(this);
     }
 
     /**
@@ -79,7 +101,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) hideSystemBars();
+        if (hasFocus && !BuildConfig.EVOTOR) hideSystemBars();
     }
 
     /**
@@ -114,6 +136,17 @@ public class MainActivity extends BridgeActivity {
     }
 
     private class NativeBridge {
+
+        /**
+         * Где мы работаем. Интерфейс по этому флагу убирает то, чего на
+         * смарт-терминале быть не должно: жесты выхода из киоска и
+         * самообновление своим APK (на Эвоторе обновления приходят из
+         * Эвотор.Маркета).
+         */
+        @JavascriptInterface
+        public boolean isEvotor() {
+            return BuildConfig.EVOTOR;
+        }
 
         /** Выход из закрепления — секретным жестом из интерфейса. */
         @JavascriptInterface

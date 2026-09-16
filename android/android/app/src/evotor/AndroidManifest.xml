@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Отличия сборки для смарт-терминала Эвотор от планшетной.
+
+  Правила площадки прямо противоположны тому, что нужно на выделенном
+  планшете раздачи:
+
+  • Терминал принадлежит кассиру, а не нашему приложению. Захват экрана
+    (screen pinning) и автозапуск после включения здесь недопустимы: человек
+    обязан в любой момент вернуться в меню Эвотора.
+  • Обновления приходят из Эвотор.Маркета, поэтому право ставить пакеты
+    (REQUEST_INSTALL_PACKAGES) приложению не нужно — и его наличие само по
+    себе вызывает вопросы при модерации.
+  • Ориентация не фиксируется: Эвотор 5 и 6 — вертикальные, 7.2/7.3 и 10 —
+    горизонтальные. Пусть решает терминал.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Штрихкоды от встроенного сканера терминала -->
+    <uses-permission android:name="ru.evotor.devices.SCANNER_RECEIVER" />
+
+    <!-- Право ставить APK нужно только планшетной версии с самообновлением -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"
+                     tools:node="remove" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"
+                     tools:node="remove" />
+
+    <application>
+
+        <!--
+          Идентификатор приложения из личного кабинета dev.evotor.ru.
+          Подставляется при сборке (EVOTOR_APP_UUID) — в репозитории его нет.
+        -->
+        <meta-data android:name="app_uuid" android:value="${evotorAppUuid}" />
+
+        <activity
+            android:name=".MainActivity"
+            android:screenOrientation="fullSensor"
+            tools:replace="android:screenOrientation">
+            <!--
+              Категория EVOTOR обязательна: по ней терминал показывает
+              приложение в своём меню. Категорию LAUNCHER оставляем — без неё
+              приложение нельзя запустить при отладке через adb.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.EVOTOR" />
+            </intent-filter>
+        </activity>
+
+        <!-- Автозапуск после включения: на чужом терминале это навязчиво -->
+        <receiver android:name=".BootReceiver" tools:node="remove" />
+    </application>
+</manifest>

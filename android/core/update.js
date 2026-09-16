@@ -39,6 +39,12 @@
     }
 
     async function check() {
+        // На смарт-терминале Эвотор обновления ставит Эвотор.Маркет. Ходить за
+        // своим APK мимо магазина там нельзя, поэтому проверка молча ничего не
+        // находит — вместо того чтобы показывать оператору кнопку, которая
+        // всё равно не сработает.
+        if (global.SF_UPDATES_DISABLED) return getStatus();
+
         _status.checking = true;
         _status.error    = null;
         try {
@@ -69,6 +75,7 @@
      * один раз при первом обновлении.
      */
     function install() {
+        if (global.SF_UPDATES_DISABLED) return false;
         if (!_status.url) return false;
         if (global.SFNative && global.SFNative.openUrl) {
             global.SFNative.openUrl(_status.url);

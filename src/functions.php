@@ -632,6 +632,10 @@ function latestBuildFile(string $dir, string $ext): ?array
     foreach (glob(rtrim($dir, '/') . '/*.' . $ext) as $f) {
         $name = basename($f);
         if (!preg_match('/(\d+)\.(\d+)\.(\d+)/', $name, $m)) continue;
+        // Сборка для смарт-терминала Эвотор лежит в той же папке, но на
+        // страницу загрузки не идёт: её ставят не файлом, а из
+        // Эвотор.Маркета, и на планшет она не годится.
+        if (str_contains($name, '-evotor')) continue;
         $ver    = [(int)$m[1], (int)$m[2], (int)$m[3]];
         $isTest = str_contains($name, '-test');
 

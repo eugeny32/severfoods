@@ -11,6 +11,10 @@ on:
         description: 'Разрешить тестовую (debug) сборку, если ключ подписи недоступен'
         type: boolean
         default: false
+      build_evotor:
+        description: 'Собрать APK для смарт-терминала Эвотор (нужен секрет EVOTOR_APP_UUID)'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -119,14 +123,29 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          # Идентификатор приложения из кабинета dev.evotor.ru — попадает в
+          # манифест сборки evotor. В репозитории его нет.
+          EVOTOR_APP_UUID: ${{ secrets.EVOTOR_APP_UUID }}
         run: |
           cd android
           chmod +x gradlew
+
+          # Флейворы: tablet — обычный планшет, evotor — смарт-терминал.
+          TASKS="assembleTabletRelease"
+          DEBUG_TASKS="assembleTabletDebug"
+          if [ "${{ inputs.build_evotor }}" = "true" ]; then
+            if [ -z "${EVOTOR_APP_UUID:-}" ]; then
+              echo "::warning::Секрет EVOTOR_APP_UUID не задан. APK для Эвотора соберётся, но БЕЗ идентификатора приложения — терминал не признает его своим и в Эвотор.Маркет его не примут. UUID выдаётся в личном кабинете dev.evotor.ru."
+            fi
+            TASKS="$TASKS assembleEvotorRelease"
+            DEBUG_TASKS="$DEBUG_TASKS assembleEvotorDebug"
+          fi
+
           if [ -n "${ANDROID_KEYSTORE_PATH:-}" ]; then
-            ./gradlew assembleRelease --no-daemon
+            ./gradlew $TASKS --no-daemon
           else
             echo "::warning::Ключ подписи не задан — собирается ТЕСТОВАЯ (debug) сборка. Она пригодна для проверки, но не для рабочих точек: обновить её боевой сборкой можно только с удалением приложения."
-            ./gradlew assembleDebug --no-daemon
+            ./gradlew $DEBUG_TASKS --no-daemon
           fi
 
       - name: Collect APK
@@ -135,16 +154,30 @@ jobs:
           mkdir -p ../offline/dist/android
           VER="${{ steps.pkg.outputs.version }}"
           if [ -n "${ANDROID_KEYSTORE_PATH:-}" ]; then
-            SRC=android/app/build/outputs/apk/release
-            NAME="SeverFoods-$VER.apk"
+            BUILD=release
+            SUFFIX=""
           else
-            SRC=android/app/build/outputs/apk/debug
-            NAME="SeverFoods-$VER-test.apk"
+            BUILD=debug
+            SUFFIX="-test"
           fi
-          APK=$(find "$SRC" -name '*.apk' | head -1)
-          if [ -z "$APK" ]; then echo "APK не найден в $SRC"; exit 1; fi
+
+          # Планшетная сборка
+          NAME="SeverFoods-$VER$SUFFIX.apk"
+          APK=$(find "android/app/build/outputs/apk/tablet/$BUILD" -name '*.apk' | head -1)
+          if [ -z "$APK" ]; then echo "APK планшета не найден"; exit 1; fi
           cp "$APK" "../offline/dist/android/$NAME"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+          # Сборка для смарт-терминала Эвотор. В latest-android.json она НЕ
+          # попадает: на терминале обновления ставит Эвотор.Маркет, и наш
+          # манифест обновлений к ней отношения не имеет.
+          if [ "${{ inputs.build_evotor }}" = "true" ]; then
+            EV_NAME="SeverFoods-$VER$SUFFIX-evotor.apk"
+            EV_APK=$(find "android/app/build/outputs/apk/evotor/$BUILD" -name '*.apk' | head -1)
+            if [ -z "$EV_APK" ]; then echo "APK Эвотора не найден"; exit 1; fi
+            cp "$EV_APK" "../offline/dist/android/$EV_NAME"
+            echo "Готов APK для Эвотора: $EV_NAME (загружается вручную в кабинете dev.evotor.ru)"
+          fi
 
           # Манифест обновления пишем ТОЛЬКО для подписанной сборки: иначе
           # планшеты увидели бы «обновление», которое не сможет установиться.

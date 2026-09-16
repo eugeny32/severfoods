@@ -442,3 +442,54 @@ body {
 .about-meta { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-sub); }
 .about-sep { opacity:.5; }
 .about-author { font-size:12px; color:var(--text-sub); text-align:center; }
+
+/* ══════════════════════════════════════════
+   УЗКИЙ ЭКРАН (вертикальные терминалы Эвотор 5 и 6)
+   ══════════════════════════════════════════
+   Планшет и терминалы Эвотор 7.2/7.3/10 — горизонтальные, там боковое меню
+   шириной 218 px уместно. На вертикальном терминале 5.5" вся ширина — около
+   360 CSS-пикселей, и то же меню съело бы две трети экрана. Поэтому оно
+   превращается в нижнюю панель с иконками: палец достаёт до неё легче, чем
+   до верхнего края, а рабочая область остаётся целой. */
+@media (max-width: 700px) {
+    .main-app { flex-direction: column-reverse; }
+
+    .sidebar {
+        width: 100%; min-width: 0;
+        flex-direction: row; align-items: center;
+        padding: 4px 6px; gap: 4px;
+        border-top: 1px solid rgba(255,255,255,.12);
+    }
+    /* Логотип, данные оператора и панель синхронизации в нижней полосе не
+       помещаются и не нужны: то же есть на экранах «Настройки» и «Журнал». */
+    .sidebar .logo,
+    .sidebar .sync-panel,
+    .sidebar .user-details { display: none; }
+
+    .nav { flex-direction: row; justify-content: space-around; flex: 1; gap: 2px; }
+    .nav-btn {
+        flex-direction: column; gap: 2px;
+        padding: 6px 4px; font-size: 10px; font-weight: 600;
+        text-align: center; min-width: 0; flex: 1;
+    }
+    .nav-btn i { font-size: 17px; width: auto; }
+
+    .user-panel { border-top: none; padding-top: 0; margin-top: 0; gap: 4px; }
+    .user-info { flex: 0; }
+
+    .page { padding: 12px 12px; gap: 10px; }
+    .page-header h1 { font-size: 18px; }
+
+    /* Четыре счётчика в ряд на такой ширине нечитаемы */
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .org-grid  { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+    .emp-info-row .lbl { min-width: 96px; }
+
+    /* Поле ручного ввода кода и кнопки рядом с ним на узком экране в одну
+       строку не помещаются: поле сжималось до нечитаемого. Переносим. */
+    .qr-input-row { flex-wrap: wrap; }
+    .qr-input-row input { flex: 1 0 100%; }
+
+    /* Модальные окна — почти во весь экран, иначе содержимое не помещается */
+    .modal-box { max-height: 94vh; }
+}

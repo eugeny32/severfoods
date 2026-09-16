@@ -15,6 +15,11 @@ if (versionProps.exists()) {
 
 android {
     namespace "ru.severfoods.offline"
+    // AGP 8 по умолчанию не генерирует BuildConfig, а флаг EVOTOR читается
+    // из него в MainActivity.
+    buildFeatures {
+        buildConfig true
+    }
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "ru.severfoods.offline"
@@ -29,6 +34,32 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Две сборки из одного кода: для обычного планшета и для смарт-терминала
+    // Эвотор. Различаются они не интерфейсом, а правилами площадки:
+    // на Эвоторе нельзя захватывать экран (кассир обязан вернуться в меню
+    // терминала) и нельзя обновлять себя своим же APK — обновления приходят
+    // из Эвотор.Маркета. Всё это включается флагом BuildConfig.EVOTOR.
+    flavorDimensions "target"
+    productFlavors {
+        tablet {
+            dimension "target"
+            applicationId "ru.severfoods.offline"
+            buildConfigField "boolean", "EVOTOR", "false"
+        }
+        evotor {
+            dimension "target"
+            // Отдельный пакет: в Эвотор.Маркете приложение живёт своей жизнью,
+            // с собственными обновлениями. Общий пакет с планшетной версией
+            // означал бы, что одна сборка пытается обновить другую.
+            applicationId "ru.severfoods.evotor"
+            buildConfigField "boolean", "EVOTOR", "true"
+            // app_uuid выдаётся в личном кабинете dev.evotor.ru и обязателен:
+            // без него терминал не признаёт приложение своим. В репозитории
+            // его нет — подставляется при сборке из переменной окружения.
+            manifestPlaceholders = [evotorAppUuid: (System.getenv("EVOTOR_APP_UUID") ?: "")]
+        }
+    }
+
     // Ключ подписи в репозитории НЕ хранится: он есть только у заказчика и в
     // секретах GitHub Actions. Без него собирается неподписанный APK — его
     // можно поставить только вручную и нельзя обновить поверх подписанного.
@@ -56,7 +87,8 @@ android {
 
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
-            outputFileName = "SeverFoods-${variant.versionName}.apk"
+            def suffix = variant.flavorName == 'evotor' ? '-evotor' : ''
+            outputFileName = "SeverFoods-${variant.versionName}${suffix}.apk"
         }
     }
 }
