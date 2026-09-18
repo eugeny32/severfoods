@@ -1334,6 +1334,20 @@ function renderSettings() {
     `);
     }
 
+    // 2c. Справка — ссылка на инструкцию по использованию и установке.
+    // Показываем только там, где известен адрес сервера (Android/Эвотор,
+    // core/settings.js): на Windows офлайн-приложении своя справка есть в
+    // manual.php сайта, и адрес там определяется иначе — трогать не нужно.
+    if (window.SFSettings && window.SFSettings.serverUrl) {
+        const manualUrl = window.SFSettings.serverUrl() + '/manual-evotor.html';
+        grid.innerHTML += card('Справка', 'question-circle', `
+        <p class="setting-note">Как пользоваться приложением и как его устанавливать —
+        в отдельной инструкции.</p>
+        <button class="btn-primary" onclick="window.open('${manualUrl}','_blank')">
+            <i class="fas fa-book"></i> Открыть инструкцию</button>
+    `);
+    }
+
     // 3. Meal point info (all roles)
     const ptName = currentUser?.selected_point_name || currentUser?.assigned_point_name || '—';
     grid.innerHTML += card('Точка питания', 'map-marker-alt', `
