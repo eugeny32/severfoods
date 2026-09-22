@@ -126,8 +126,12 @@
         SFSync.init();
 
         // Интерфейс — последним, когда /api/ уже отвечает.
+        // Версия в query-строке — та же причина, что и у остальных
+        // скриптов в build-www.sh: WebView кэширует локальные файлы по URL
+        // между обновлениями приложения, без этого могла бы выполняться
+        // старая копия app.js даже после установки новой версии APK.
         const s = document.createElement('script');
-        s.src = 'assets/app.js';
+        s.src = 'assets/app.js?v=' + (global.SF_APP_VERSION || Date.now());
         document.body.appendChild(s);
     }
 
