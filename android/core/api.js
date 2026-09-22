@@ -15,6 +15,25 @@
 
     const nativeFetch = global.fetch.bind(global);
 
+    /**
+     * fetch() при сетевой ошибке всегда бросает один и тот же «Failed to
+     * fetch» — настоящий код (DNS, TLS, обрыв, CORS) виден только в
+     * логе Chromium, а до него без ADB на терминале не добраться.
+     * <img> идёт в обход fetch/CORS и её onload/onerror отличают «сервер
+     * вообще недоступен» от «доступен, но именно fetch к нему блокируется»
+     * — этого достаточно, чтобы сузить причину без ADB и без браузера.
+     */
+    function probeImage(baseUrl, timeoutMs = 8000) {
+        return new Promise(resolve => {
+            const img = new Image();
+            const done = ok => { img.onload = img.onerror = null; resolve(ok); };
+            const timer = setTimeout(() => done(false), timeoutMs);
+            img.onload  = () => { clearTimeout(timer); done(true); };
+            img.onerror = () => { clearTimeout(timer); done(false); };
+            img.src = baseUrl.replace(/\/$/, '') + '/favicon.ico?probe=' + Date.now();
+        });
+    }
+
     // ── ответы ────────────────────────────────────────────────
     function json(body, status = 200) {
         return new Response(JSON.stringify(body), {
@@ -78,9 +97,13 @@
                 // соединение (DNS, таймаут, сертификат и т.д.), не только сам факт,
                 // что офлайн-справочник пуст.
                 const reason = (netErr && (netErr.message || netErr.name)) || 'неизвестная ошибка сети';
+                const imgOk = await probeImage(SFSettings.serverUrl());
+                const hint = imgOk
+                    ? ' Сервер отвечает на обычный запрос — блокируется именно fetch (похоже на CORS или прокси).'
+                    : ' Сервер не отвечает вообще ни на один запрос (DNS, сертификат или сеть терминала).';
                 return json({
                     ok: false,
-                    error: `QR-код не найден в офлайн-базе, а сервер недоступен (${reason}). Подключитесь к серверу для первой синхронизации.`,
+                    error: `QR-код не найден в офлайн-базе, а сервер недоступен (${reason}).${hint}`,
                 }, 401);
             }
 
