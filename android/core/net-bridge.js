@@ -42,11 +42,11 @@
             const reqId = 'r' + (++reqCounter) + '_' + Date.now();
             const timeoutMs = opts.timeoutMs || 15000;
 
-            pending.set(reqId, raw => {
-                let data;
-                try { data = JSON.parse(raw); }
-                catch (e) { reject(new Error('Некорректный ответ нативного моста: ' + e.message)); return; }
-
+            // evaluateJavascript выполняет resultJson как JS-выражение, поэтому
+            // сюда приходит уже готовый объект, а не строка — повторный
+            // JSON.parse ловил TypeError "[object Object] is not valid JSON".
+            pending.set(reqId, data => {
+                if (!data || typeof data !== 'object') { reject(new Error('Некорректный ответ нативного моста')); return; }
                 if (!data.ok) { reject(new Error(data.error || 'Сетевая ошибка (нативный мост)')); return; }
 
                 resolve({
