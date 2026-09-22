@@ -61,6 +61,7 @@ core = f'''<script>window.SF_APP_VERSION = "{version}"; window.SF_BUILD_DATE = "
 <script src="core/storage.js"></script>
 <script src="core/db.js"></script>
 <script src="core/tz.js"></script>
+<script src="core/net-bridge.js"></script>
 <script src="core/settings.js"></script>
 <script src="core/update.js"></script>
 <script src="core/sync.js"></script>

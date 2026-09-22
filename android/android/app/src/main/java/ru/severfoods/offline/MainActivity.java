@@ -21,6 +21,16 @@ import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
 
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.Iterator;
+
 /**
  * Терминал раздачи на планшете.
  *
@@ -228,6 +238,90 @@ public class MainActivity extends BridgeActivity {
                     android.util.Log.e("SeverFoods", "Не удалось открыть ссылку: " + e.getMessage());
                 }
             });
+        }
+
+        /**
+         * Запрос к серверу в обход сетевого стека WebView (Chromium/Cronet).
+         *
+         * На живом терминале Эвотор 7.3 подтверждено: обычный интернет на
+         * устройстве есть (работает удалённый доступ, штатные функции
+         * терминала), а из WebView не проходит вообще ни один HTTPS-запрос —
+         * ни к нашему серверу, ни к google.com. Настройка проксирования в
+         * кабинете Эвотора (вкладка «Интеграция») на это не повлияла. Это
+         * значит, что дело именно в сетевом стеке WebView, а не в самом
+         * устройстве — java.net.HttpURLConnection идёт другим путём.
+         *
+         * Ответ уходит обратно в JS асинхронно через evaluateJavascript,
+         * потому что JavascriptInterface не может возвращать Promise.
+         */
+        @JavascriptInterface
+        public void httpRequest(String reqId, String method, String url,
+                                 String headersJson, String body, int timeoutMs) {
+            new Thread(() -> {
+                String resultJson;
+                try {
+                    resultJson = doHttpRequest(method, url, headersJson, body, timeoutMs);
+                } catch (Exception e) {
+                    try {
+                        resultJson = new JSONObject()
+                            .put("ok", false)
+                            .put("error", e.getClass().getSimpleName() + ": " + e.getMessage())
+                            .toString();
+                    } catch (Exception inner) {
+                        resultJson = "{\"ok\":false,\"error\":\"internal\"}";
+                    }
+                }
+                final String js = "window.__evotorNetCallback && window.__evotorNetCallback("
+                    + JSONObject.quote(reqId) + "," + resultJson + ")";
+                runOnUiThread(() -> {
+                    WebView wv = getBridge().getWebView();
+                    if (wv != null) wv.evaluateJavascript(js, null);
+                });
+            }).start();
+        }
+
+        private String doHttpRequest(String method, String urlStr, String headersJson,
+                                      String body, int timeoutMs) throws Exception {
+            HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+            try {
+                conn.setRequestMethod(method);
+                conn.setConnectTimeout(timeoutMs);
+                conn.setReadTimeout(timeoutMs);
+
+                JSONObject headers = new JSONObject(headersJson == null ? "{}" : headersJson);
+                Iterator<String> keys = headers.keys();
+                while (keys.hasNext()) {
+                    String k = keys.next();
+                    conn.setRequestProperty(k, headers.getString(k));
+                }
+
+                if (body != null && !body.isEmpty()) {
+                    conn.setDoOutput(true);
+                    try (OutputStream os = conn.getOutputStream()) {
+                        os.write(body.getBytes(StandardCharsets.UTF_8));
+                    }
+                }
+
+                int status = conn.getResponseCode();
+                InputStream is = (status >= 200 && status < 400) ? conn.getInputStream() : conn.getErrorStream();
+                String respBody = is == null ? "" : readAll(is);
+
+                return new JSONObject()
+                    .put("ok", true)
+                    .put("status", status)
+                    .put("body", respBody)
+                    .toString();
+            } finally {
+                conn.disconnect();
+            }
+        }
+
+        private String readAll(InputStream is) throws Exception {
+            ByteArrayOutputStream buf = new ByteArrayOutputStream();
+            byte[] chunk = new byte[4096];
+            int n;
+            while ((n = is.read(chunk)) != -1) buf.write(chunk, 0, n);
+            return buf.toString("UTF-8");
         }
     }
 }

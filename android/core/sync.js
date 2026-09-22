@@ -43,16 +43,23 @@
         const timeout = opts.timeout
             || (action === 'ping' ? TIMEOUT_PING : action === 'push' ? TIMEOUT_PUSH : TIMEOUT_DEFAULT);
 
-        const res = await fetch(url + since, {
+        const reqOpts = {
             method:  opts.method || 'GET',
             headers: {
                 'X-Sync-Token': SFSettings.syncToken(),
                 'Content-Type': 'application/json',
                 'Accept':       'application/json',
             },
-            body:   opts.body ? JSON.stringify(opts.body) : undefined,
-            signal: AbortSignal.timeout(timeout),
-        });
+            body:      opts.body ? JSON.stringify(opts.body) : undefined,
+            signal:    AbortSignal.timeout(timeout),
+            timeoutMs: timeout,
+        };
+        // Через нативный мост (core/net-bridge.js), если он есть — на Эвоторе
+        // WebView сам по себе не мог достучаться ни до одного HTTPS-хоста,
+        // хотя интернет на устройстве был.
+        const res = (global.SFNet && global.SFNet.available())
+            ? await global.SFNet.nativeHttpFetch(url + since, reqOpts)
+            : await fetch(url + since, reqOpts);
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();

@@ -41,6 +41,24 @@
         return probeImage('https://www.google.com', timeoutMs);
     }
 
+    /**
+     * Запрос к серверу: через нативный мост (core/net-bridge.js), если он
+     * есть, иначе — обычный fetch(). На терминале Эвотор WebView сам по себе
+     * не мог достучаться ни до одного HTTPS-хоста, хотя интернет на
+     * устройстве был; нативный код идёт другим сетевым путём.
+     */
+    async function serverFetch(url, opts) {
+        if (global.SFNet && global.SFNet.available()) {
+            return global.SFNet.nativeHttpFetch(url, {
+                method:    opts.method,
+                headers:   opts.headers,
+                body:      opts.body,
+                timeoutMs: opts.timeoutMs,
+            });
+        }
+        return nativeFetch(url, opts);
+    }
+
     // ── ответы ────────────────────────────────────────────────
     function json(body, status = 200) {
         return new Response(JSON.stringify(body), {
@@ -81,15 +99,16 @@
 
         // Сначала пробуем сервер — он единственный знает актуальные права.
         try {
-            const r = await nativeFetch(`${SFSettings.syncEndpoint()}?action=auth`, {
+            const r = await serverFetch(`${SFSettings.syncEndpoint()}?action=auth`, {
                 method:  'POST',
                 headers: {
                     'X-Sync-Token': SFSettings.syncToken(),
                     'Content-Type': 'application/json',
                     'Accept':       'application/json',
                 },
-                body:   JSON.stringify({ qr_code, role: role || 'operator', meal_point_id }),
-                signal: AbortSignal.timeout(12000),
+                body:      JSON.stringify({ qr_code, role: role || 'operator', meal_point_id }),
+                signal:    AbortSignal.timeout(12000), // игнорируется нативным мостом — у него свой timeoutMs
+                timeoutMs: 12000,
             });
             const data = await r.json();
             if (!data.ok) return json({ ok: false, error: data.error }, 401);
