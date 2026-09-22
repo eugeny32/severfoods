@@ -199,17 +199,30 @@ initGlobalScanCapture(); // один раз на весь жизненный ц�
 })();
 
 // ── Login points dropdown ──────────────────────────────────
+//
+// Раньше список заполнялся один раз при старте страницы — до того, как
+// первая синхронизация вообще успевала завершиться (она стартует на 5 сек
+// позже, в фоне). На новом устройстве с пустой локальной базой список
+// оставался пустым навсегда, даже после успешной синхронизации: повторного
+// заполнения не было. На «старых» точках это скрывала база, оставшаяся с
+// прошлого раза. Теперь функция вызывается и после успешной синхронизации
+// (см. showLogin) и сама сначала чистит список, чтобы не задваивать пункты.
 async function loadLoginPoints() {
     try {
         const r = await fetch('/api/meal_points');
         const d = await r.json();
         const sel = document.getElementById('opPointSelect');
+        if (!sel) return;
+        const current = sel.value;
+        sel.querySelectorAll('option[data-point]').forEach(o => o.remove());
         (d.meal_points || []).forEach(p => {
             const o = document.createElement('option');
             o.value = p.id;
+            o.dataset.point = '1';
             o.textContent = p.point_name + (p.city ? ` — ${p.city}` : '');
             sel.appendChild(o);
         });
+        if (current && sel.querySelector(`option[value="${current}"]`)) sel.value = current;
     } catch (_) {}
 }
 
@@ -374,7 +387,7 @@ function showLogin() {
     // попытки входа, чтобы узнать, что сервер недоступен. Теперь видно сразу,
     // до того как оператор вообще потянется к сканеру.
     startSyncPolling();
-    syncNow();
+    syncNow().then(loadLoginPoints);
 }
 
 // Опрос статуса синхронизации — общий и для сайдбара (после входа), и для
@@ -1721,6 +1734,7 @@ async function syncNow() {
     }
 }
 
+let _loginPointsRefreshed = false;
 async function pollSyncStatus() {
     try {
         let status;
@@ -1731,6 +1745,14 @@ async function pollSyncStatus() {
             status  = (await r.json()).status;
         }
         updateSyncUI(status);
+        // Подстраховка: если список точек на экране входа опустел на новом
+        // устройстве, а первая синхронизация завершилась позже (в фоне, не
+        // из showLogin) — подхватываем её результат, не дожидаясь перезахода.
+        if (status && status.lastSyncOk && !_loginPointsRefreshed
+                && document.getElementById('loginScreen').style.display !== 'none') {
+            _loginPointsRefreshed = true;
+            loadLoginPoints();
+        }
     } catch (_) {}
 }
 
