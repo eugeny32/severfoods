@@ -347,7 +347,10 @@ async function doLogin(role) {
             if (data.offline) document.getElementById('loginOfflineNote').style.display = '';
             onLogin(data.employee);
         } else {
-            showLoginError(data.error || 'Ошибка входа');
+            // Раньше при отсутствии data.error показывалась голая «Ошибка
+            // входа» без единой зацепки — на терминале без браузера/ADB это
+            // тупик. Теперь запасной текст включает сырой ответ целиком.
+            showLoginError(data.error || ('Ошибка входа (пустой ответ: ' + JSON.stringify(data).slice(0, 300) + ')'));
         }
     } catch (_) {
         showLoginError('Ошибка соединения с локальным сервером');
