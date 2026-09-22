@@ -316,6 +316,12 @@ async function doLogin(role) {
     btns.forEach(b => { b.disabled = true; });
     hideLoginError();
 
+    // Не ждём — просто даём синхронизации ещё один шанс ровно в момент входа,
+    // параллельно с самим запросом логина. syncNow() сама не выполнится
+    // повторно, если предыдущая попытка (запущенная при показе экрана) ещё
+    // не закончилась — SFSync/sync.js это уже проверяют.
+    syncNow();
+
     try {
         const r    = await fetch('/api/auth/login', {
             method:  'POST',
@@ -362,6 +368,24 @@ function showLogin() {
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('mainApp').style.display = 'none';
     setTimeout(() => autoFocusInput(document.getElementById('opQrInput')), 100);
+
+    // Принудительная синхронизация прямо при показе экрана входа: раньше
+    // приложение просто ждало планового цикла (до часа) или первой неудачной
+    // попытки входа, чтобы узнать, что сервер недоступен. Теперь видно сразу,
+    // до того как оператор вообще потянется к сканеру.
+    startSyncPolling();
+    syncNow();
+}
+
+// Опрос статуса синхронизации — общий и для сайдбара (после входа), и для
+// экрана входа. Флаг не даёт завести второй setInterval при повторном входе
+// без перезагрузки страницы (после выхода showLogin() вызывается снова).
+let _syncPollingStarted = false;
+function startSyncPolling() {
+    if (_syncPollingStarted) return;
+    _syncPollingStarted = true;
+    pollSyncStatus();
+    setInterval(pollSyncStatus, 10000);
 }
 
 function onLogin(emp) {
@@ -385,8 +409,7 @@ function onLogin(emp) {
         updateMealTypeAuto();
         loadTodayStats();
     });
-    pollSyncStatus();
-    setInterval(pollSyncStatus, 10000);
+    startSyncPolling();
     initUsbQrInput();
 }
 
@@ -1711,16 +1734,25 @@ async function pollSyncStatus() {
     } catch (_) {}
 }
 
+// Индикатор в сайдбаре (после входа) и на экране входа — одна и та же логика,
+// применённая к двум разным наборам id, чтобы прямо на форме входа было видно,
+// есть ли вообще связь с сервером, не дожидаясь неудачной попытки логина.
+const SYNC_UI_ID_SETS = [
+    { dot: 'syncDot',      label: 'syncLabel',      time: 'syncTime' },
+    { dot: 'loginSyncDot', label: 'loginSyncLabel', time: 'loginSyncTime' },
+];
+
 function updateSyncUI(status) {
     if (!status) return;
-    const dot   = document.getElementById('syncDot');
-    const label = document.getElementById('syncLabel');
-    const time  = document.getElementById('syncTime');
-    if (dot) {
+    for (const ids of SYNC_UI_ID_SETS) {
+        const dot   = document.getElementById(ids.dot);
+        const label = document.getElementById(ids.label);
+        const time  = document.getElementById(ids.time);
+        if (!dot) continue;
         dot.className = 'sync-dot';
         if (status.inProgress)               { dot.classList.add('syncing'); if(label) label.textContent = 'Синхронизация…'; }
         else if (status.online && status.lastSyncOk) { dot.classList.add('online');  if(label) label.textContent = 'Онлайн'; }
-        else if (!status.online)             { if(label) label.textContent = 'Нет связи'; }
+        else if (!status.online)             { if(label) label.textContent = status.syncError || 'Нет связи'; }
         else                                 { dot.classList.add('error'); if(label) label.textContent = 'Ошибка'; }
         if (status.lastSync && time) {
             time.textContent = new Date(status.lastSync).toLocaleString('ru-RU', { hour:'2-digit', minute:'2-digit' });

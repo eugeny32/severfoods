@@ -165,6 +165,9 @@ body {
 .btn-sync:disabled { opacity:.4; cursor:default; }
 .sync-time { font-size:10px; color:rgba(255,255,255,.3); }
 
+.login-sync-status { display:flex; align-items:center; justify-content:center; gap:6px; margin:-8px 0 14px; color:rgba(255,255,255,.55); font-size:12px; }
+.login-sync-status .sync-time { font-size:11px; }
+
 /* Content area */
 .content { flex:1; overflow-y:auto; display:flex; flex-direction:column; background:var(--bg-page); }
 .page { display:none; flex-direction:column; flex:1; padding:20px 24px; gap:14px; min-height:0; }
