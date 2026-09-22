@@ -176,6 +176,10 @@ body {
 
 .page-header { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .page-header h1 { font-size:22px; font-weight:700; flex:1; color:var(--text-main); }
+/* Логотип в шапке страницы — только когда сайдбар со своим логотипом скрыт
+   (узкий экран, см. брейкпоинт ниже). На широком экране логотип уже есть
+   в сайдбаре, дублировать его в каждой странице не нужно. */
+.page-header-logo { display:none; height:28px; }
 
 /* ── Scanner ── */
 .meal-type-auto { display:flex; align-items:center; gap:7px; background:var(--bg-card); border:1.5px solid var(--border); border-radius:9px; padding:5px 12px; }
@@ -482,6 +486,13 @@ body {
 
     .page { padding: 12px 12px; gap: 10px; }
     .page-header h1 { font-size: 18px; }
+    /* Сайдбар с логотипом здесь скрыт целиком (превратился в нижнюю панель
+       без него) — на экране сканера показываем логотип вместо текстового
+       заголовка, чтобы бренд не терялся полностью. На других страницах
+       (Сотрудники/Журнал/Настройки) текстовый заголовок остаётся — там
+       своего логотипа в разметке нет. */
+    #page-scanner .page-header h1 { display: none; }
+    #page-scanner .page-header-logo { display: block; }
 
     /* Четыре счётчика в ряд на такой ширине нечитаемы */
     .stats-row { grid-template-columns: repeat(2, 1fr); }
