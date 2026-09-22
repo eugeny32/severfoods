@@ -111,7 +111,14 @@
                 timeoutMs: 12000,
             });
             const data = await r.json();
-            if (!data.ok) return json({ ok: false, error: data.error }, 401);
+            if (!data.ok) {
+                // data.error иногда оказывается undefined — тогда JSON.stringify
+                // молча выбрасывает поле, и на экране видно голое {"ok":false}
+                // без единой зацепки. Показываем статус и сырое тело ответа
+                // сервера целиком, чтобы понять, что он реально прислал.
+                const raw = data.error || `сервер ответил статусом ${r.status}, тело: ${JSON.stringify(data).slice(0, 200)}`;
+                return json({ ok: false, error: raw }, 401);
+            }
             await SFDb.setMeta('session', JSON.stringify({ employee: data.employee, expires_at: data.expires_at }));
             return json({ ok: true, employee: data.employee });
         } catch (netErr) {
