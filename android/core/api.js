@@ -69,10 +69,20 @@
             if (!data.ok) return json({ ok: false, error: data.error }, 401);
             await SFDb.setMeta('session', JSON.stringify({ employee: data.employee, expires_at: data.expires_at }));
             return json({ ok: true, employee: data.employee });
-        } catch (_) {
+        } catch (netErr) {
             // Сети нет — вход по локальному справочнику, как в Windows-версии.
             const emp = SFDb.getEmployeeByQr(qr_code);
-            if (!emp) return json({ ok: false, error: 'QR-код не найден. Подключитесь к серверу для первой синхронизации.' }, 401);
+            if (!emp) {
+                // Показываем настоящую причину сетевой ошибки — на терминале без
+                // браузера и ADB это единственный способ понять, где рвётся
+                // соединение (DNS, таймаут, сертификат и т.д.), не только сам факт,
+                // что офлайн-справочник пуст.
+                const reason = (netErr && (netErr.message || netErr.name)) || 'неизвестная ошибка сети';
+                return json({
+                    ok: false,
+                    error: `QR-код не найден в офлайн-базе, а сервер недоступен (${reason}). Подключитесь к серверу для первой синхронизации.`,
+                }, 401);
+            }
 
             const adminRoles    = ['admin', 'super_admin'];
             const operatorRoles = ['operator', 'admin', 'super_admin'];
