@@ -48,6 +48,12 @@ video{max-width:100%;max-height:100%;cursor:crosshair;touch-action:none}
 .hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-size:12px;color:rgba(255,255,255,.5);background:rgba(0,0,0,.4);padding:4px 12px;border-radius:20px}
 .placeholder{color:#64748b;font-size:14px;text-align:center;padding:20px}
 .placeholder .fa-spinner{font-size:28px;margin-bottom:10px;display:block}
+.clipboard-bar{display:flex;gap:8px;padding:10px 14px;background:#0f1a2e;border-top:1px solid rgba(255,255,255,.08)}
+.clipboard-bar input{flex:1;background:#1a2740;border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#e2e8f0;padding:8px 12px;font-family:'Onest',sans-serif;font-size:13px}
+.clipboard-bar input:focus{outline:none;border-color:#3b82f6}
+.cb-btn{background:rgba(255,255,255,.1);color:#e2e8f0;border:none;border-radius:8px;padding:8px 14px;font-family:'Onest',sans-serif;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.cb-btn:hover{background:rgba(255,255,255,.18)}
+.cb-btn:disabled{opacity:.4;cursor:not-allowed}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet"></script>
 </head>
@@ -67,6 +73,12 @@ video{max-width:100%;max-height:100%;cursor:crosshair;touch-action:none}
     <video id="video" autoplay playsinline style="display:none"></video>
     <div class="hint" id="hint" style="display:none">Клик/тап на видео — как на экране терминала</div>
 </main>
+
+<div class="clipboard-bar" id="clipboardBar" style="display:none">
+    <input type="text" id="clipboardInput" placeholder="Текст для буфера обмена терминала…">
+    <button class="cb-btn" id="clipboardSendBtn" title="Отправить в буфер обмена терминала"><i class="fas fa-arrow-right-to-bracket"></i> На терминал</button>
+    <button class="cb-btn" id="clipboardGetBtn" title="Забрать текущий буфер обмена терминала (может не сработать — ограничение Android 10+)"><i class="fas fa-arrow-right-from-bracket"></i> С терминала</button>
+</div>
 
 <script>
 const DEVICE_ID = <?= json_encode($deviceId) ?>;
@@ -108,7 +120,19 @@ async function start() {
     pc.onconnectionstatechange = () => {
         if (pc.connectionState === 'failed' || pc.connectionState === 'closed') setStatus('Соединение потеряно', 'failed');
     };
-    pc.ondatachannel = (e) => { dc = e.channel; };
+    pc.ondatachannel = (e) => {
+        dc = e.channel;
+        dc.onopen = () => { document.getElementById('clipboardBar').style.display = 'flex'; };
+        dc.onmessage = (ev) => {
+            let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
+            if (msg.type === 'clipboard_data') {
+                document.getElementById('clipboardInput').value = msg.text || '';
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(msg.text || '').catch(() => {});
+                }
+            }
+        };
+    };
 
     setStatus('Ждём терминал…', 'connecting');
     pollTimer = setInterval(poll, 1000);
@@ -165,6 +189,18 @@ function attachControl(video) {
     video.addEventListener('touchmove',  (e) => { e.preventDefault(); const t = e.touches[0]; const { x, y } = relCoords(t.clientX, t.clientY); send('move', x, y); }, { passive: false });
     video.addEventListener('touchend',   (e) => { e.preventDefault(); const t = e.changedTouches[0]; const { x, y } = relCoords(t.clientX, t.clientY); send('up', x, y); }, { passive: false });
 }
+
+function sendControl(msg) {
+    if (dc && dc.readyState === 'open') dc.send(JSON.stringify(msg));
+}
+
+document.getElementById('clipboardSendBtn').addEventListener('click', () => {
+    const text = document.getElementById('clipboardInput').value;
+    sendControl({ type: 'clipboard_set', text });
+});
+document.getElementById('clipboardGetBtn').addEventListener('click', () => {
+    sendControl({ type: 'clipboard_get' });
+});
 
 window.addEventListener('beforeunload', () => {
     if (sessionId && !ended) navigator.sendBeacon('api/remote_access.php?action=screen_end',

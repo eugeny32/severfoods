@@ -4,6 +4,8 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.PixelFormat;
@@ -352,6 +354,10 @@ public class RemoteScreenService extends Service {
             try {
                 JSONObject msg = new JSONObject(new String(bytes, StandardCharsets.UTF_8));
                 String type = msg.optString("type", "");
+
+                if ("clipboard_set".equals(type)) { setClipboard(msg.optString("text", "")); return; }
+                if ("clipboard_get".equals(type)) { sendClipboard(); return; }
+
                 float x = (float) (msg.optDouble("x", 0) * captureWidthPx);
                 float y = (float) (msg.optDouble("y", 0) * captureHeightPx);
 
@@ -369,6 +375,50 @@ public class RemoteScreenService extends Service {
                 Log.w(TAG, "Некорректное сообщение управления: " + e.getMessage());
             }
         }
+    }
+
+    /**
+     * Буфер обмена — в обе стороны через тот же DataChannel, без отдельного
+     * запроса к серверу. Запись работает всегда; чтение (sendClipboard) на
+     * Android 10+ может вернуть пусто, если система считает наш фоновый
+     * сервис "не в фокусе" — это ограничение платформы (защита от фоновых
+     * приложений, подглядывающих чужой буфер), а не баг здесь.
+     */
+    private void setClipboard(String text) {
+        mainHandler.post(() -> {
+            try {
+                ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                cm.setPrimaryClip(ClipData.newPlainText("severfoods-remote", text));
+            } catch (Exception e) {
+                Log.w(TAG, "Не удалось записать буфер обмена: " + e.getMessage());
+            }
+        });
+    }
+
+    private void sendClipboard() {
+        mainHandler.post(() -> {
+            String text = "";
+            try {
+                ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cm.hasPrimaryClip() && cm.getPrimaryClip().getItemCount() > 0) {
+                    CharSequence t = cm.getPrimaryClip().getItemAt(0).coerceToText(this);
+                    text = t != null ? t.toString() : "";
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Не удалось прочитать буфер обмена: " + e.getMessage());
+            }
+            if (controlChannel != null && controlChannel.state() == DataChannel.State.OPEN) {
+                try {
+                    JSONObject msg = new JSONObject();
+                    msg.put("type", "clipboard_data");
+                    msg.put("text", text);
+                    byte[] bytes = msg.toString().getBytes(StandardCharsets.UTF_8);
+                    controlChannel.send(new DataChannel.Buffer(java.nio.ByteBuffer.wrap(bytes), false));
+                } catch (Exception e) {
+                    Log.w(TAG, "Не удалось отправить буфер обмена зрителю: " + e.getMessage());
+                }
+            }
+        });
     }
 
     // ── наблюдатель PeerConnection ──────────────────────────────────────
