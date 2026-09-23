@@ -829,8 +829,14 @@ function releaseMealLock(PDO $pdo, int $employeeId): void
  */
 function mintTurnCredentials(int $ttlSeconds = 3600): ?array
 {
-    $secret = env('TURN_SHARED_SECRET', '');
-    $host   = env('TURN_HOST', 'ntrip.host');
+    $secret  = env('TURN_SHARED_SECRET', '');
+    $host    = env('TURN_HOST', 'ntrip.host');
+    // На ntrip.host coturn слушает нестандартные порты (listening-port=50000,
+    // tls-listening-port=5349), а не общепринятый 3478 — без этого TURN-relay
+    // молча не работал бы за пределами локальной сети (STUN бы прошёл, TURN —
+    // нет). По умолчанию оставлены стандартные порты для других инсталляций.
+    $port    = env('TURN_PORT', '3478');
+    $tlsPort = env('TURN_TLS_PORT', '5349');
     if ($secret === '') return null;
 
     $username   = (string)(time() + $ttlSeconds) . ':severfoods';
@@ -838,9 +844,10 @@ function mintTurnCredentials(int $ttlSeconds = 3600): ?array
 
     return [
         'ice_servers' => [
-            ['urls' => "stun:{$host}:3478"],
-            ['urls' => "turn:{$host}:3478?transport=udp", 'username' => $username, 'credential' => $credential],
-            ['urls' => "turn:{$host}:3478?transport=tcp", 'username' => $username, 'credential' => $credential],
+            ['urls' => "stun:{$host}:{$port}"],
+            ['urls' => "turn:{$host}:{$port}?transport=udp", 'username' => $username, 'credential' => $credential],
+            ['urls' => "turn:{$host}:{$port}?transport=tcp", 'username' => $username, 'credential' => $credential],
+            ['urls' => "turns:{$host}:{$tlsPort}?transport=tcp", 'username' => $username, 'credential' => $credential],
         ],
         'expires_at' => date('c', time() + $ttlSeconds),
     ];
