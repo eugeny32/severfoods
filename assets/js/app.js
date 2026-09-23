@@ -1784,11 +1784,6 @@ async function loadRemotePoints() {
                     <i class="fas ${icon}"></i>
                 </button>
             `).join('') + `
-                <button type="button" class="btn-sm" title="Удалённая поддержка — видео и управление (терминалы Эвотор)" ${p.online ? '' : 'disabled style="opacity:.35;cursor:not-allowed"'}
-                    onclick="openRemoteScreen('${p.device_id}', '${safePointName}')">
-                    <i class="fas fa-display"></i>
-                </button>
-            ` + `
                 <button type="button" class="btn-sm" title="Установить Tailscale (VPN-сеть для полноценного удалённого доступа — RDP и т.п.)" ${p.online ? '' : 'disabled style="opacity:.35;cursor:not-allowed"'}
                     onclick="queueTailscaleInstall('${p.device_id}', '${safePointName}', this)">
                     <i class="fas fa-network-wired"></i>
@@ -1866,11 +1861,6 @@ async function deleteRemotePoint(deviceId, pointName) {
     } catch (e) {
         alert('Ошибка сети');
     }
-}
-
-function openRemoteScreen(deviceId, pointName) {
-    const url = `remote_viewer.php?device_id=${encodeURIComponent(deviceId)}&point_name=${encodeURIComponent(pointName || deviceId)}`;
-    window.open(url, `remote-screen-${deviceId}`, 'width=1100,height=680,noopener');
 }
 
 async function queueTailscaleInstall(deviceId, pointName, btnEl) {

@@ -113,14 +113,6 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
-
-    // WebRTC — только сборка для Эвотора (удалённый просмотр/управление
-    // экраном терминала, android/EVOTOR.md → «Удалённый доступ»). Планшетной
-    // сборке эта зависимость не нужна, поэтому configuration привязан к
-    // флейвору (evotorImplementation), а не ко всем сборкам сразу — иначе
-    // раздули бы вес APK планшета без всякой пользы.
-    evotorImplementation "io.github.webrtc-sdk:android:125.6422.07"
-
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

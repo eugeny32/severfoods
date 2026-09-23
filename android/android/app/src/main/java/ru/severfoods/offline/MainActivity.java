@@ -197,15 +197,6 @@ public class MainActivity extends BridgeActivity {
         pendingCameraRequest = null;
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        // Ответ системного диалога «Разрешить захват экрана» для удалённого
-        // доступа (только сборка Эвотор — на планшете RemoteAccess пустая
-        // заглушка и вернёт false для любого кода).
-        RemoteAccess.onActivityResult(this, requestCode, resultCode, data);
-    }
-
     private class NativeBridge {
 
         /**
@@ -230,45 +221,6 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public void pin() {
             runOnUiThread(MainActivity.this::pinScreen);
-        }
-
-        /**
-         * Удалённая поддержка (только Эвотор, android/EVOTOR.md → «Удалённая
-         * поддержка»). isEvotor() уже даёт понять интерфейсу, показывать ли
-         * вообще кнопку — на планшете эти методы просто ничего не делают.
-         */
-        @JavascriptInterface
-        public boolean hasScreenCapturePermission() {
-            return RemoteAccess.hasScreenCapturePermission();
-        }
-
-        @JavascriptInterface
-        public void requestScreenCapturePermission() {
-            runOnUiThread(() -> RemoteAccess.requestScreenCapturePermission(MainActivity.this));
-        }
-
-        /** Запуск сеанса по команде с сервера — см. core/sync.js → handleRemoteCommand. */
-        @JavascriptInterface
-        public void startRemoteScreen(String sessionId, String iceServersJson, String syncEndpoint, String syncToken) {
-            runOnUiThread(() -> RemoteAccess.startSession(MainActivity.this, sessionId, iceServersJson, syncEndpoint, syncToken));
-        }
-
-        /**
-         * Экран касаний терминала эмулирует AccessibilityService — включить
-         * его программно приложение не может (см. RemoteControlAccessibilityService),
-         * поэтому кнопка в Настройках просто открывает системный список
-         * специальных возможностей, где оператор включает нашу вручную.
-         */
-        @JavascriptInterface
-        public void openAccessibilitySettings() {
-            runOnUiThread(() -> {
-                try {
-                    startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-                } catch (Exception e) {
-                    android.util.Log.e("SeverFoods", "Не удалось открыть настройки специальных возможностей: " + e.getMessage());
-                }
-            });
         }
 
         /**

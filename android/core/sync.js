@@ -238,34 +238,6 @@
         }
     }
 
-    /**
-     * Удалённый просмотр/управление экраном (только Эвотор) — команда
-     * remote_screen от api/remote_access.php. Сам захват, WebRTC и обмен
-     * сигналами дальше идут в нативном коде (RemoteScreenService.java),
-     * здесь только передаём то, что для этого нужно: session_id,
-     * ICE-серверы из payload, и текущие адрес/токен синхронизации — теми же
-     * запросами, что и обычная синхронизация (api/offline_sync.php).
-     */
-    async function handleRemoteScreen(payload) {
-        if (!global.SFNative || !global.SFNative.isEvotor || !global.SFNative.isEvotor()) {
-            throw new Error('Удалённый экран доступен только на сборке для Эвотора');
-        }
-        if (!payload.session_id || !payload.ice_servers) {
-            throw new Error('Некорректная команда: нет session_id или ice_servers');
-        }
-        if (!global.SFNative.hasScreenCapturePermission()) {
-            // Разрешение выдаётся системным диалогом с участием оператора —
-            // само не запросится. RemoteAccess.java на нативной стороне
-            // запомнит этот сеанс и запустит его сам, как только оператор
-            // подтвердит диалог (кнопка в Настройках, см. app.js).
-            global.SFNative.startRemoteScreen(payload.session_id, JSON.stringify(payload.ice_servers),
-                SFSettings.syncEndpoint(), SFSettings.syncToken());
-            throw new Error('Захват экрана ещё не разрешён — откройте приложение и включите удалённый доступ в Настройках, затем повторите');
-        }
-        global.SFNative.startRemoteScreen(payload.session_id, JSON.stringify(payload.ice_servers),
-            SFSettings.syncEndpoint(), SFSettings.syncToken());
-    }
-
     async function handleRemoteCommand(cmd) {
         try {
             switch (cmd.command) {
@@ -274,9 +246,6 @@
                     break;
                 case 'check_update':
                     await SFUpdate.check();
-                    break;
-                case 'remote_screen':
-                    await handleRemoteScreen(cmd.payload || {});
                     break;
                 default:
                     // Команды Windows-версии (restart, unlock_kiosk, install_tailscale,
