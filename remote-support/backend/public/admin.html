@@ -1,19 +1,27 @@
 <!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Удалённая поддержка — устройства</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 <style>
-*{box-sizing:border-box}body{margin:0;font:15px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#0b1220;color:#e2e8f0}
-header{background:#003366;padding:16px 20px}header h1{margin:0;font-size:18px}
+/* Палитра — та же, что у ntrip.host (см. /assets/style.css самого сервера):
+   --brand:#2f6fed, тёмный фон #0c0f14, стеклянные карточки rgba(20,24,31,.92) —
+   чтобы карточка приложения и сама панель визуально были одним продуктом
+   с сервисом, на котором она живёт, а не случайным набором цветов. */
+:root{--brand:#2f6fed;--bg:#0c0f14;--card:rgba(20,24,31,.92)}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 -apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:#cbd2d9}
+header{background:var(--card);border-bottom:1px solid rgba(255,255,255,.06);padding:16px 20px;display:flex;align-items:center;gap:10px}
+header h1{margin:0;font-size:18px;color:#fff;font-weight:600;display:flex;align-items:center;gap:10px}
+header .bi{color:var(--brand);font-size:20px}
 main{max-width:900px;margin:20px auto;padding:0 16px}
-.gate{max-width:360px;margin:80px auto;padding:24px;background:#111c2e;border-radius:12px}
-.gate input{width:100%;padding:10px;border-radius:8px;border:1px solid #334;background:#0b1220;color:#fff;margin:8px 0}
-.gate button,.dev button{background:#2563eb;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer}
-.dev{display:flex;align-items:center;gap:12px;background:#111c2e;border-radius:10px;padding:12px 16px;margin-bottom:10px}
+.gate{max-width:360px;margin:80px auto;padding:24px;background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:12px}
+.gate input{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:var(--bg);color:#fff;margin:8px 0}
+.gate button,.dev button{background:var(--brand);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer}
+.dev{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px 16px;margin-bottom:10px}
 .dot{width:9px;height:9px;border-radius:50%;background:#64748b;flex-shrink:0}
 .dot.online{background:#22c55e}
-.name{flex:1}.sub{font-size:12px;color:#94a3b8}
+.name{flex:1;color:#fff}.sub{font-size:12px;color:#94a3b8}
 </style></head><body>
-<header><h1>📡 Удалённая поддержка — устройства</h1></header>
+<header><h1><i class="bi bi-display"></i> Удалённая поддержка — устройства</h1></header>
 <main>
 <div class="gate" id="gate">
   <p>Введите админский токен (тот же, что в <code>ADMIN_TOKEN</code> на сервере):</p>
