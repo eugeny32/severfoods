@@ -17,7 +17,13 @@ android {
     compileSdk 34
     defaultConfig {
         applicationId "ru.remotesupport.evotor"
-        minSdkVersion 26
+        // 24 (Android 7.0) — минимум, ниже которого не работает GestureDescription/
+        // dispatchGesture (эмуляция касаний через AccessibilityService), поэтому
+        // опускать дальше некуда. Было 26 — завышено без необходимости и, вероятно,
+        // отсекало реальные терминалы Эвотор со старой прошивкой при установке
+        // через Маркет (карточка совместимости описывает модель, а не факт. версию
+        // Android на конкретном экземпляре терминала).
+        minSdkVersion 24
         targetSdkVersion 34
         versionCode rsVersionCode
         versionName rsVersionName
