@@ -50,6 +50,19 @@ android {
     }
 }
 
+// io.github.webrtc-sdk:android транзитивно тянет kotlin-stdlib-jdk7/jdk8
+// версии 1.6.0, а другая зависимость — kotlin-stdlib 1.8.22 (в котором
+// функциональность jdk7/jdk8-модулей уже слита в основной stdlib начиная
+// с Kotlin 1.8). Без androidx/Capacitor-зависимостей, которые в основном
+// проекте (android/android) случайно продавливали единую версию, здесь
+// оба варианта остаются в classpath одновременно и AGP считает это
+// дублирующимися классами (checkDebugDuplicateClasses FAILED). Явно
+// исключаем устаревшие jdk7/jdk8-артефакты.
+configurations.all {
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+}
+
 dependencies {
     implementation "androidx.appcompat:appcompat:1.6.1"
     implementation "androidx.core:core:1.12.0"
