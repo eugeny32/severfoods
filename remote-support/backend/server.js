@@ -27,6 +27,21 @@ const path = require('path');
 const store = require('./store');
 const { mintTurnCredentials } = require('./turn');
 
+// Одна неучтённая ошибка (например, при записи data.json на диск —
+// см. store.js) раньше валила весь процесс целиком, и пока systemd его
+// перезапускал, nginx отдавал 502 — снаружи это выглядело как случайные
+// обрывы каждого второго-третьего запроса. Сам сбой уже не должен
+// долетать досюда (обработан на месте), но это последний рубеж на случай
+// чего-то непредвиденного — process.exit() убран намеренно: сервис не
+// критичен, лучше продолжить работу с залогированной ошибкой, чем
+// обрывать все текущие сеансы просмотра.
+process.on('uncaughtException', (err) => {
+    console.error('[remote-support] необработанное исключение:', err);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('[remote-support] необработанный reject:', reason);
+});
+
 const app = express();
 app.use(express.json({ limit: '256kb' }));
 app.use(express.static(path.join(__dirname, 'public')));

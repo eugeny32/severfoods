@@ -27,7 +27,19 @@ function save() {
     saveScheduled = true;
     setImmediate(() => {
         saveScheduled = false;
-        fs.writeFileSync(DB_PATH, JSON.stringify(db));
+        try {
+            fs.writeFileSync(DB_PATH, JSON.stringify(db));
+        } catch (e) {
+            // Необработанное исключение внутри setImmediate раньше валило
+            // весь процесс (нет try/catch выше по стеку, кто бы его поймал) —
+            // и это объясняло перемежающиеся 502: systemd перезапускал
+            // упавший Node на любой ошибке записи (например, файл data.json
+            // однажды создался от другого пользователя, чем тот, под которым
+            // работает сервис, и запись каждый раз падала с EACCES). Теперь
+            // сбой записи только логируется — сама запись пропускается, но
+            // процесс живёт, а данные в памяти не теряются.
+            console.error('[store] не удалось сохранить data.json:', e.message);
+        }
     });
 }
 
