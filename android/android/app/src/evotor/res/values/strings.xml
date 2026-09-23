@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="remote_control_service_description">Позволяет администратору СеверФудс эмулировать касания на экране во время удалённого сеанса поддержки. Включайте только когда сами инициируете сеанс.</string>
+</resources>

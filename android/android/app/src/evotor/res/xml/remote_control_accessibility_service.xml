@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Служба ничего не «слушает» — она нужна только ради права вызывать
+  dispatchGesture() (эмуляция касаний по командам зрителя). canPerformGestures
+  единственный флаг, который нам реально нужен; canRetrieveWindowContent и
+  события не запрашиваем намеренно — служба не должна ничего читать с экрана
+  сверх того, что и так видно в самой видеотрансляции.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeAllMask"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canPerformGestures="true"
+    android:canRetrieveWindowContent="false"
+    android:notificationTimeout="100"
+    android:description="@string/remote_control_service_description" />

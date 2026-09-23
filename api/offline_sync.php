@@ -55,6 +55,8 @@ switch ($action) {
     case 'heartbeat':    doHeartbeat();   break;
     case 'command_ack':  doCommandAck();  break;
     case 'check_meal':   doCheckMeal();   break;
+    case 'remote_signal':      doRemoteSignal();     break;
+    case 'remote_signal_poll': doRemoteSignalPoll(); break;
     default:
         http_response_code(400);
         echo json_encode(['error' => 'Unknown action']);
@@ -194,6 +196,97 @@ function doCommandAck(): void
     )->execute([$status, $result, $id]);
 
     echo json_encode(['ok' => true]);
+}
+
+// ─── Удалённый просмотр/управление экраном (WebRTC) ─────────────────────
+// Терминал получает команду remote_screen через heartbeat (см. выше) с
+// session_id и ICE-серверами, дальше сам создаёт offer и обменивается
+// сигналами (offer/answer/ice) с зрителем через опрос этих двух действий —
+// тем же принципом long polling, что и heartbeat: входящего соединения к
+// терминалу по-прежнему не требуется. Сторона зрителя — api/remote_access.php.
+
+function ensureRemoteScreenTables(PDO $pdo): void
+{
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS remote_screen_sessions (
+            session_id  VARCHAR(64) NOT NULL PRIMARY KEY,
+            device_id   VARCHAR(64) NOT NULL,
+            status      VARCHAR(20) NOT NULL DEFAULT 'pending',
+            created_by  VARCHAR(100) DEFAULT NULL,
+            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ended_at    DATETIME DEFAULT NULL,
+            INDEX idx_device (device_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (PDOException $e) {}
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS remote_screen_signals (
+            id          BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            session_id  VARCHAR(64) NOT NULL,
+            sender      VARCHAR(10) NOT NULL,
+            type        VARCHAR(20) NOT NULL,
+            payload     MEDIUMTEXT NOT NULL,
+            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_session (session_id, sender, id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (PDOException $e) {}
+}
+
+/** Терминал отправляет свой сигнал (offer / ice) зрителю. */
+function doRemoteSignal(): void
+{
+    global $pdo;
+    ensureRemoteScreenTables($pdo);
+
+    $body      = json_decode(file_get_contents('php://input'), true) ?? [];
+    $sessionId = trim($body['session_id'] ?? '');
+    $type      = trim($body['type'] ?? '');
+    $payload   = $body['payload'] ?? null;
+
+    if ($sessionId === '' || !in_array($type, ['offer', 'ice', 'bye'], true) || $payload === null) {
+        echo json_encode(['ok' => false, 'error' => 'Некорректные параметры']);
+        return;
+    }
+
+    $pdo->prepare(
+        "INSERT INTO remote_screen_signals (session_id, sender, type, payload) VALUES (?, 'device', ?, ?)"
+    )->execute([$sessionId, $type, json_encode($payload, JSON_UNESCAPED_UNICODE)]);
+
+    if ($type === 'offer') {
+        $pdo->prepare("UPDATE remote_screen_sessions SET status = 'connecting' WHERE session_id = ?")->execute([$sessionId]);
+    }
+
+    echo json_encode(['ok' => true]);
+}
+
+/** Терминал забирает новые сигналы от зрителя (answer / ice / bye) и текущий статус сеанса. */
+function doRemoteSignalPoll(): void
+{
+    global $pdo;
+    ensureRemoteScreenTables($pdo);
+
+    $sessionId = trim($_GET['session_id'] ?? '');
+    $after     = (int)($_GET['after'] ?? 0);
+    if ($sessionId === '') { echo json_encode(['ok' => false, 'error' => 'session_id required']); return; }
+
+    $status = $pdo->prepare("SELECT status FROM remote_screen_sessions WHERE session_id = ?");
+    $status->execute([$sessionId]);
+    $sessionStatus = $status->fetchColumn();
+    if ($sessionStatus === false) { echo json_encode(['ok' => false, 'error' => 'not_found']); return; }
+
+    $stmt = $pdo->prepare(
+        "SELECT id, type, payload FROM remote_screen_signals
+         WHERE session_id = ? AND sender = 'viewer' AND id > ?
+         ORDER BY id ASC LIMIT 100"
+    );
+    $stmt->execute([$sessionId, $after]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as &$r) { $r['id'] = (int)$r['id']; $r['payload'] = json_decode($r['payload'], true); }
+    unset($r);
+
+    echo json_encode(['ok' => true, 'status' => $sessionStatus, 'signals' => $rows], JSON_UNESCAPED_UNICODE);
 }
 
 /**

@@ -813,3 +813,35 @@ function releaseMealLock(PDO $pdo, int $employeeId): void
         $pdo->prepare('SELECT RELEASE_LOCK(?)')->execute(['meal_emp_' . $employeeId]);
     } catch (PDOException $e) {}
 }
+
+/**
+ * Временные учётные данные для TURN-сервера (coturn) по механизму
+ * static-auth-secret (REST API, RFC-подобная схема, которую понимает coturn
+ * "из коробки" при use-auth-secret). Общий секрет живёт только на сервере
+ * (переменная окружения TURN_SHARED_SECRET) — ни на терминал, ни в браузер
+ * зрителя он никогда не попадает, вместо него уходит уже готовая пара
+ * логин/пароль с ограниченным сроком действия (username — это unix-время
+ * истечения плюс метка, credential — HMAC-SHA1 от username на общем
+ * секрете, как считает сам coturn при проверке).
+ *
+ * Возвращает null, если TURN не настроен (TURN_SHARED_SECRET не задан) —
+ * тогда WebRTC попробует обойтись STUN'ом или сработает как есть, без TURN.
+ */
+function mintTurnCredentials(int $ttlSeconds = 3600): ?array
+{
+    $secret = env('TURN_SHARED_SECRET', '');
+    $host   = env('TURN_HOST', 'ntrip.host');
+    if ($secret === '') return null;
+
+    $username   = (string)(time() + $ttlSeconds) . ':severfoods';
+    $credential = base64_encode(hash_hmac('sha1', $username, $secret, true));
+
+    return [
+        'ice_servers' => [
+            ['urls' => "stun:{$host}:3478"],
+            ['urls' => "turn:{$host}:3478?transport=udp", 'username' => $username, 'credential' => $credential],
+            ['urls' => "turn:{$host}:3478?transport=tcp", 'username' => $username, 'credential' => $credential],
+        ],
+        'expires_at' => date('c', time() + $ttlSeconds),
+    ];
+}

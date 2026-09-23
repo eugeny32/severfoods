@@ -1387,6 +1387,25 @@ function renderSettings() {
     `);
     }
 
+    // 2d. Удалённый доступ — разовое разрешение на захват экрана для
+    // просмотра/управления с сайта (супер-администратор → «Удалённый
+    // доступ» → кнопка «Экран»). Системный диалог Android нельзя вызвать
+    // без участия человека — поэтому кнопка есть, а не включается сама.
+    // Только Эвотор: на планшете такой функции нет вовсе.
+    if (isAdmin && window.SFNative && window.SFNative.isEvotor && window.SFNative.isEvotor()) {
+        const granted = window.SFNative.hasScreenCapturePermission && window.SFNative.hasScreenCapturePermission();
+        grid.innerHTML += card('Удалённый доступ', 'satellite-dish', `
+        <p class="setting-note">Разрешает супер-администратору на сайте временно посмотреть
+        экран этого терминала и понажимать на него для диагностики — включайте только если
+        сами ждёте такой сеанс поддержки.</p>
+        <div class="setting-row"><label>Статус</label><span>${granted ? '✅ Включён' : '— Не включён'}</span></div>
+        <button class="btn-primary" onclick="window.SFNative.requestScreenCapturePermission()">
+            <i class="fas fa-satellite-dish"></i> ${granted ? 'Выдать разрешение заново' : 'Включить удалённый доступ'}</button>
+        <button class="btn-primary" style="margin-top:8px" onclick="window.SFNative.openAccessibilitySettings()">
+            <i class="fas fa-hand-pointer"></i> Разрешить управление (Спец. возможности)</button>
+    `);
+    }
+
     // 3. Meal point info (all roles)
     const ptName = currentUser?.selected_point_name || currentUser?.assigned_point_name || '—';
     grid.innerHTML += card('Точка питания', 'map-marker-alt', `

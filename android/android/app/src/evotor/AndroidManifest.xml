@@ -23,6 +23,14 @@
     <!-- Штрихкоды от встроенного сканера терминала -->
     <uses-permission android:name="ru.evotor.devices.SCANNER_RECEIVER" />
 
+    <!-- Удалённый просмотр/управление экраном (android/EVOTOR.md → «Удалённый
+         доступ»): захват экрана через MediaProjection в фоновом сервисе, и
+         внутри него — эмуляция касаний AccessibilityService. Оба разрешения
+         нужны только этой сборке. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Право ставить APK нужно только планшетной версии с самообновлением -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"
                      tools:node="remove" />
@@ -51,5 +59,26 @@
 
         <!-- Автозапуск после включения: на чужом терминале это навязчиво -->
         <receiver android:name=".BootReceiver" tools:node="remove" />
+
+        <!-- Захват и трансляция экрана (WebRTC) для удалённого доступа.
+             foregroundServiceType=mediaProjection обязателен начиная с
+             Android 14 — без него система убивает сервис почти сразу. -->
+        <service android:name=".RemoteScreenService"
+                 android:foregroundServiceType="mediaProjection"
+                 android:exported="false" />
+
+        <!-- Эмуляция касаний по командам с экрана зрителя. Требует, чтобы
+             оператор один раз включил её вручную в Настройки → Специальные
+             возможности — включить эту службу программно приложение само
+             не может (осознанное ограничение Android, не наша прихоть). -->
+        <service android:name=".RemoteControlAccessibilityService"
+                 android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+                 android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice"
+                       android:resource="@xml/remote_control_accessibility_service" />
+        </service>
     </application>
 </manifest>
