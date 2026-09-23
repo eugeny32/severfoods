@@ -36,49 +36,29 @@
 
 ## Разворачивание бэкенда на ntrip.host
 
-На сервере сейчас есть только coturn — веб-сервиса ещё нет, разворачивать
-нужно вручную (у этой среды разработки нет SSH-доступа к серверу):
+**Развёрнуто (2026-09-23), публичный адрес: `https://remote.ntrip.host`** (отдельный поддомен, не
+подпуть под ntrip.host — фронтенд использует абсолютные пути `/api/...`, которые пересеклись бы с
+основным сайтом при монтировании как `/remote-support/`). Вход — через тот же HAProxy
+SNI-демультиплексор на 443, что у остальных сайтов сервера (`nginx` слушает только
+`127.0.0.1:8443 proxy_protocol`, HAProxy сам решает по SNI, куда направить трафик — coturn или nginx;
+HAProxy трогать не нужно, он и так шлёт всё, кроме `turn.ntrip.host`, на nginx).
 
-```bash
-# на ntrip.host
-cd /opt && git clone --filter=blob:none --sparse https://github.com/eugeny32/severfoods.git remote-support-src
-cd remote-support-src && git sparse-checkout set remote-support/backend
-cd remote-support/backend
-npm install --production
+Скрипты развёртывания — `remote-support/deploy_backend.py` (клонирует код, ставит зависимости,
+создаёт `.env` и systemd-юнит, пользователь `remotesupport` без домашней папки/sudo) и
+`remote-support/deploy_nginx.py` (двухэтапно: сначала только блок `:80` для ACME-challenge,
+`certbot certonly --webroot`, затем полный `remote-support-nginx.conf` с блоком `:8443`). Оба берут
+секреты (`ADMIN_TOKEN`, `TURN_SHARED_SECRET`, `RS_USER`/`RS_PASS`) из переменных окружения — в
+репозитории не хранятся. `TURN_SHARED_SECRET` — это `static-auth-secret` из `/etc/turnserver.conf`
+на сервере.
 
-cat > .env <<'EOF'
-ADMIN_TOKEN=<придумайте длинный случайный токен — им откроется admin.html>
-TURN_HOST=ntrip.host
-TURN_SHARED_SECRET=<тот же static-auth-secret, что в конфиге coturn>
-PORT=8787
-EOF
+**Важно: порты TURN на этом сервере нестандартные** — coturn слушает `listening-port=50000` и
+`tls-listening-port=5349`, а не общепринятый `3478` (обнаружено при первом деплое: `turn.js` был
+захардкожен на 3478 и TURN-relay молча не работал бы за пределами локальной сети). Порты теперь
+настраиваются через `TURN_PORT`/`TURN_TLS_PORT` в `.env` (по умолчанию 3478/5349 для обычных
+инсталляций coturn — на ntrip.host используются 50000/5349).
 
-# systemd-юнит (пример)
-sudo tee /etc/systemd/system/remote-support.service <<'EOF'
-[Unit]
-Description=Remote Support signaling server
-After=network.target
-
-[Service]
-WorkingDirectory=/opt/remote-support-src/remote-support/backend
-EnvironmentFile=/opt/remote-support-src/remote-support/backend/.env
-ExecStart=/usr/bin/node server.js
-Restart=on-failure
-User=www-data
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable --now remote-support
-
-# обратный прокси (nginx, пример) — порт 8787 наружу лучше не светить голым
-# и сразу отдавать по HTTPS: WebRTC / getUserMedia-подобные API браузер
-# разрешает только с защищённых страниц.
-```
-
-Обновление — `git -C /opt/remote-support-src pull && systemctl restart remote-support`.
+Обновление — `git -C /opt/remote-support-src pull && systemctl restart remote-support` на сервере,
+или просто повторный запуск `deploy_backend.py`.
 
 ## Сборка Android-приложения
 
