@@ -21,6 +21,15 @@
         android:allowBackup="false"
         android:theme="@android:style/Theme.Material.Light">
 
+        <!--
+          Идентификатор приложения из личного кабинета dev.evotor.ru — без
+          него Эвотор не свяжет установленный APK с карточкой приложения.
+          Подставляется при сборке (EVOTOR_APP_UUID), в репозитории его нет
+          (см. app/build.gradle) — тот же приём, что и в основном проекте
+          severfoods/android для сборки evotor.
+        -->
+        <meta-data android:name="app_uuid" android:value="${evotorAppUuid}" />
+
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
