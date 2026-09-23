@@ -21,11 +21,12 @@ android {
         targetSdkVersion 34
         versionCode rsVersionCode
         versionName rsVersionName
-        // Получаете после регистрации приложения на dev.evotor.ru — вкладка
-        // приложения, поле app_uuid. Секретом не является (лежит в манифесте
-        // каждого установленного APK), но в репозитории всё равно не хранится,
-        // чтобы сборка не могла молча уйти без него.
-        manifestPlaceholders = [evotorAppUuid: (System.getenv("EVOTOR_APP_UUID") ?: "")]
+        // Получен при регистрации приложения «Удалённая поддержка» на dev.evotor.ru
+        // (вкладка приложения, поле app_uuid). Секретом не является — лежит
+        // в манифесте каждого установленного APK, поэтому хранится прямо
+        // здесь как значение по умолчанию; EVOTOR_APP_UUID можно переопределить
+        // окружением, если понадобится собрать под другую регистрацию.
+        manifestPlaceholders = [evotorAppUuid: (System.getenv("EVOTOR_APP_UUID") ?: "c83d1197-504a-49ce-ba1f-48a97fd6ddf7")]
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
