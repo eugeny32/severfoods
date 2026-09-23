@@ -69,6 +69,7 @@ env_content = (
     "TURN_PORT=%s\n"
     "TURN_TLS_PORT=%s\n"
     "PORT=%s\n"
+    "DATA_FILE=/var/lib/remote-support/data.json\n"
 ) % (ADMIN_TOKEN, TURN_SHARED_SECRET, TURN_PORT, TURN_TLS_PORT, BACKEND_PORT)
 tmp_env = "/tmp/remote-support.env.upload"
 sftp = c.open_sftp()
@@ -90,6 +91,7 @@ Group=remotesupport
 WorkingDirectory=/opt/remote-support-src/remote-support/backend
 EnvironmentFile=/etc/remote-support/backend.env
 Environment=PYTHONUNBUFFERED=1
+StateDirectory=remote-support
 ExecStart=/usr/bin/node server.js
 Restart=on-failure
 RestartSec=5

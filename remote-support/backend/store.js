@@ -9,7 +9,9 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const DB_PATH = path.join(__dirname, 'data.json');
+// Путь можно вынести из каталога кода (DATA_FILE) — например в /var/lib/remote-support под
+// systemd StateDirectory, когда сам каталог кода смонтирован только на чтение.
+const DB_PATH = process.env.DATA_FILE || path.join(__dirname, 'data.json');
 
 function load() {
     try {
