@@ -1,0 +1,77 @@
+name: Build Remote Support APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_apk:
+        description: 'Закоммитить готовый APK в remote-support/dist/'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: remote-support/android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+
+      - name: Read version
+        id: pkg
+        run: echo "version=$(grep versionName version.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      # Debug-сборка: подписана служебным отладочным ключом Android, ставится
+      # на устройство как обычный APK. Ключа для боевой release-подписи в
+      # репозитории нет (см. app/build.gradle) — до его появления это
+      # единственный вариант, который вообще можно установить.
+      - name: Build APK (debug)
+        run: chmod +x gradlew && ./gradlew assembleDebug
+
+      - name: Locate APK
+        id: apk
+        run: |
+          APK=$(find app/build/outputs/apk -name "*.apk" | head -1)
+          echo "path=$APK" >> "$GITHUB_OUTPUT"
+
+      - name: Commit APK
+        if: ${{ inputs.commit_apk }}
+        run: |
+          mkdir -p ../dist
+          cp "${{ steps.apk.outputs.path }}" "../dist/RemoteSupport-${{ steps.pkg.outputs.version }}.apk"
+          cd ../..
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          for i in 1 2 3 4; do
+            git add remote-support/dist/
+            git commit -m "Собрать Remote Support APK v${{ steps.pkg.outputs.version }} [skip ci]" && break
+            git pull --rebase && continue
+          done
+          for i in 1 2 3 4; do
+            git push && break
+            sleep $((i*2))
+            git pull --rebase
+          done
+
+      - name: Upload artifact
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: RemoteSupport-apk
+          path: remote-support/android/${{ steps.apk.outputs.path }}

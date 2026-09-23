@@ -1,0 +1,25 @@
+// Отдельный продукт «Удалённая поддержка» — не связан с проектом
+// severfoods/android/android (учёт питания). Живёт в этом же git-репозитории
+// только потому, что здесь единственный репозиторий, куда есть доступ на
+// запись — логически это самостоятельное приложение со своим бэкендом
+// (../backend), деплоящимся отдельно на ntrip.host.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.2.1'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}

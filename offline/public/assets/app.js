@@ -1387,14 +1387,14 @@ function renderSettings() {
     `);
     }
 
-    // 2d. Удалённый доступ — разовое разрешение на захват экрана для
+    // 2d. Удалённая поддержка — разовое разрешение на захват экрана для
     // просмотра/управления с сайта (супер-администратор → «Удалённый
     // доступ» → кнопка «Экран»). Системный диалог Android нельзя вызвать
     // без участия человека — поэтому кнопка есть, а не включается сама.
     // Только Эвотор: на планшете такой функции нет вовсе.
     if (isAdmin && window.SFNative && window.SFNative.isEvotor && window.SFNative.isEvotor()) {
         const granted = window.SFNative.hasScreenCapturePermission && window.SFNative.hasScreenCapturePermission();
-        grid.innerHTML += card('Удалённый доступ', 'satellite-dish', `
+        grid.innerHTML += card('Удалённая поддержка', 'satellite-dish', `
         <p class="setting-note">Разрешает супер-администратору на сайте временно посмотреть
         экран этого терминала и понажимать на него для диагностики — включайте только если
         сами ждёте такой сеанс поддержки.</p>

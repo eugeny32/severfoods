@@ -66,13 +66,13 @@ final class RemoteAccess {
 
         if (resultCode != Activity.RESULT_OK || data == null) {
             Log.w(TAG, "Оператор не подтвердил захват экрана");
-            Toast.makeText(activity, "Удалённый доступ не включён: захват экрана не разрешён", Toast.LENGTH_LONG).show();
+            Toast.makeText(activity, "Удалённая поддержка не включена: захват экрана не разрешён", Toast.LENGTH_LONG).show();
             return true;
         }
 
         grantedResultCode = resultCode;
         grantedData = data;
-        Toast.makeText(activity, "Удалённый доступ включён", Toast.LENGTH_SHORT).show();
+        Toast.makeText(activity, "Удалённая поддержка включена", Toast.LENGTH_SHORT).show();
 
         if (pendingSessionId != null) {
             startSession(activity, pendingSessionId, pendingIceServersJson, pendingSyncEndpoint, pendingSyncToken);

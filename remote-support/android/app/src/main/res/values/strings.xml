@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Удалённая поддержка</string>
+    <string name="accessibility_service_description">Позволяет администратору эмулировать касания на экране во время удалённого сеанса поддержки. Включайте только когда сами ждёте такой сеанс.</string>
+</resources>

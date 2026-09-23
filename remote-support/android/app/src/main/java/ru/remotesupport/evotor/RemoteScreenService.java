@@ -1,4 +1,4 @@
-package ru.severfoods.offline;
+package ru.remotesupport.evotor;
 
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -8,9 +8,6 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.PixelFormat;
-import android.hardware.display.DisplayManager;
-import android.hardware.display.VirtualDisplay;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.os.Build;
@@ -43,41 +40,37 @@ import org.webrtc.SurfaceTextureHelper;
 import org.webrtc.VideoSource;
 import org.webrtc.VideoTrack;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Захват и трансляция экрана терминала одному подключившемуся зрителю
- * (веб-страница remote_viewer.php) + приём команд управления обратно через
- * WebRTC DataChannel, эмулируемых через RemoteControlAccessibilityService.
+ * Захват и трансляция экрана терминала подключившемуся администратору
+ * (веб-страница backend/public/viewer.html) + приём команд управления
+ * обратно через WebRTC DataChannel, эмулируемых через
+ * RemoteControlAccessibilityService.
  *
  * Обмен служебными сообщениями WebRTC (offer/answer/ice) идёт HTTP-опросом
- * api/offline_sync.php (действия remote_signal / remote_signal_poll) — тем
- * же принципом, что обычная синхронизация: сервис сам инициирует все
- * запросы, входящих соединений к терминалу не требуется.
+ * собственного бэкенда (remote-support/backend, действия /api/signal и
+ * /api/signal/poll) — тем же принципом, что и heartbeat: сервис сам
+ * инициирует все запросы, входящих соединений к терминалу не требуется.
  */
 public class RemoteScreenService extends Service {
 
-    private static final String TAG = "SeverFoods/RemoteScreen";
+    private static final String TAG = "RemoteSupport/Screen";
     private static final String CHANNEL_ID = "remote_screen";
-    private static final int NOTIF_ID = 7302;
+    private static final int NOTIF_ID = 4102;
     private static final int POLL_INTERVAL_MS = 1000;
     private static final int SIGNAL_TIMEOUT_MS = 15000;
 
-    static final String EXTRA_RESULT_CODE       = "result_code";
-    static final String EXTRA_RESULT_DATA       = "result_data";
-    static final String EXTRA_SESSION_ID        = "session_id";
-    static final String EXTRA_ICE_SERVERS_JSON  = "ice_servers_json";
-    static final String EXTRA_SYNC_ENDPOINT     = "sync_endpoint";
-    static final String EXTRA_SYNC_TOKEN        = "sync_token";
+    static final String EXTRA_RESULT_CODE      = "result_code";
+    static final String EXTRA_RESULT_DATA      = "result_data";
+    static final String EXTRA_SESSION_ID       = "session_id";
+    static final String EXTRA_ICE_SERVERS_JSON = "ice_servers_json";
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean stopped = new AtomicBoolean(false);
@@ -94,8 +87,9 @@ public class RemoteScreenService extends Service {
     private Thread pollThread;
 
     private String sessionId;
-    private String syncEndpoint;
-    private String syncToken;
+    private String serverUrl;
+    private String deviceId;
+    private String deviceToken;
     private int captureWidthPx, captureHeightPx;
 
     @Override
@@ -103,9 +97,8 @@ public class RemoteScreenService extends Service {
         super.onCreate();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManager nm = getSystemService(NotificationManager.class);
-            NotificationChannel ch = new NotificationChannel(
-                CHANNEL_ID, "Удалённая поддержка", NotificationManager.IMPORTANCE_LOW);
-            nm.createNotificationChannel(ch);
+            nm.createNotificationChannel(new NotificationChannel(
+                CHANNEL_ID, "Удалённая поддержка", NotificationManager.IMPORTANCE_LOW));
         }
     }
 
@@ -114,26 +107,28 @@ public class RemoteScreenService extends Service {
         if (intent == null) { stopSelf(); return START_NOT_STICKY; }
 
         Notification notif = new NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("СеверФудс — удалённая поддержка")
+            .setContentTitle("Удалённая поддержка")
             .setContentText("Идёт сеанс удалённой поддержки")
             .setSmallIcon(android.R.drawable.presence_video_online)
             .setOngoing(true)
             .build();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(NOTIF_ID, notif,
-                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
+            startForeground(NOTIF_ID, notif, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
         } else {
             startForeground(NOTIF_ID, notif);
         }
 
-        sessionId    = intent.getStringExtra(EXTRA_SESSION_ID);
-        syncEndpoint = intent.getStringExtra(EXTRA_SYNC_ENDPOINT);
-        syncToken    = intent.getStringExtra(EXTRA_SYNC_TOKEN);
-        int resultCode   = intent.getIntExtra(EXTRA_RESULT_CODE, 0);
+        Prefs prefs = new Prefs(this);
+        serverUrl   = prefs.serverUrl();
+        deviceId    = prefs.deviceId();
+        deviceToken = prefs.deviceToken();
+
+        sessionId = intent.getStringExtra(EXTRA_SESSION_ID);
+        int resultCode    = intent.getIntExtra(EXTRA_RESULT_CODE, 0);
         Intent resultData = intent.getParcelableExtra(EXTRA_RESULT_DATA);
         String iceServersJson = intent.getStringExtra(EXTRA_ICE_SERVERS_JSON);
 
-        if (sessionId == null || resultData == null) {
+        if (sessionId == null || resultData == null || serverUrl.isEmpty()) {
             Log.e(TAG, "Недостаточно данных для запуска сеанса");
             stopSelf();
             return START_NOT_STICKY;
@@ -158,7 +153,6 @@ public class RemoteScreenService extends Service {
         wm.getDefaultDisplay().getRealMetrics(dm);
         captureWidthPx  = dm.widthPixels;
         captureHeightPx = dm.heightPixels;
-        int dpi = dm.densityDpi;
 
         eglBase = EglBase.create();
         PeerConnectionFactory.initialize(
@@ -170,7 +164,7 @@ public class RemoteScreenService extends Service {
             .createPeerConnectionFactory();
 
         videoSource = factory.createVideoSource(true /* isScreencast */);
-        surfaceTextureHelper = SurfaceTextureHelper.create("SeverFoodsRemoteCapture", eglBase.getEglBaseContext());
+        surfaceTextureHelper = SurfaceTextureHelper.create("RemoteSupportCapture", eglBase.getEglBaseContext());
 
         capturer = new ScreenCapturerAndroid(resultData, new MediaProjection.Callback() {
             @Override public void onStop() {
@@ -179,11 +173,10 @@ public class RemoteScreenService extends Service {
             }
         });
         capturer.initialize(surfaceTextureHelper, getApplicationContext(), videoSource.getCapturerObserver());
-        // 12 fps достаточно для просмотра/поддержки, не для игр — экономит
-        // канал и CPU терминала, которому ещё раздачу питания обслуживать.
+        // 12 fps достаточно для просмотра/поддержки, экономит канал и CPU.
         capturer.startCapture(captureWidthPx, captureHeightPx, 12);
 
-        VideoTrack videoTrack = factory.createVideoTrack("severfoods-screen", videoSource);
+        VideoTrack videoTrack = factory.createVideoTrack("remote-support-screen", videoSource);
 
         List<PeerConnection.IceServer> iceServers = parseIceServers(iceServersJson);
         PeerConnection.RTCConfiguration rtcConfig = new PeerConnection.RTCConfiguration(iceServers);
@@ -192,10 +185,9 @@ public class RemoteScreenService extends Service {
         peerConnection = factory.createPeerConnection(rtcConfig, new SimplePcObserver());
         if (peerConnection == null) throw new IllegalStateException("createPeerConnection вернул null");
 
-        peerConnection.addTrack(videoTrack, java.util.Collections.singletonList("severfoods-stream"));
+        peerConnection.addTrack(videoTrack, java.util.Collections.singletonList("remote-support-stream"));
 
-        DataChannel.Init dcInit = new DataChannel.Init();
-        controlChannel = peerConnection.createDataChannel("control", dcInit);
+        controlChannel = peerConnection.createDataChannel("control", new DataChannel.Init());
         controlChannel.registerObserver(new ControlChannelObserver());
 
         MediaConstraints offerConstraints = new MediaConstraints();
@@ -233,7 +225,7 @@ public class RemoteScreenService extends Service {
         return result;
     }
 
-    // ── сигналинг (HTTP long polling) ──────────────────────────────────
+    // ── сигналинг (HTTP long polling к собственному бэкенду) ────────────
 
     private void startPolling() {
         pollThread = new Thread(() -> {
@@ -247,14 +239,16 @@ public class RemoteScreenService extends Service {
                     try { Thread.sleep(POLL_INTERVAL_MS); } catch (InterruptedException ignored) {}
                 }
             }
-        }, "SeverFoodsRemoteSignalPoll");
+        }, "RemoteSupportSignalPoll");
         pollThread.start();
     }
 
     private void pollOnce() throws Exception {
-        String url = syncEndpoint + "?action=remote_signal_poll&session_id=" + sessionId
-            + "&after=" + signalCursor.get();
-        JSONObject resp = new JSONObject(httpRequest("GET", url, null));
+        String url = serverUrl + "/api/signal/poll?device_id=" + deviceId
+            + "&session_id=" + sessionId + "&after=" + signalCursor.get();
+        Map<String, String> headers = new HashMap<>();
+        headers.put("X-Device-Token", deviceToken);
+        JSONObject resp = new JSONObject(HttpUtil.request("GET", url, headers, null, SIGNAL_TIMEOUT_MS));
         if (!resp.optBoolean("ok", false)) {
             Log.w(TAG, "Сеанс не найден на сервере — завершаю");
             stopSelf();
@@ -267,7 +261,7 @@ public class RemoteScreenService extends Service {
         if (signals == null) return;
         for (int i = 0; i < signals.length(); i++) {
             JSONObject sig = signals.getJSONObject(i);
-            signalCursor.set(Math.max(signalCursor.get(), sig.getInt("id")));
+            signalCursor.set(Math.max(signalCursor.get(), sig.getInt("seq")));
             String type = sig.getString("type");
             JSONObject payload = sig.getJSONObject("payload");
             if ("answer".equals(type)) {
@@ -291,14 +285,17 @@ public class RemoteScreenService extends Service {
         new Thread(() -> {
             try {
                 JSONObject body = new JSONObject();
+                body.put("device_id", deviceId);
                 body.put("session_id", sessionId);
                 body.put("type", type);
                 body.put("payload", payload);
-                httpRequest("POST", syncEndpoint + "?action=remote_signal", body.toString());
+                Map<String, String> headers = new HashMap<>();
+                headers.put("X-Device-Token", deviceToken);
+                HttpUtil.request("POST", serverUrl + "/api/signal", headers, body.toString(), SIGNAL_TIMEOUT_MS);
             } catch (Exception e) {
                 Log.w(TAG, "Не удалось отправить сигнал " + type + ": " + e.getMessage());
             }
-        }, "SeverFoodsRemoteSignalSend").start();
+        }, "RemoteSupportSignalSend").start();
     }
 
     private JSONObject sdpToJson(SessionDescription sdp) {
@@ -310,38 +307,7 @@ public class RemoteScreenService extends Service {
         return o;
     }
 
-    private String httpRequest(String method, String urlStr, @Nullable String body) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
-        try {
-            conn.setRequestMethod(method);
-            conn.setConnectTimeout(SIGNAL_TIMEOUT_MS);
-            conn.setReadTimeout(SIGNAL_TIMEOUT_MS);
-            conn.setRequestProperty("X-Sync-Token", syncToken);
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("Accept", "application/json");
-            if (body != null) {
-                conn.setDoOutput(true);
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(body.getBytes(StandardCharsets.UTF_8));
-                }
-            }
-            int status = conn.getResponseCode();
-            InputStream is = (status >= 200 && status < 400) ? conn.getInputStream() : conn.getErrorStream();
-            return is == null ? "{}" : readAll(is);
-        } finally {
-            conn.disconnect();
-        }
-    }
-
-    private String readAll(InputStream is) throws Exception {
-        ByteArrayOutputStream buf = new ByteArrayOutputStream();
-        byte[] chunk = new byte[4096];
-        int n;
-        while ((n = is.read(chunk)) != -1) buf.write(chunk, 0, n);
-        return buf.toString("UTF-8");
-    }
-
-    // ── управление (DataChannel → AccessibilityService) ────────────────
+    // ── управление (DataChannel → AccessibilityService) + буфер обмена ──
 
     private class ControlChannelObserver implements DataChannel.Observer {
         @Override public void onBufferedAmountChange(long l) {}
@@ -377,18 +343,11 @@ public class RemoteScreenService extends Service {
         }
     }
 
-    /**
-     * Буфер обмена — в обе стороны через тот же DataChannel, без отдельного
-     * запроса к серверу. Запись работает всегда; чтение (sendClipboard) на
-     * Android 10+ может вернуть пусто, если система считает наш фоновый
-     * сервис "не в фокусе" — это ограничение платформы (защита от фоновых
-     * приложений, подглядывающих чужой буфер), а не баг здесь.
-     */
     private void setClipboard(String text) {
         mainHandler.post(() -> {
             try {
                 ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                cm.setPrimaryClip(ClipData.newPlainText("severfoods-remote", text));
+                cm.setPrimaryClip(ClipData.newPlainText("remote-support", text));
             } catch (Exception e) {
                 Log.w(TAG, "Не удалось записать буфер обмена: " + e.getMessage());
             }
@@ -452,7 +411,6 @@ public class RemoteScreenService extends Service {
         @Override public void onAddTrack(RtpReceiver receiver, MediaStream[] streams) {}
     }
 
-    // ── пустой SdpObserver-адаптер, чтобы не реализовывать все 4 метода каждый раз ──
     private static class SdpObserverAdapter implements SdpObserver {
         @Override public void onCreateSuccess(SessionDescription sdp) {}
         @Override public void onSetSuccess() {}

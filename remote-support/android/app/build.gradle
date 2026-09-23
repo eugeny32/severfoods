@@ -1,0 +1,59 @@
+apply plugin: 'com.android.application'
+
+// Версия — единственное место, где задана, чтобы номер приложения и имя
+// собранного APK не расходились (см. .github/workflows в корне репозитория).
+def rsVersionName = "1.0.0"
+def rsVersionCode = 1
+def versionProps = file('../version.properties')
+if (versionProps.exists()) {
+    def props = new Properties()
+    versionProps.withInputStream { props.load(it) }
+    rsVersionName = props.getProperty('versionName', rsVersionName)
+    rsVersionCode = props.getProperty('versionCode', String.valueOf(rsVersionCode)) as Integer
+}
+
+android {
+    namespace "ru.remotesupport.evotor"
+    compileSdk 34
+    defaultConfig {
+        applicationId "ru.remotesupport.evotor"
+        minSdkVersion 26
+        targetSdkVersion 34
+        versionCode rsVersionCode
+        versionName rsVersionName
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    signingConfigs {
+        release {
+            def keystoreProps = new Properties()
+            def keystorePropsFile = rootProject.file('keystore.properties')
+            if (keystorePropsFile.exists()) {
+                keystoreProps.load(new FileInputStream(keystorePropsFile))
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (rootProject.file('keystore.properties').exists()) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+}
+
+dependencies {
+    implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "androidx.core:core:1.12.0"
+    // WebRTC — тот же артефакт, что и в основном проекте (android/EVOTOR.md).
+    implementation "io.github.webrtc-sdk:android:125.6422.07"
+    testImplementation "junit:junit:4.13.2"
+}

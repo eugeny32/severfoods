@@ -26,7 +26,7 @@ if ($deviceId === '') { header('Location: index.php'); exit; }
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Удалённый экран — <?= htmlspecialchars($pointName ?: $deviceId, ENT_QUOTES) ?></title>
+<title>Удалённая поддержка — <?= htmlspecialchars($pointName ?: $deviceId, ENT_QUOTES) ?></title>
 <?= Csrf::meta() ?>
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -61,7 +61,7 @@ video{max-width:100%;max-height:100%;cursor:crosshair;touch-action:none}
 
 <header>
     <div>
-        <h1><i class="fas fa-satellite-dish"></i> Удалённый экран</h1>
+        <h1><i class="fas fa-satellite-dish"></i> Удалённая поддержка</h1>
         <div class="sub"><?= htmlspecialchars($pointName ?: $deviceId, ENT_QUOTES) ?></div>
     </div>
     <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Запуск сеанса…</span></div>

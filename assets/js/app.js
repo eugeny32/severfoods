@@ -1784,7 +1784,7 @@ async function loadRemotePoints() {
                     <i class="fas ${icon}"></i>
                 </button>
             `).join('') + `
-                <button type="button" class="btn-sm" title="Удалённый экран — видео и управление (терминалы Эвотор)" ${p.online ? '' : 'disabled style="opacity:.35;cursor:not-allowed"'}
+                <button type="button" class="btn-sm" title="Удалённая поддержка — видео и управление (терминалы Эвотор)" ${p.online ? '' : 'disabled style="opacity:.35;cursor:not-allowed"'}
                     onclick="openRemoteScreen('${p.device_id}', '${safePointName}')">
                     <i class="fas fa-display"></i>
                 </button>
