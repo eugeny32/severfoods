@@ -753,7 +753,7 @@ async function handleQrScan(qrData) {
     try {
         const scanRes  = await fetch(`/api/employees/scan?qr=${encodeURIComponent(qrData)}`);
         const scanData = await scanRes.json();
-        if (!scanData.ok) { showResult(null, 'error', 'QR-код не найден'); return; }
+        if (!scanData.ok) { showResult(null, 'error', scanData.message || 'QR-код не найден'); return; }
 
         const emp    = scanData.employee;
         const ptId   = currentUser?.selected_point_id || currentUser?.assigned_point_id || null;
