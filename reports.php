@@ -47,6 +47,21 @@ if ($region !== currentRegionKey()) {
 // по которой строится отчёт.
 $org_list     = getOrganizationList($pdo);
 $selected_orgs = selectedOrganizations($pdo, $_GET['orgs'] ?? null);
+
+// Точечный отбор конкретных сотрудников — для разбора спорных случаев, когда
+// нужна выгрузка не по всей организации, а по одному-нескольким людям
+// (выбираются через поиск по списку или можно оставить пустым — тогда фильтр
+// не действует и отчёт строится как раньше, по всем).
+$selected_employees = selectedEmployeeIds($pdo, $_GET['emp'] ?? null);
+[$empListSql, $empListParams] = orgFilterSql($selected_orgs);
+$employee_picker = $pdo->prepare(
+    "SELECT id, full_name, organization FROM employees WHERE 1=1{$empListSql} ORDER BY full_name"
+);
+$employee_picker->execute($empListParams);
+$employee_list = $employee_picker->fetchAll(PDO::FETCH_ASSOC);
+$empQuery = $selected_employees
+    ? '&' . http_build_query(['emp' => $selected_employees])
+    : '';
 // Тот же выбор надо донести до выгрузок в Excel — иначе на экране одни
 // организации, а в файле все.
 $orgQuery = $selected_orgs
@@ -87,6 +102,8 @@ if ($source === 'scanner') { $sql .= " AND (ml.scanner_ip IS NULL OR ml.scanner_
 elseif ($source !== 'all') { $sql .= " AND ml.scanner_ip = :src"; $params[':src'] = $source; }
 [$orgSql, $orgParams] = orgFilterSql($selected_orgs);
 $sql .= $orgSql; $params += $orgParams;
+[$empSql, $empParams] = employeeFilterSql($selected_employees, 'ml.employee_id');
+$sql .= $empSql; $params += $empParams;
 $sql .= " ORDER BY ml.scanned_at DESC";
 
 $stmt = $pdo->prepare($sql); $stmt->execute($params);
@@ -160,6 +177,8 @@ if ($source === 'scanner') { $sqlEmp .= " AND (ml.scanner_ip IS NULL OR ml.scann
 elseif ($source !== 'all') { $sqlEmp .= " AND ml.scanner_ip = :src"; $paramsEmp[':src'] = $source; }
 [$orgSqlEmp, $orgParamsEmp] = orgFilterSql($selected_orgs, 'e.organization', 'eorg');
 $sqlEmp .= $orgSqlEmp; $paramsEmp += $orgParamsEmp;
+[$empSqlEmp, $empParamsEmp] = employeeFilterSql($selected_employees, 'e.id', 'semp');
+$sqlEmp .= $empSqlEmp; $paramsEmp += $empParamsEmp;
 $sqlEmp .= " GROUP BY e.id, e.full_name, e.organization, e.department
              ORDER BY e.organization, e.full_name";
 $stmtEmp = $pdo->prepare($sqlEmp);
@@ -188,6 +207,8 @@ if ($report_type === 'dry_rations') {
         if ($dry_type !== 'all') { $sqlDry .= " AND dr.ration_type = :rt"; $paramsDry[':rt'] = $dry_type; }
         [$orgSqlDry, $orgParamsDry] = orgFilterSql($selected_orgs, 'e.organization', 'dorg');
         $sqlDry .= $orgSqlDry; $paramsDry += $orgParamsDry;
+        [$empSqlDry, $empParamsDry] = employeeFilterSql($selected_employees, 'dr.employee_id', 'demp');
+        $sqlDry .= $empSqlDry; $paramsDry += $empParamsDry;
         $sqlDry .= " ORDER BY dr.ration_date DESC, e.full_name";
         $stmtDry = $pdo->prepare($sqlDry);
         $stmtDry->execute($paramsDry);
@@ -411,14 +432,50 @@ th.sortable:not(.asc):not(.desc) .sort-icon::after { content:'⇅'; }
         <?php endif; ?>
     </div>
     <?php endif; ?>
+    <?php if ($employee_list): ?>
+    <div class="form-group" style="flex-basis:100%;min-width:100%">
+        <label><i class="fas fa-user-check"></i> Сотрудники
+            <span style="font-weight:400;color:#64748b">— точечная выгрузка по конкретным людям (для разбора споров); ничего не отмечено означает все</span>
+        </label>
+        <input type="text" id="empSearch" placeholder="Поиск по ФИО, чтобы отметить нужных людей"
+               oninput="filterEmpChips(this.value)"
+               style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:6px;font-size:13px">
+        <div class="org-filter" id="empFilter">
+            <?php foreach ($employee_list as $emp): ?>
+            <label class="org-chip emp-chip" data-name="<?= htmlspecialchars(mb_strtolower($emp['full_name']), ENT_QUOTES) ?>">
+                <input type="checkbox" name="emp[]" value="<?= (int)$emp['id'] ?>"
+                       <?= in_array((int)$emp['id'], $selected_employees, true) ? 'checked' : '' ?>>
+                <span><?= htmlspecialchars($emp['full_name']) ?><?php if ($emp['organization']): ?>
+                    <span style="opacity:.55"> — <?= htmlspecialchars($emp['organization']) ?></span>
+                <?php endif; ?></span>
+            </label>
+            <?php endforeach; ?>
+        </div>
+        <?php if ($selected_employees): ?>
+        <div style="margin-top:6px">
+            <a href="?<?= htmlspecialchars(http_build_query(array_diff_key($_GET, ['emp' => 1])), ENT_QUOTES) ?>"
+               style="font-size:12px;color:#64748b">Снять выбор со всех сотрудников</a>
+        </div>
+        <?php endif; ?>
+    </div>
+    <script>
+    function filterEmpChips(q) {
+        q = q.trim().toLowerCase();
+        document.querySelectorAll('#empFilter .emp-chip').forEach(function (chip) {
+            var match = !q || chip.dataset.name.indexOf(q) !== -1;
+            chip.style.display = match ? '' : 'none';
+        });
+    }
+    </script>
+    <?php endif; ?>
     <div class="form-group" style="min-width:auto">
         <label>&nbsp;</label>
         <div style="display:flex;gap:8px">
             <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Применить</button>
-            <a href="export_excel.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&report_type=<?= $report_type ?>&meal_type=<?= $meal_type ?>&dry_type=<?= $dry_type ?>&region=<?= urlencode($region) ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?><?= $orgQuery ?>"
+            <a href="export_excel.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&report_type=<?= $report_type ?>&meal_type=<?= $meal_type ?>&dry_type=<?= $dry_type ?>&region=<?= urlencode($region) ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?><?= $orgQuery ?><?= $empQuery ?>"
                class="btn btn-success" style="background:#1d6f42"><i class="fas fa-table"></i> Excel (детали)</a>
             <?php if ($report_type !== 'dry_rations'): ?>
-            <a href="export_excel_employees.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?>&region=<?= urlencode($region) ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?><?= $orgQuery ?>"
+            <a href="export_excel_employees.php?start_date=<?= $start_date ?>&end_date=<?= $end_date ?>&meal_type=<?= $meal_type ?>&region=<?= urlencode($region) ?><?= $filter_point_id?'&point_id='.$filter_point_id:'' ?><?= $orgQuery ?><?= $empQuery ?>"
                class="btn btn-success" style="background:#15803d"><i class="fas fa-users"></i> Excel (сотрудники)</a>
             <?php endif; ?>
         </div>

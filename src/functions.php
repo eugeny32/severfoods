@@ -606,6 +606,51 @@ function selectedOrganizations(PDO $pdo, $raw): array
     return array_values(array_intersect(array_map('trim', $raw), $known));
 }
 
+/**
+ * Условие "IN (...)" по списку id сотрудников — точечная выгрузка/фильтр
+ * отчёта по конкретным людям (для разбора спорных случаев: точный набор
+ * лиц вместо целой организации). Тот же приём, что и orgFilterSql(), но по
+ * числовым id, а не по строкам организаций.
+ *
+ * @param int[]  $empIds выбранные id сотрудников
+ * @param string $column выражение с id сотрудника (обычно ml.employee_id или e.id)
+ * @param string $prefix префикс имён параметров
+ * @return array{0:string,1:array} кусок SQL (может быть пустым) и параметры
+ */
+function employeeFilterSql(array $empIds, string $column = 'ml.employee_id', string $prefix = 'emp'): array
+{
+    if (!$empIds) return ['', []];
+
+    $names  = [];
+    $params = [];
+    foreach (array_values($empIds) as $i => $id) {
+        $key = ":{$prefix}{$i}";
+        $names[]      = $key;
+        $params[$key] = $id;
+    }
+    return [" AND {$column} IN (" . implode(',', $names) . ")", $params];
+}
+
+/**
+ * Id сотрудников, выбранные в запросе. Сверяются с реально существующими в
+ * базе — иначе в фильтр попадёт что угодно из адресной строки (см.
+ * selectedOrganizations() — тот же приём для организаций).
+ *
+ * @return int[]
+ */
+function selectedEmployeeIds(PDO $pdo, $raw): array
+{
+    if (!is_array($raw)) return [];
+    $ids = array_values(array_unique(array_filter(array_map('intval', $raw))));
+    if (!$ids) return [];
+
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    $st = $pdo->prepare("SELECT id FROM employees WHERE id IN ($in)");
+    $st->execute($ids);
+    $known = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+    return array_values(array_intersect($ids, $known));
+}
+
 // ─── Дистрибутивы приложения ──────────────────────────
 
 /**

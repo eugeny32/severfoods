@@ -44,6 +44,10 @@ if ($region !== currentRegionKey()) {
     }
 }
 
+// Точечная выгрузка по конкретным сотрудникам — сверяется с базой ПОСЛЕ
+// переключения региона (см. комментарий в export_excel.php).
+$selected_employees = selectedEmployeeIds($pdo, $_GET['emp'] ?? null);
+
 $scannedLocal = "CONVERT_TZ(ml.scanned_at, '+00:00', COALESCE(mpt.tz_offset, '" . APP_TZ_OFFSET . "'))";
 // COUNT(DISTINCT ...) по типу+дате — дублирующиеся записи внутри одного
 // приёма пищи считаются одним приёмом, а не раздувают выгрузку (см. также
@@ -67,6 +71,8 @@ if ($meal_type !== 'all') { $sql .= " AND ml.meal_type = :mt";      $params[':mt
 if ($point_id)            { $sql .= " AND ml.meal_point_id = :pid"; $params[':pid'] = $point_id; }
 [$orgSql, $orgParams] = orgFilterSql($selected_orgs);
 $sql .= $orgSql; $params += $orgParams;
+[$empSql, $empParams] = employeeFilterSql($selected_employees, 'e.id', 'semp');
+$sql .= $empSql; $params += $empParams;
 $sql .= " GROUP BY e.id, e.full_name, e.organization, e.department ORDER BY e.organization, e.full_name";
 
 $stmt = $pdo->prepare($sql);
@@ -75,6 +81,8 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Dry rations per employee in the period
 [$orgSqlDry, $orgParamsDry] = orgFilterSql($selected_orgs, 'e.organization', 'dorg');
+[$empSqlDry, $empParamsDry] = employeeFilterSql($selected_employees, 'dr.employee_id', 'demp');
+$orgSqlDry .= $empSqlDry; $orgParamsDry += $empParamsDry;
 $dryByEmp = [];
 $dryDetails = [];
 try {

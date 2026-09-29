@@ -24,10 +24,10 @@ $is_super     = ($user_role === 'super_admin');
 $assigned_pid = $_SESSION['assigned_point_id'] ?? null;
 if (!$is_super && $assigned_pid) $point_id = $assigned_pid;
 
-// Тот же фильтр по организациям, что и на экране отчёта (см. reports.php).
-// Условие собирается общим помощником: если бы оно здесь отличалось, в файле
-// оказался бы не тот набор строк, что видел человек, — и заметили бы это
-// нескоро.
+// Тот же фильтр по организациям и по конкретным сотрудникам, что и на экране
+// отчёта (см. reports.php). Условие собирается общим помощником: если бы оно
+// здесь отличалось, в файле оказался бы не тот набор строк, что видел
+// человек, — и заметили бы это нескоро.
 $selected_orgs = selectedOrganizations($pdo, $_GET['orgs'] ?? null);
 
 // Регион — см. src/regions.php. Только для супер-администратора, только чтение.
@@ -56,6 +56,11 @@ if ($region !== currentRegionKey()) {
     }
 }
 
+// Список id сотрудников сверяется с базой ПОСЛЕ переключения региона —
+// иначе для чужого региона в фильтр прошли бы id из своей базы, которых там
+// может и не быть (или, наоборот, отфильтровался бы кто-то не тот).
+$selected_employees = selectedEmployeeIds($pdo, $_GET['emp'] ?? null);
+
 if ($report_type === 'dry_rations') {
     // Данные по сухим пайкам
     $sqlDry = "SELECT dr.ration_date, dr.ration_type, dr.status, dr.created_at,
@@ -69,6 +74,8 @@ if ($report_type === 'dry_rations') {
     if ($dry_type !== 'all') { $sqlDry .= " AND dr.ration_type = :rt"; $paramsDry[':rt'] = $dry_type; }
     [$orgSqlDry, $orgParamsDry] = orgFilterSql($selected_orgs, 'e.organization', 'dorg');
     $sqlDry .= $orgSqlDry; $paramsDry += $orgParamsDry;
+    [$empSqlDry, $empParamsDry] = employeeFilterSql($selected_employees, 'dr.employee_id', 'demp');
+    $sqlDry .= $empSqlDry; $paramsDry += $empParamsDry;
     $sqlDry .= " ORDER BY dr.ration_date DESC, e.full_name";
     $stmtDry = $pdo->prepare($sqlDry);
     $stmtDry->execute($paramsDry);
@@ -145,6 +152,8 @@ if ($meal_type !== 'all') { $sql .= " AND ml.meal_type = :mt";  $params[':mt']  
 if ($point_id)            { $sql .= " AND ml.meal_point_id = :pid"; $params[':pid'] = $point_id; }
 [$orgSql, $orgParams] = orgFilterSql($selected_orgs);
 $sql .= $orgSql; $params += $orgParams;
+[$empSql, $empParams] = employeeFilterSql($selected_employees, 'ml.employee_id');
+$sql .= $empSql; $params += $empParams;
 $sql .= " ORDER BY ml.scanned_at DESC";
 
 $stmt = $pdo->prepare($sql);
