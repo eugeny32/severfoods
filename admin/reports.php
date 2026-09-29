@@ -26,6 +26,7 @@ $filters = [
     'source'    => trim((string)($_GET['source']    ?? '')),
     'dry_type'  => trim((string)($_GET['dry_type']  ?? '')),
     'search'    => trim((string)($_GET['search']    ?? '')),
+    'employees' => trim((string)($_GET['employees'] ?? '')),
 ];
 
 $rows = [];
@@ -132,6 +133,15 @@ adminHead('Отчёты', 'reports');
         <div class="field"><label>Поиск</label>
             <input type="text" name="search" placeholder="ФИО или организация"
                    value="<?= adminEsc($filters['search']) ?>"></div>
+    </div>
+
+    <div class="field" style="flex-basis:100%;min-width:100%">
+        <label>Точечная выгрузка по сотрудникам
+            <span style="font-weight:400;color:#64748b">— для разбора спорных случаев: по одному ФИО на строку,
+            точное совпадение (в отличие от «Поиска» выше, который ищет по подстроке); пусто — фильтр не действует</span>
+        </label>
+        <textarea name="employees" rows="3" style="width:100%;font:inherit"
+                  placeholder="Иванов Иван Иванович&#10;Петров Пётр Петрович"><?= adminEsc($filters['employees']) ?></textarea>
     </div>
 
     <button class="btn" type="submit"><i class="fas fa-magnifying-glass"></i> Показать</button>

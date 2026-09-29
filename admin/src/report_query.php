@@ -45,6 +45,9 @@ function adminMealsQuery(array $regions, array $filters, string $fallbackTz = '+
         $params[] = '%' . $filters['search'] . '%';
     }
 
+    [$empWhere, $empParams] = adminEmployeeNamesFilter($filters['employees'] ?? '');
+    if ($empWhere) { $where[] = $empWhere; $params = array_merge($params, $empParams); }
+
     // Способ проводки определяется так же, как в региональных отчётах, —
     // по имени оператора: отдельного поля в таблице нет.
     if (!empty($filters['source'])) {
@@ -132,6 +135,9 @@ function adminRationsQuery(array $regions, array $filters): array
         $params[] = '%' . $filters['search'] . '%';
     }
 
+    [$empWhere, $empParams] = adminEmployeeNamesFilter($filters['employees'] ?? '');
+    if ($empWhere) { $where[] = $empWhere; $params = array_merge($params, $empParams); }
+
     $part = "SELECT {REGION} AS region_key,
                     dr.id AS ration_id, dr.issue_date, dr.dry_type, dr.status,
                     dr.created_at, e.full_name, e.organization, e.department
@@ -140,6 +146,30 @@ function adminRationsQuery(array $regions, array $filters): array
              WHERE " . implode(' AND ', $where);
 
     return adminUnionQuery($regions, $part, $params);
+}
+
+/**
+ * Точечный отбор по списку ФИО — для разбора спорных случаев, когда нужна
+ * выгрузка не по всей организации, а по конкретному человеку или нескольким
+ * (вводятся по одному на строку). Отдельно от обычного поиска ($filters
+ * ['search']): тот ищет частичным совпадением по подстроке, а этот —
+ * точным совпадением по каждому указанному ФИО, чтобы не подтянуть лишних
+ * однофамильцев/похожие подстроки в спорной выгрузке.
+ *
+ * employee_id здесь не годится (в отличие от региональных отчётов — см.
+ * selectedEmployeeIds() в src/functions.php): это сводный отчёт по
+ * НЕСКОЛЬКИМ регионам, у каждого своя база, и одинаковый id в разных базах —
+ * разные люди.
+ *
+ * @return array{0:string,1:array} кусок WHERE (может быть пустым) и параметры
+ */
+function adminEmployeeNamesFilter(string $raw): array
+{
+    $names = array_values(array_filter(array_map('trim', preg_split('/[\r\n]+/', $raw))));
+    if (!$names) return ['', []];
+
+    $ph = implode(',', array_fill(0, count($names), '?'));
+    return ["e.full_name IN ($ph)", $names];
 }
 
 /** Человекочитаемое название приёма пищи. */
