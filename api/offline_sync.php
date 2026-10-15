@@ -9,7 +9,8 @@
  *  Auth: заголовок  X-Sync-Token: <OFFLINE_SYNC_TOKEN из .env>
  *
  *  GET  ?action=ping              — проверка связи
- *  GET  ?action=employees         — все активные сотрудники + QR
+ *  GET  ?action=employees         — все сотрудники + QR (включая деактивированных,
+ *                                   чтобы терминал узнал об увольнении/блокировке)
  *  GET  ?action=meal_points       — точки питания с расписаниями
  *  GET  ?action=logs&since=ISO    — записи питания с указанной даты
  *  POST ?action=push              — загрузить офлайн-записи на сервер
@@ -250,14 +251,21 @@ function doCheckMeal(): void
 function doEmployees(): void
 {
     global $pdo;
+    // Раньше фильтровалось WHERE is_active = 1 — но терминал хранит справочник
+    // локально и обновляет его только upsert'ом (см. offline/src/sync.js и
+    // android/core/sync.js): если сотрудника деактивировали/заблокировали
+    // ПОСЛЕ того, как он уже попал в локальную базу терминала, сервер больше
+    // никогда не прислал бы по нему обновление — is_active=1 оставался бы
+    // в локальной базе терминала бессрочно, и офлайн-сканер продолжал бы
+    // пропускать такой QR. Отдаём всех (с qr_code), чтобы терминал мог
+    // узнать об увольнении/блокировке так же, как узнаёт об их начале.
     $rows = $pdo->query(
         "SELECT id, full_name, birth_date, organization, department, position,
                 vjg_type, price, qr_code, qr_expires_at, qr_status,
                 is_active, role, assigned_point_id,
                 UNIX_TIMESTAMP(updated_at) AS updated_ts
          FROM employees
-         WHERE is_active = 1
-           AND qr_code IS NOT NULL
+         WHERE qr_code IS NOT NULL
            AND NOT (COALESCE(chat_access,0)=1 AND role IS NULL)
          ORDER BY full_name"
     )->fetchAll(PDO::FETCH_ASSOC);
