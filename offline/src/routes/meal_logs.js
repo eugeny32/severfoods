@@ -17,7 +17,7 @@ router.get('/', (req, res) => {
 
 // POST /api/meal_logs — register a meal scan
 router.post('/', async (req, res) => {
-    const { employee_id, meal_type, meal_point_id, meal_point_name, operator_name } = req.body || {};
+    const { employee_id, meal_type, meal_point_id, meal_point_name, operator_name, manual } = req.body || {};
 
     if (!employee_id || !VALID_TYPES.includes(meal_type)) {
         return res.status(400).json({ ok: false, error: 'invalid_params' });
@@ -33,8 +33,15 @@ router.post('/', async (req, res) => {
     //    нет или сервер не ответил за 2 сек — возвращается null, и решение
     //    принимается только по локальной базе, как раньше. Питание из-за
     //    проблем со связью никогда не блокируется.
-    const remote = await sync.checkMealRemotely(employee_id, meal_type, meal_point_id);
-    if (remote === true) {
+    //    Тот же ответ говорит и «можно ли вообще»: если QR заблокирован/просрочен
+    //    или сотрудник неактивен, сервер отказывает (allowed=false) — это ловит
+    //    и случай, когда локальная база терминала ещё не успела обновиться.
+    const remote = await sync.checkMealRemotely(employee_id, meal_type, meal_point_id, !!manual);
+    if (remote && remote.allowed === false) {
+        return res.json({ ok: false, error: (remote.code || 'denied').toLowerCase(),
+                          message: remote.message || 'Питание не разрешено' });
+    }
+    if (remote && remote.exists) {
         return res.json({ ok: false, error: 'duplicate', message: 'Уже питался сегодня на другой точке' });
     }
 

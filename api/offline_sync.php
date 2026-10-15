@@ -198,6 +198,34 @@ function doCommandAck(): void
 }
 
 /**
+ * Причина отказа в питании по состоянию сотрудника и его QR-кода — те же
+ * правила, что и у сканирования на сайте (processAccess() в src/functions.php):
+ * неактивный/несуществующий, QR заблокирован, срок QR истёк.
+ *
+ * При ручном пропуске ($manual) статус и срок QR НЕ проверяются — как и в
+ * manual_pass.php на сайте: ручной пропуск существует как обход для утерянной
+ * или просроченной карточки. Неактивного сотрудника не пропускаем и так.
+ *
+ * @param string $localDate местная дата точки 'YYYY-MM-DD' — срок QR сравнивается
+ *                          с ней, а не с датой сервера (у точек разные пояса)
+ * @return array{code:string,message:string}|null null — отказа нет
+ */
+function mealDenialReason(?array $emp, string $localDate, bool $manual): ?array
+{
+    if (!$emp || (int)$emp['is_active'] !== 1) {
+        return ['code' => 'NOT_FOUND', 'message' => 'Сотрудник не найден или неактивен'];
+    }
+    if ($manual) return null;
+    if (($emp['qr_status'] ?? null) === 'blocked') {
+        return ['code' => 'BLOCKED', 'message' => 'QR-код заблокирован'];
+    }
+    if (!empty($emp['qr_expires_at']) && substr((string)$emp['qr_expires_at'], 0, 10) < $localDate) {
+        return ['code' => 'EXPIRED', 'message' => 'Срок действия QR-кода истёк'];
+    }
+    return null;
+}
+
+/**
  * Быстрая проверка: питался ли сотрудник этим приёмом пищи сегодня —
  * ВКЛЮЧАЯ записи с других точек. Нужна, когда две точки раздачи стоят рядом:
  * оффлайн-приложение знает только свою локальную базу и до плановой
@@ -206,8 +234,19 @@ function doCommandAck(): void
  * Только чтение, ничего не пишет. Отвечает максимально коротко — точка
  * ждёт этот ответ перед выдачей питания, поэтому важна скорость.
  *
- * Действие ДОБАВЛЕНО, существующие не меняются — старые версии приложения
- * его просто не вызывают и работают как прежде.
+ * Действие ДОБАВЛЕНО, существующие не меняются — версии приложения, вышедшие
+ * до него, его просто не вызывают и работают как прежде.
+ *
+ * Помимо «питался ли уже» отвечает и на вопрос «можно ли вообще» — заблокированный
+ * или просроченный QR, неактивный сотрудник (см. mealDenialReason). Отказ приходит
+ * как allowed=false с code/message; новые версии показывают message оператору.
+ * Старые версии читают ТОЛЬКО поле exists, поэтому при отказе оно тоже true — иначе
+ * они бы выдали питание. Цена совместимости: у старой версии оператор увидит
+ * «Уже питался на другой точке» вместо настоящей причины.
+ *
+ * Новые версии при ручном пропуске шлют manual=true — тогда статус и срок QR не
+ * проверяются (как на сайте). Старые такого флага не шлют, поэтому их ручной
+ * пропуск для людей с заблокированным/просроченным QR тоже получит отказ.
  */
 function doCheckMeal(): void
 {
@@ -238,6 +277,22 @@ function doCheckMeal(): void
     $nowLocal   = time() + offsetToMinutes($tzForCheck) * 60;
     $mealType   = applyNightWindow($pdo, $mealType, $pointId,
                                    gmdate('H:i:s', $nowLocal), (int)gmdate('N', $nowLocal));
+
+    $st = $pdo->prepare("SELECT is_active, qr_status, qr_expires_at FROM employees WHERE id = ? LIMIT 1");
+    $st->execute([$empId]);
+    $denial = mealDenialReason($st->fetch(PDO::FETCH_ASSOC) ?: null,
+                               gmdate('Y-m-d', $nowLocal), !empty($body['manual']));
+    if ($denial) {
+        echo json_encode([
+            'ok'      => true,
+            'exists'  => true,   // для старых версий — см. комментарий к функции
+            'allowed' => false,
+            'code'    => $denial['code'],
+            'message' => $denial['message'],
+            'at'      => null,
+        ]);
+        return;
+    }
 
     $existing = hasExistingMealLog($pdo, $empId, $mealType, $pointId);
 
@@ -274,6 +329,9 @@ function doEmployees(): void
         $r['id']           = (int)$r['id'];
         $r['price']        = (float)($r['price'] ?? 0);
         $r['is_active']    = (int)$r['is_active'];
+        // Деактивированным нужен только факт деактивации — дата рождения уволенного
+        // терминалу ни к чему, не раздаём лишние персональные данные.
+        if (!$r['is_active']) $r['birth_date'] = null;
         $r['updated_ts']   = (int)($r['updated_ts'] ?? 0);
         $r['assigned_point_id'] = $r['assigned_point_id'] ? (int)$r['assigned_point_id'] : null;
     }

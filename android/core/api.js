@@ -172,9 +172,21 @@
     });
 
     // --- employees ---
+    // Порт offline/src/routes/employees.js:/scan — те же проверки, что и в
+    // онлайн-версии (processAccess() в src/functions.php). getEmployeeByQr()
+    // фильтрует только is_active, поэтому заблокированный (qr_status='blocked')
+    // или просроченный QR активного сотрудника без этих проверок проходил бы как
+    // обычный успешный проход.
     route('GET', /^\/api\/employees\/scan$/, (m, b, q) => {
         const emp = SFDb.getEmployeeByQr(q.get('qr') || '');
-        return emp ? json({ ok: true, employee: emp }) : json({ ok: false, error: 'not_found' }, 404);
+        if (!emp) return json({ ok: false, error: 'not_found' }, 404);
+        if (emp.qr_status === 'blocked') {
+            return json({ ok: false, error: 'blocked', message: 'QR-код заблокирован' }, 403);
+        }
+        if (emp.qr_expires_at && String(emp.qr_expires_at).slice(0, 10) < SFTz.localToday()) {
+            return json({ ok: false, error: 'expired', message: 'Срок действия QR-кода истёк' }, 403);
+        }
+        return json({ ok: true, employee: emp });
     });
 
     route('GET', /^\/api\/employees$/, (m, b, q) => {
@@ -203,7 +215,7 @@
     });
 
     route('POST', /^\/api\/meal_logs$/, async (m, body) => {
-        const { employee_id, meal_type, meal_point_id, meal_point_name, operator_name } = body || {};
+        const { employee_id, meal_type, meal_point_id, meal_point_name, operator_name, manual } = body || {};
         if (!employee_id || !VALID_TYPES.includes(meal_type)) {
             return json({ ok: false, error: 'invalid_params' }, 400);
         }
@@ -216,8 +228,15 @@
         // 2. Проверка на сервере — видит записи с ДРУГИХ точек. null («не знаем»)
         //    означает, что решаем по локальной базе: питание из-за проблем со
         //    связью не блокируется никогда.
-        const remote = await SFSync.checkMealRemotely(employee_id, meal_type, meal_point_id);
-        if (remote === true) {
+        //    Тот же ответ говорит и «можно ли вообще»: если QR заблокирован/просрочен
+        //    или сотрудник неактивен, сервер отказывает (allowed=false) — это ловит
+        //    и случай, когда локальная база терминала ещё не успела обновиться.
+        const remote = await SFSync.checkMealRemotely(employee_id, meal_type, meal_point_id, !!manual);
+        if (remote && remote.allowed === false) {
+            return json({ ok: false, error: (remote.code || 'denied').toLowerCase(),
+                          message: remote.message || 'Питание не разрешено' });
+        }
+        if (remote && remote.exists) {
             return json({ ok: false, error: 'duplicate', message: 'Уже питался сегодня на другой точке' });
         }
 

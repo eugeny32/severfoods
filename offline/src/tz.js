@@ -36,4 +36,9 @@ function todayWindowUtc() {
     return { start: toStr(localMidnightUtcMs), end: toStr(localMidnightUtcMs + 24 * 3600000) };
 }
 
-module.exports = { DEFAULT_TZ, getTzOffset, setTzOffset, offsetToMinutes, todayWindowUtc };
+/** Местная дата точки, 'YYYY-MM-DD' — аналог localToday() на сервере (src/functions.php). */
+function localToday() {
+    return new Date(Date.now() + offsetToMinutes(getTzOffset()) * 60000).toISOString().slice(0, 10);
+}
+
+module.exports = { DEFAULT_TZ, getTzOffset, setTzOffset, offsetToMinutes, todayWindowUtc, localToday };

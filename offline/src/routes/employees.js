@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const db     = require('../db');
+const tz     = require('../tz');
 
 // GET /api/employees — list all active employees
 router.get('/', (req, res) => {
@@ -29,7 +30,7 @@ router.get('/scan', (req, res) => {
     if (emp.qr_status === 'blocked') {
         return res.status(403).json({ ok: false, error: 'blocked', message: 'QR-код заблокирован' });
     }
-    if (emp.qr_expires_at && emp.qr_expires_at < new Date().toISOString().slice(0, 10)) {
+    if (emp.qr_expires_at && String(emp.qr_expires_at).slice(0, 10) < tz.localToday()) {
         return res.status(403).json({ ok: false, error: 'expired', message: 'Срок действия QR-кода истёк' });
     }
     res.json({ ok: true, employee: emp });

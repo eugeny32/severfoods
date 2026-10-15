@@ -99,7 +99,9 @@ async function pullEmployees() {
     } finally {
         db.endBatch(); // одна запись на диск вместо N
     }
-    return data.employees.length;
+    // Сервер отдаёт и деактивированных (чтобы терминал узнал об увольнении/блокировке) —
+    // в счётчике, который видит оператор, считаем только действующих.
+    return data.employees.filter(e => Number(e.is_active ?? 1) !== 0).length;
 }
 
 async function pullMealPoints() {
@@ -167,20 +169,32 @@ function pushSoon() {
 const CHECK_MEAL_TIMEOUT_MS = 2000; // оператор ждёт этот ответ — держим коротким
 
 /**
- * Спрашивает у сервера, не питался ли человек этим приёмом пищи сегодня на
- * ДРУГОЙ точке. Возвращает true/false, либо null — если ответа нет (нет сети,
- * таймаут, старый сервер без этого действия). null означает "не знаем" —
- * вызывающий код в этом случае должен решать по локальной базе, как раньше.
+ * Спрашивает у сервера: можно ли выдать питание и не питался ли человек этим
+ * приёмом пищи сегодня на ДРУГОЙ точке. Возвращает
+ *   { exists, allowed, code, message }
+ * где allowed === false — сервер отказывает (QR заблокирован/просрочен,
+ * сотрудник неактивен), а message — причина для оператора; exists — уже питался.
+ * Либо null — если ответа нет (нет сети, таймаут, старый сервер без этого
+ * действия). null означает "не знаем" — вызывающий код в этом случае должен
+ * решать по локальной базе, как раньше.
+ *
+ * manual=true — ручной пропуск: сервер не проверяет статус и срок QR (как на
+ * сайте), потому что ручной пропуск — обход для утерянной/просроченной карточки.
  */
-async function checkMealRemotely(employeeId, mealType, mealPointId) {
+async function checkMealRemotely(employeeId, mealType, mealPointId, manual = false) {
     if (!_status.online) return null;
     try {
         const data = await api('check_meal', {
             method:  'POST',
             timeout: CHECK_MEAL_TIMEOUT_MS,
-            body: { employee_id: employeeId, meal_type: mealType, meal_point_id: mealPointId || null },
+            body: { employee_id: employeeId, meal_type: mealType, meal_point_id: mealPointId || null, manual: !!manual },
         });
-        return !!data.exists;
+        return {
+            exists:  !!data.exists,
+            allowed: data.allowed !== false, // старый сервер поля не шлёт — считаем «можно»
+            code:    data.code    || null,
+            message: data.message || null,
+        };
     } catch (e) {
         return null; // сеть/таймаут/старый сервер — не блокируем выдачу питания
     }

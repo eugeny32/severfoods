@@ -1150,6 +1150,7 @@ async function doManualPass(mealType) {
             meal_point_id:   ptId,
             meal_point_name: ptName,
             operator_name:   currentUser?.full_name || 'Оператор',
+            manual:          true, // ручной пропуск: сервер не проверяет статус/срок QR (как на сайте)
         }),
     });
     const data = await res.json();

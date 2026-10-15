@@ -79,7 +79,9 @@
         } finally {
             SFDb.endBatch(); // одна запись в IndexedDB вместо N
         }
-        return data.employees.length;
+        // Сервер отдаёт и деактивированных (чтобы терминал узнал об увольнении/блокировке) —
+        // в счётчике, который видит оператор, считаем только действующих.
+        return data.employees.filter(e => Number(e.is_active ?? 1) !== 0).length;
     }
 
     async function pullMealPoints() {
@@ -126,18 +128,27 @@
     }
 
     /**
-     * null — «не знаем» (нет сети, таймаут, старый сервер). В этом случае
-     * решение принимается по локальной базе, и питание не блокируется.
+     * Возвращает { exists, allowed, code, message }: allowed === false — сервер
+     * отказывает (QR заблокирован/просрочен, сотрудник неактивен), message —
+     * причина для оператора; exists — уже питался. null — «не знаем» (нет сети,
+     * таймаут, старый сервер): решение принимается по локальной базе, и питание
+     * не блокируется. manual=true — ручной пропуск: сервер не проверяет статус и
+     * срок QR (как на сайте).
      */
-    async function checkMealRemotely(employeeId, mealType, mealPointId) {
+    async function checkMealRemotely(employeeId, mealType, mealPointId, manual = false) {
         if (!_status.online) return null;
         try {
             const data = await api('check_meal', {
                 method:  'POST',
                 timeout: CHECK_MEAL_TIMEOUT_MS,
-                body: { employee_id: employeeId, meal_type: mealType, meal_point_id: mealPointId || null },
+                body: { employee_id: employeeId, meal_type: mealType, meal_point_id: mealPointId || null, manual: !!manual },
             });
-            return !!data.exists;
+            return {
+                exists:  !!data.exists,
+                allowed: data.allowed !== false, // старый сервер поля не шлёт — считаем «можно»
+                code:    data.code    || null,
+                message: data.message || null,
+            };
         } catch (_) {
             return null;
         }
