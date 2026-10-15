@@ -20,6 +20,13 @@
         currentVersion: global.SF_APP_VERSION || '1.0.0',
         available:      false,
         newVersion:     null,
+        // Общий с Windows интерфейс (offline/public/assets/app.js) читает version и
+        // downloaded. Без них на планшете кнопка «Установить сейчас» не показывалась
+        // никогда, а статус выглядел как «Загружается… (vundefined)». На Android
+        // файл скачивает и ставит сама система по ссылке, поэтому «готово к
+        // установке» здесь означает «найдена новая версия и есть ссылка».
+        version:        null,
+        downloaded:     false,
         url:            null,
         checking:       false,
         error:          null,
@@ -60,9 +67,12 @@
             _status.url = info.url
                 ? new URL(info.url, base + '/offline/dist/android/').href
                 : null;
+            _status.version    = _status.newVersion;
+            _status.downloaded = _status.available && !!_status.url;
         } catch (e) {
-            _status.available = false;
-            _status.error     = e.message;
+            _status.available  = false;
+            _status.downloaded = false;
+            _status.error      = e.message;
         } finally {
             _status.checking = false;
         }

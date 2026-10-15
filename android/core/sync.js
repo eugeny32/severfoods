@@ -180,6 +180,13 @@
             await SFDb.setMeta('last_sync', _status.lastSync);
             await SFDb.setMeta('employees_count', String(empCount));
 
+            // Автоматическая проверка обновления — при запуске и каждый час вместе с
+            // синхронизацией. Раньше на планшете она не выполнялась вовсе: только по
+            // кнопке в настройках или удалённой командой. Установку Android всё равно
+            // подтверждает человек, но о новой версии планшет должен узнавать сам.
+            // Сбой проверки не должен портить успешную синхронизацию.
+            try { if (global.SFUpdate) await global.SFUpdate.check(); } catch (_) {}
+
             console.log(`[sync] OK — emp:${empCount} pts:${ptCount} pushed:${pushRes.inserted} dup:${pushRes.skipped}`);
         } catch (err) {
             _status.lastSyncOk = false;

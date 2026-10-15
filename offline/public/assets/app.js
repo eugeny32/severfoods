@@ -1673,6 +1673,11 @@ function updStatusLabel(s) {
     return { text: `✓ ${UPD_LABELS.idle}`, color: '#16a34a' };
 }
 
+// Установщик весит десятки мегабайт и качается дольше, чем разовое обновление
+// статуса через 1,5 с после «Проверить сейчас» — без повторов кнопка «Установить
+// сейчас» не появлялась, пока не открыть настройки заново.
+let _updPollTimer = null;
+
 async function refreshUpdateStatus() {
     try {
         const d = await fetch('/api/update/status').then(r => r.json());
@@ -1688,6 +1693,13 @@ async function refreshUpdateStatus() {
         }
         const btn = id('updInstallBtn');
         if (btn) btn.style.display = s.downloaded ? '' : 'none';
+
+        // Пока идёт проверка или загрузка — повторяем, пока открыт экран настроек.
+        // Ошибка (например, не удалось скачать) останавливает повторы.
+        clearTimeout(_updPollTimer);
+        if (id('updStatus') && !s.error && (s.checking || (s.available && !s.downloaded))) {
+            _updPollTimer = setTimeout(refreshUpdateStatus, 2000);
+        }
     } catch (_) {}
 }
 
