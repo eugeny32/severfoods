@@ -198,6 +198,17 @@ function doCommandAck(): void
 }
 
 /**
+ * Заблокирована ли организация — с защитой от неполной выкладки файлов.
+ * organizationBlock() живёт в src/functions.php; если на сервер залили только этот
+ * файл, прямой вызов дал бы фатальную ошибку при КАЖДОЙ синхронизации и проверке
+ * питания на всех терминалах. Без функции ведём себя как до блокировок организаций.
+ */
+function offlineOrgBlocked(PDO $pdo, ?string $organization): bool
+{
+    return function_exists('organizationBlock') && organizationBlock($pdo, $organization) !== null;
+}
+
+/**
  * Причина отказа в питании по состоянию сотрудника и его QR-кода — те же
  * правила, что и у сканирования на сайте (processAccess() в src/functions.php):
  * неактивный/несуществующий, QR заблокирован, срок QR истёк.
@@ -290,7 +301,7 @@ function doCheckMeal(): void
     $st->execute([$empId]);
     $empRow = $st->fetch(PDO::FETCH_ASSOC) ?: null;
     $denial = mealDenialReason($empRow, gmdate('Y-m-d', $nowLocal), !empty($body['manual']),
-                               $empRow !== null && organizationBlock($pdo, $empRow['organization'] ?? '') !== null);
+                               $empRow !== null && offlineOrgBlocked($pdo, $empRow['organization'] ?? ''));
     if ($denial) {
         echo json_encode([
             'ok'      => true,
@@ -344,7 +355,7 @@ function doEmployees(): void
         // Исключение — учётные записи с ролью (оператор/администратор): иначе они
         // потеряли бы вход на терминал, а блокировка организации — про питание.
         // Их питание заблокировано на сервере (check_meal, сайт).
-        if ($r['is_active'] && ($r['role'] === null || $r['role'] === '') && organizationBlock($pdo, $r['organization'] ?? '')) {
+        if ($r['is_active'] && ($r['role'] === null || $r['role'] === '') && offlineOrgBlocked($pdo, $r['organization'] ?? '')) {
             $r['is_active'] = 0;
         }
         // Деактивированным нужен только факт деактивации — дата рождения уволенного
