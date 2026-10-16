@@ -644,8 +644,13 @@ function selectedEmployeeIds(PDO $pdo, $raw): array
     $ids = array_values(array_unique(array_filter(array_map('intval', $raw))));
     if (!$ids) return [];
 
-    $in = implode(',', array_fill(0, count($ids), '?'));
-    $st = $pdo->prepare("SELECT id FROM employees WHERE id IN ($in)");
+    $in  = implode(',', array_fill(0, count($ids), '?'));
+    $sql = "SELECT id FROM employees WHERE id IN ($in)";
+    // Карточки супер-администраторов обычному администратору недоступны (см.
+    // canAccessEmployeeCard): поимённая выгрузка по ним была бы обходом запрета,
+    // поэтому их id отбрасываем так же, как несуществующие.
+    if (($_SESSION['role'] ?? '') !== 'super_admin') $sql .= " AND COALESCE(role,'') <> 'super_admin'";
+    $st = $pdo->prepare($sql);
     $st->execute($ids);
     $known = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
     return array_values(array_intersect($ids, $known));

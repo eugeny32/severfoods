@@ -24,7 +24,7 @@ $filters = [
     'source'    => trim((string)($_GET['source']    ?? '')),
     'dry_type'  => trim((string)($_GET['dry_type']  ?? '')),
     'search'    => trim((string)($_GET['search']    ?? '')),
-    'employees' => trim((string)($_GET['employees'] ?? '')),
+    'employees' => is_string($_GET['employees'] ?? null) ? trim($_GET['employees']) : '', // массив из адреса — игнорируем
 ];
 
 // Ошибку показываем страницей, а не отдаём испорченный файл: получить в Excel

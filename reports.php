@@ -57,12 +57,15 @@ $selected_employees = selectedEmployeeIds($pdo, $_GET['emp'] ?? null);
 // у таблицы здесь обязателен, иначе при выбранных организациях запрос падает
 // с «Unknown column 'e.organization'».
 [$empListSql, $empListParams] = orgFilterSql($selected_orgs);
+// Карточки супер-администраторов обычному администратору недоступны (см.
+// canAccessEmployeeCard) — поимённая выгрузка по ним была бы обходом этого запрета.
+$empPickerRoleSql = $is_super_admin ? '' : " AND COALESCE(e.role,'') <> 'super_admin'";
 $employee_picker = $pdo->prepare(
     // Служебные учётные записи «только чат» (без роли) за стол не садятся — их нет
     // ни в списке организаций, ни в синхронизации с терминалами (см. doEmployees);
     // уволенных оставляем: для разбора спора нужна и история ушедших сотрудников.
     "SELECT e.id, e.full_name, e.organization FROM employees e
-     WHERE NOT (COALESCE(e.chat_access,0) = 1 AND e.role IS NULL){$empListSql}
+     WHERE NOT (COALESCE(e.chat_access,0) = 1 AND e.role IS NULL){$empListSql}{$empPickerRoleSql}
      ORDER BY e.full_name"
 );
 $employee_picker->execute($empListParams);
