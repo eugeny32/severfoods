@@ -53,9 +53,17 @@ $selected_orgs = selectedOrganizations($pdo, $_GET['orgs'] ?? null);
 // (выбираются через поиск по списку или можно оставить пустым — тогда фильтр
 // не действует и отчёт строится как раньше, по всем).
 $selected_employees = selectedEmployeeIds($pdo, $_GET['emp'] ?? null);
+// orgFilterSql() по умолчанию подставляет колонку e.organization — алиас e
+// у таблицы здесь обязателен, иначе при выбранных организациях запрос падает
+// с «Unknown column 'e.organization'».
 [$empListSql, $empListParams] = orgFilterSql($selected_orgs);
 $employee_picker = $pdo->prepare(
-    "SELECT id, full_name, organization FROM employees WHERE 1=1{$empListSql} ORDER BY full_name"
+    // Служебные учётные записи «только чат» (без роли) за стол не садятся — их нет
+    // ни в списке организаций, ни в синхронизации с терминалами (см. doEmployees);
+    // уволенных оставляем: для разбора спора нужна и история ушедших сотрудников.
+    "SELECT e.id, e.full_name, e.organization FROM employees e
+     WHERE NOT (COALESCE(e.chat_access,0) = 1 AND e.role IS NULL){$empListSql}
+     ORDER BY e.full_name"
 );
 $employee_picker->execute($empListParams);
 $employee_list = $employee_picker->fetchAll(PDO::FETCH_ASSOC);
