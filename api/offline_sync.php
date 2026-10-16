@@ -206,14 +206,21 @@ function doCommandAck(): void
  * manual_pass.php на сайте: ручной пропуск существует как обход для утерянной
  * или просроченной карточки. Неактивного сотрудника не пропускаем и так.
  *
- * @param string $localDate местная дата точки 'YYYY-MM-DD' — срок QR сравнивается
- *                          с ней, а не с датой сервера (у точек разные пояса)
+ * Блокировка организации ($orgBlocked) сильнее блокировки QR и ручным пропуском
+ * НЕ снимается — как и на сайте (manual_pass.php): «этих людей не кормим».
+ *
+ * @param string $localDate  местная дата точки 'YYYY-MM-DD' — срок QR сравнивается
+ *                           с ней, а не с датой сервера (у точек разные пояса)
+ * @param bool   $orgBlocked организация сотрудника заблокирована (organizationBlock)
  * @return array{code:string,message:string}|null null — отказа нет
  */
-function mealDenialReason(?array $emp, string $localDate, bool $manual): ?array
+function mealDenialReason(?array $emp, string $localDate, bool $manual, bool $orgBlocked = false): ?array
 {
     if (!$emp || (int)$emp['is_active'] !== 1) {
         return ['code' => 'NOT_FOUND', 'message' => 'Сотрудник не найден или неактивен'];
+    }
+    if ($orgBlocked) {
+        return ['code' => 'ORG_BLOCKED', 'message' => 'Организация заблокирована'];
     }
     if ($manual) return null;
     if (($emp['qr_status'] ?? null) === 'blocked') {
@@ -247,6 +254,7 @@ function mealDenialReason(?array $emp, string $localDate, bool $manual): ?array
  * Новые версии при ручном пропуске шлют manual=true — тогда статус и срок QR не
  * проверяются (как на сайте). Старые такого флага не шлют, поэтому их ручной
  * пропуск для людей с заблокированным/просроченным QR тоже получит отказ.
+ * Блокировка ОРГАНИЗАЦИИ действует и при manual=true.
  */
 function doCheckMeal(): void
 {
@@ -278,10 +286,11 @@ function doCheckMeal(): void
     $mealType   = applyNightWindow($pdo, $mealType, $pointId,
                                    gmdate('H:i:s', $nowLocal), (int)gmdate('N', $nowLocal));
 
-    $st = $pdo->prepare("SELECT is_active, qr_status, qr_expires_at FROM employees WHERE id = ? LIMIT 1");
+    $st = $pdo->prepare("SELECT is_active, qr_status, qr_expires_at, organization FROM employees WHERE id = ? LIMIT 1");
     $st->execute([$empId]);
-    $denial = mealDenialReason($st->fetch(PDO::FETCH_ASSOC) ?: null,
-                               gmdate('Y-m-d', $nowLocal), !empty($body['manual']));
+    $empRow = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    $denial = mealDenialReason($empRow, gmdate('Y-m-d', $nowLocal), !empty($body['manual']),
+                               $empRow !== null && organizationBlock($pdo, $empRow['organization'] ?? '') !== null);
     if ($denial) {
         echo json_encode([
             'ok'      => true,
@@ -329,6 +338,15 @@ function doEmployees(): void
         $r['id']           = (int)$r['id'];
         $r['price']        = (float)($r['price'] ?? 0);
         $r['is_active']    = (int)$r['is_active'];
+        // Организация заблокирована — терминал должен узнать об этом так же, как об
+        // увольнении: is_active=0 понимают и старые версии приложения (они читают
+        // только его), поэтому защита работает и офлайн, и без обновления клиента.
+        // Исключение — учётные записи с ролью (оператор/администратор): иначе они
+        // потеряли бы вход на терминал, а блокировка организации — про питание.
+        // Их питание заблокировано на сервере (check_meal, сайт).
+        if ($r['is_active'] && ($r['role'] === null || $r['role'] === '') && organizationBlock($pdo, $r['organization'] ?? '')) {
+            $r['is_active'] = 0;
+        }
         // Деактивированным нужен только факт деактивации — дата рождения уволенного
         // терминалу ни к чему, не раздаём лишние персональные данные.
         if (!$r['is_active']) $r['birth_date'] = null;

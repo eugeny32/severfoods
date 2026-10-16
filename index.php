@@ -1158,6 +1158,7 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal, $is_admin) {
     window.isSuperAdmin     = <?= json_encode($is_super_admin) ?>;
     window.allEmployeesData = <?= json_encode($allEmployeesJson, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.orgStats         = <?= json_encode($orgStats,         JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.blockedOrgs      = <?= json_encode(blockedOrganizationsList($pdo), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.points           = <?= json_encode($points,           JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.mealPointId      = <?= json_encode($meal_point_id) ?>;
     window.CURRENT_MEAL     = <?= json_encode($current_meal) ?>;

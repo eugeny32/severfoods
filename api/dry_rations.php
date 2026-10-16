@@ -80,6 +80,13 @@ if ($method === 'POST') {
     Csrf::guard();
     guardEmployeeAccess($pdo, $empId);
 
+    // Сотруднику заблокированной организации сухой паёк / выездное питание не выдаём.
+    $empRow = getEmployeeById($pdo, $empId);
+    if (organizationBlock($pdo, $empRow['organization'] ?? '')) {
+        echo json_encode(['ok' => false, 'error' => 'Организация заблокирована — выдача не выполняется'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     $dates = [];
     $cur = new DateTime($dateFrom);
     $end = new DateTime($dateTo);

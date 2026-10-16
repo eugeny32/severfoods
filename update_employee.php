@@ -47,6 +47,16 @@ $birth_date   = $data['birth_date']        ?? null;
 // Организацию может менять и администратор: перевод сотрудника между
 // подрядчиками — обычное дело на площадке.
 $organization = trim($data['organization'] ?? '');
+
+// Но вывести сотрудника ИЗ заблокированной организации обычный администратор не
+// может: иначе блокировку организации снимали бы простым редактированием карточки.
+// Блокировку ставит и снимает супер-администратор — он же может перевести человека.
+if (!$is_super
+    && organizationBlock($pdo, $emp['organization'] ?? '')
+    && !organizationBlock($pdo, $organization)) {
+    echo json_encode(['success' => false, 'message' => 'Организация сотрудника заблокирована — перевести его в другую организацию может только супер-администратор'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 $department   = trim($data['department']   ?? '');
 $position     = trim($data['position']     ?? '');
 $vjg_type     = trim($data['vjg_type']     ?? '');

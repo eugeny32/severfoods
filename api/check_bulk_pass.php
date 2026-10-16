@@ -30,7 +30,7 @@ $employeeIds = array_values(array_unique(array_filter(array_map('intval', $data[
 $pointId     = !empty($data['point_id']) ? (int)$data['point_id'] : null;
 
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !in_array($mealType, ['breakfast', 'lunch', 'dinner'], true) || !$employeeIds) {
-    echo json_encode(['success' => true, 'already' => []]);
+    echo json_encode(['success' => true, 'already' => [], 'blocked' => []]);
     exit;
 }
 
@@ -59,4 +59,14 @@ if ($already) {
 
 $alreadyList = array_map(fn($id) => ['id' => $id, 'name' => $names[$id] ?? "#{$id}"], $already);
 
-echo json_encode(['success' => true, 'already' => array_values($alreadyList)], JSON_UNESCAPED_UNICODE);
+// Сотрудники заблокированной организации при проводке будут пропущены — предупреждаем заранее.
+$blockedList = [];
+$orgStmt = $pdo->prepare("SELECT id, full_name, organization FROM employees WHERE id IN ($placeholders)");
+$orgStmt->execute($employeeIds);
+foreach ($orgStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    if (organizationBlock($pdo, $r['organization'] ?? '')) {
+        $blockedList[] = ['id' => (int)$r['id'], 'name' => $r['full_name']];
+    }
+}
+
+echo json_encode(['success' => true, 'already' => array_values($alreadyList), 'blocked' => $blockedList], JSON_UNESCAPED_UNICODE);

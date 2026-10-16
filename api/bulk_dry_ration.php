@@ -70,11 +70,15 @@ try {
 } catch (PDOException $e) {}
 
 $namesStmt = $pdo->prepare(
-    "SELECT id, full_name FROM employees WHERE id IN (" . implode(',', array_fill(0, count($employeeIds), '?')) . ")"
+    "SELECT id, full_name, organization FROM employees WHERE id IN (" . implode(',', array_fill(0, count($employeeIds), '?')) . ")"
 );
 $namesStmt->execute($employeeIds);
 $names = [];
-foreach ($namesStmt->fetchAll(PDO::FETCH_ASSOC) as $r) $names[(int)$r['id']] = $r['full_name'];
+$orgs  = [];
+foreach ($namesStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    $names[(int)$r['id']] = $r['full_name'];
+    $orgs[(int)$r['id']]  = $r['organization'];
+}
 
 // Все 3 приёма пищи на указанную местную дату — по фиксированному
 // серверному часовому поясу (SERVER_TZ_OFFSET), как и в bulk_pass.php:
@@ -106,8 +110,15 @@ $inserted   = [];
 $already    = [];
 $conflicted = [];
 $limited    = [];
+$blocked    = [];
 
 foreach ($employeeIds as $empId) {
+    // Сотруднику заблокированной организации выдача не выполняется.
+    if (organizationBlock($pdo, $orgs[$empId] ?? '')) {
+        $blocked[] = ['id' => $empId, 'name' => $names[$empId] ?? "#{$empId}"];
+        continue;
+    }
+
     $mealsCountStmt->execute([$empId, SERVER_TZ_OFFSET, $date]);
     if ((int)$mealsCountStmt->fetchColumn() >= 3) {
         $conflicted[] = ['id' => $empId, 'name' => $names[$empId] ?? "#{$empId}"];
@@ -131,7 +142,7 @@ foreach ($employeeIds as $empId) {
 }
 
 $typeName = $rationType === 'dry_ration' ? 'Сухой паёк' : 'Выездное питание';
-logAction('bulk_dry_ration', "Массовая проводка ({$typeName}, {$date}): проведено " . count($inserted) . ", уже было " . count($already) . ", конфликт (все 3 приёма пищи) " . count($conflicted) . ", лимит будущих дней " . count($limited));
+logAction('bulk_dry_ration', "Массовая проводка ({$typeName}, {$date}): проведено " . count($inserted) . ", уже было " . count($already) . ", конфликт (все 3 приёма пищи) " . count($conflicted) . ", лимит будущих дней " . count($limited) . ($blocked ? ", организация заблокирована " . count($blocked) : ''));
 
 echo json_encode([
     'success'    => true,
@@ -139,4 +150,5 @@ echo json_encode([
     'already'    => $already,
     'conflicted' => $conflicted,
     'limited'    => $limited,
+    'blocked'    => $blocked,
 ], JSON_UNESCAPED_UNICODE);

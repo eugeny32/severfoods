@@ -27,6 +27,13 @@ if (!$employee_id || !in_array($meal_type, ['breakfast','lunch','dinner'], true)
 $emp = getEmployeeById($pdo, $employee_id);
 if (!$emp) { echo json_encode(['success' => false, 'message' => 'Сотрудник не найден']); exit; }
 
+// Ручной пропуск обходит блокировку QR (утерянная/просроченная карточка), но не
+// блокировку организации: «этих людей не кормим» не снимается решением оператора.
+if (organizationBlock($pdo, $emp['organization'] ?? '')) {
+    echo json_encode(['success' => false, 'message' => "Организация «" . trim((string)$emp['organization']) . "» заблокирована — питание не выдаётся"], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 $meal_point_id   = $_SESSION['meal_point_id']   ?? null;
 $pointTz = getPointTz($pdo, $meal_point_id);
 $today   = gmdate('Y-m-d', time() + offsetToMinutes($pointTz) * 60);

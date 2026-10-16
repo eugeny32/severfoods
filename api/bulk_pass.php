@@ -97,11 +97,24 @@ $alreadySet = array_flip($already);
 
 $toInsert = array_values(array_diff($employeeIds, $already));
 
-// Имена сотрудников для ответа
-$namesStmt = $pdo->prepare("SELECT id, full_name FROM employees WHERE id IN ($placeholders)");
+// Имена сотрудников для ответа (и организации — для блокировки организации)
+$namesStmt = $pdo->prepare("SELECT id, full_name, organization FROM employees WHERE id IN ($placeholders)");
 $namesStmt->execute($employeeIds);
 $names = [];
-foreach ($namesStmt->fetchAll(PDO::FETCH_ASSOC) as $r) $names[(int)$r['id']] = $r['full_name'];
+$orgs  = [];
+foreach ($namesStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    $names[(int)$r['id']] = $r['full_name'];
+    $orgs[(int)$r['id']]  = $r['organization'];
+}
+
+// Сотрудников заблокированной организации не проводим — ни при каких условиях:
+// блокировка организации сильнее любых ручных действий («этих людей не кормим»).
+$blockedList = [];
+$toInsert = array_values(array_filter($toInsert, function ($id) use ($pdo, $orgs, $names, &$blockedList) {
+    if (!organizationBlock($pdo, $orgs[$id] ?? '')) return true;
+    $blockedList[] = ['id' => $id, 'name' => $names[$id] ?? "#{$id}"];
+    return false;
+}));
 
 $inserted = [];
 if ($toInsert) {
@@ -152,10 +165,11 @@ if ($toInsert) {
 
 $alreadyList = array_map(fn($id) => ['id' => $id, 'name' => $names[$id] ?? "#{$id}"], array_unique($already));
 
-logAction('bulk_pass', "Массовая проводка ({$mealType}, {$date}" . ($pointName ? ", точка «{$pointName}»" : '') . "): проведено " . count($inserted) . ", уже было " . count($alreadyList));
+logAction('bulk_pass', "Массовая проводка ({$mealType}, {$date}" . ($pointName ? ", точка «{$pointName}»" : '') . "): проведено " . count($inserted) . ", уже было " . count($alreadyList) . ($blockedList ? ", организация заблокирована " . count($blockedList) : ''));
 
 echo json_encode([
     'success'  => true,
     'inserted' => array_values($inserted),
     'already'  => array_values($alreadyList),
+    'blocked'  => $blockedList,
 ], JSON_UNESCAPED_UNICODE);

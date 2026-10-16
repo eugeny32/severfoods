@@ -208,6 +208,12 @@ function processAccess(PDO $pdo, string $qr_code, ?string $ip = null): array
         return ['success' => false, 'message' => 'Сотрудник не найден или заблокирован',
                 'employee' => null, 'code' => 'NOT_FOUND'];
     }
+    // Блокировка организации — раньше блокировки QR: она осмысленнее для оператора
+    // («не обслуживаем организацию») и не снимается ручным пропуском.
+    if (organizationBlock($pdo, $employee['organization'] ?? '')) {
+        return ['success' => false, 'message' => 'Организация заблокирована',
+                'employee' => $employee, 'code' => 'ORG_BLOCKED'];
+    }
     if ($employee['qr_status'] === 'blocked') {
         return ['success' => false, 'message' => 'QR-код заблокирован',
                 'employee' => $employee, 'code' => 'BLOCKED'];
@@ -654,6 +660,79 @@ function selectedEmployeeIds(PDO $pdo, $raw): array
     $st->execute($ids);
     $known = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
     return array_values(array_intersect($ids, $known));
+}
+
+// ─── Блокировка организации ───────────────────────────
+
+/**
+ * Создаёт таблицу заблокированных организаций. Вызывается ТОЛЬКО из управляющей
+ * страницы (api/org_block.php) — на горячем пути скана DDL выполнять нельзя;
+ * чтение (organizationBlock) до создания таблицы просто считает, что блокировок нет.
+ *
+ * Организации в проекте — текстовое поле у сотрудника, отдельного справочника нет
+ * (см. getOrganizationList), поэтому ключ здесь — то же значение TRIM(organization).
+ * Длина 190 символов — чтобы ключ влез в индекс на старых версиях MySQL.
+ */
+function ensureBlockedOrganizationsTable(PDO $pdo): void
+{
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS blocked_organizations (
+            organization VARCHAR(190) NOT NULL,
+            reason       VARCHAR(500) DEFAULT NULL,
+            blocked_by   VARCHAR(100) DEFAULT NULL,
+            blocked_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (organization)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+}
+
+/**
+ * Заблокирована ли организация. Возвращает запись (organization, reason,
+ * blocked_by, blocked_at) или null.
+ *
+ * Блокировка организации сильнее блокировки QR: она действует и на ручной
+ * пропуск, и на массовую проводку, и на выдачу сухпая — «этих людей не кормим».
+ * Сравнение делает SQL (а не PHP-строки), чтобы регистр, пробелы и «е/ё»
+ * сравнивались по тому же правилу, что и во всех фильтрах по организациям.
+ *
+ * Ошибка чтения (например, таблицы ещё нет) означает «не заблокирована»:
+ * без блокировок скан работает как прежде. Результат кэшируется на запрос по
+ * каждой организации — в массовых операциях это один запрос на организацию,
+ * а не на сотрудника.
+ */
+function organizationBlock(PDO $pdo, ?string $organization): ?array
+{
+    static $cache = [];
+    $org = trim((string)$organization);
+    if ($org === '') return null;
+
+    $key = spl_object_id($pdo) . '|' . $org;
+    if (array_key_exists($key, $cache)) return $cache[$key];
+
+    try {
+        $st = $pdo->prepare(
+            "SELECT organization, reason, blocked_by, blocked_at
+             FROM blocked_organizations WHERE organization = ? LIMIT 1"
+        );
+        $st->execute([$org]);
+        $row = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (PDOException $e) {
+        $row = null;
+    }
+    return $cache[$key] = $row;
+}
+
+/** Все заблокированные организации — для списка в интерфейсе. */
+function blockedOrganizationsList(PDO $pdo): array
+{
+    try {
+        return $pdo->query(
+            "SELECT organization, reason, blocked_by, blocked_at
+             FROM blocked_organizations ORDER BY organization"
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        return [];
+    }
 }
 
 // ─── Дистрибутивы приложения ──────────────────────────

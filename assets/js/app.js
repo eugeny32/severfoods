@@ -363,15 +363,29 @@ function renderOrgChips() {
     if (opCnt)  roleChips.push(`<button class="org-chip" data-role-filter="operator" style="border-color:#2563eb20;background:#eff6ff"><div class="org-chip-name" style="color:#1d4ed8">Операторы</div><div class="org-chip-count" style="color:#1d4ed8">${opCnt}</div><div class="org-chip-label">чел.</div></button>`);
     if (admCnt) roleChips.push(`<button class="org-chip" data-role-filter="admin"    style="border-color:#7c3aed20;background:#f5f3ff"><div class="org-chip-name" style="color:#6d28d9">Администраторы</div><div class="org-chip-count" style="color:#6d28d9">${admCnt}</div><div class="org-chip-label">чел.</div></button>`);
 
-    if (!window.orgStats.length && !roleChips.length) { container.innerHTML = ''; return; }
+    // Заблокированные организации, в которых не осталось активных сотрудников, в orgStats
+    // не попадают — но снять блокировку с них должно быть можно, поэтому показываем отдельно.
+    const statKeys = new Set(window.orgStats.map(o => normOrgKey(o.organization)));
+    const orphanBlocked = (window.blockedOrgs || []).filter(b => !statKeys.has(normOrgKey(b.organization)));
 
+    if (!window.orgStats.length && !roleChips.length && !orphanBlocked.length) { container.innerHTML = ''; return; }
+
+    const BLOCKED_STYLE = ' style="border-color:#fecaca;background:#fef2f2"';
     container.innerHTML =
         roleChips.join('') +
-        window.orgStats.map((o, idx) =>
-            '<button class="org-chip" data-idx="' + idx + '">' +
-            '<div class="org-chip-name">' + escHtml(o.organization) + '</div>' +
-            '<div class="org-chip-count">' + o.cnt + '</div>' +
-            '<div class="org-chip-label">сотрудников</div>' +
+        window.orgStats.map((o, idx) => {
+            const blk = orgBlockInfo(o.organization);
+            return '<button class="org-chip" data-idx="' + idx + '"' + (blk ? BLOCKED_STYLE : '') + '>' +
+                '<div class="org-chip-name">' + (blk ? '🔒 ' : '') + escHtml(o.organization) + '</div>' +
+                '<div class="org-chip-count">' + o.cnt + '</div>' +
+                '<div class="org-chip-label">' + (blk ? 'заблокирована' : 'сотрудников') + '</div>' +
+                '</button>';
+        }).join('') +
+        orphanBlocked.map(b =>
+            '<button class="org-chip" data-blocked-org="' + escAttr(b.organization) + '"' + BLOCKED_STYLE + '>' +
+            '<div class="org-chip-name">🔒 ' + escHtml(b.organization) + '</div>' +
+            '<div class="org-chip-count">0</div>' +
+            '<div class="org-chip-label">заблокирована</div>' +
             '</button>'
         ).join('');
 
@@ -392,11 +406,74 @@ function renderOrgChips() {
             openOrgModal(label, list);
             return;
         }
+        if (btn.dataset.blockedOrg) { openOrgModal(btn.dataset.blockedOrg); return; }
         const idx = parseInt(btn.dataset.idx, 10);
         if (!isNaN(idx) && window.orgStats[idx]) {
             openOrgModal(window.orgStats[idx].organization);
         }
     };
+}
+
+// ── Блокировка организации ────────────────────────────
+// Ключ сравнения совпадает с серверным: обрезка пробелов, регистр не важен.
+function normOrgKey(s) { return String(s || '').trim().toLowerCase(); }
+
+function orgBlockInfo(org) {
+    const k = normOrgKey(org);
+    return (window.blockedOrgs || []).find(b => normOrgKey(b.organization) === k) || null;
+}
+
+function escAttr(s) {
+    return escHtml(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Панель в окне организации: состояние блокировки и (для супер-администратора) кнопка.
+function renderOrgBlockPanel(org) {
+    const info = orgBlockInfo(org);
+    const canManage = !!window.isSuperAdmin;
+    if (info) {
+        const who  = [info.blocked_by, info.blocked_at].filter(Boolean).map(escHtml).join(' · ');
+        const btn  = canManage
+            ? '<button class="btn-sm" style="margin-top:8px" data-org-action="unblock" data-org="' + escAttr(org) + '">Разблокировать организацию</button>'
+            : '';
+        return '<div style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px">'
+            + '🔒 <strong>Организация заблокирована</strong> — питание не выдаётся: ни по скану, ни вручную, ни массовой проводкой, ни сухим пайком, ни на терминалах.'
+            + '<div style="margin-top:4px;font-size:12px;color:#7f1d1d">Причина: ' + (info.reason ? escHtml(info.reason) : 'не указана') + (who ? ' · ' + who : '') + '</div>'
+            + btn + '</div>';
+    }
+    if (!canManage) return '';
+    return '<div style="text-align:right;margin-bottom:10px">'
+        + '<button class="btn-sm danger" data-org-action="block" data-org="' + escAttr(org) + '">🔒 Заблокировать организацию</button></div>';
+}
+
+async function changeOrgBlock(org, action) {
+    let reason = '';
+    if (action === 'block') {
+        const stat = (window.orgStats || []).find(o => normOrgKey(o.organization) === normOrgKey(org));
+        const n = stat ? stat.cnt : 0;
+        const answer = prompt('Заблокировать организацию «' + org + '»?\n\nСотрудников: ' + n + '. Им не будет выдаваться питание: ни по скану, ни вручную, '
+            + 'ни массовой проводкой, ни на терминалах. Блокировку QR отдельных сотрудников это не меняет.\n\nПричина (по желанию):', '');
+        if (answer === null) return;
+        reason = answer.trim();
+    } else if (!confirm('Разблокировать организацию «' + org + '»?\n\nСотрудники снова смогут получать питание (если не заблокированы по отдельности).')) {
+        return;
+    }
+    let data;
+    try {
+        const res = await fetch('api/org_block.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': getCsrfToken() },
+            body: JSON.stringify({ organization: org, action, reason }),
+        });
+        data = await res.json();
+    } catch (e) {
+        alert('Не удалось связаться с сервером. Повторите попытку.');
+        return;
+    }
+    if (!data.success) { alert(data.message || 'Операция не выполнена'); return; }
+    window.blockedOrgs = data.blocked || [];
+    renderOrgChips();
+    openOrgModal(org);
 }
 
 function filterByOrg(org) {
@@ -428,10 +505,13 @@ function openOrgModal(org, prebuiltList) {
             .sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'));
     }
 
+    // Панель блокировки — только для настоящей организации (не для списков по роли).
+    const blockPanel = prebuiltList ? '' : renderOrgBlockPanel(org);
+
     if (!list.length) {
-        bodyEl.innerHTML = '<div class="empty"><div class="empty-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>Нет сотрудников</div>';
+        bodyEl.innerHTML = blockPanel + '<div class="empty"><div class="empty-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>Нет сотрудников</div>';
     } else {
-        bodyEl.innerHTML = `
+        bodyEl.innerHTML = blockPanel + `
             <div style="font-size:12px;color:var(--text-3);padding:0 0 10px;border-bottom:1px solid var(--border);margin-bottom:12px">
                 Всего: <strong>${list.length}</strong> сотрудников
             </div>
@@ -448,6 +528,12 @@ function openOrgModal(org, prebuiltList) {
                 </table>
             </div>`;
     }
+
+    // Один обработчик на контейнер: кнопки панели пересоздаются при каждом открытии окна.
+    bodyEl.onclick = function (ev) {
+        const b = ev.target.closest('[data-org-action]');
+        if (b) changeOrgBlock(b.dataset.org, b.dataset.orgAction);
+    };
 
     openModal('orgModal');
 }
@@ -709,10 +795,20 @@ async function bpCheckExisting() {
             body: JSON.stringify({ date, meal_type: mealType, employee_ids: ids, point_id: pointId }),
         });
         const data = await res.json();
-        if (!data.success || !data.already.length) { warnEl.style.display = 'none'; warnEl.innerHTML = ''; return; }
+        const already = (data && data.already) || [];
+        const blocked = (data && data.blocked) || [];
+        if (!data.success || (!already.length && !blocked.length)) { warnEl.style.display = 'none'; warnEl.innerHTML = ''; return; }
         warnEl.style.display = 'block';
-        warnEl.innerHTML = `<i class="fas fa-triangle-exclamation"></i> На эту дату и тип питания уже есть записи (дублирующиеся записи внутри одного приёма считаются одной) у ${data.already.length} из выбранных: `
-            + `<strong>${data.already.map(e => escHtml(e.name)).join(', ')}</strong>. При проводке эти сотрудники будут пропущены.`;
+        let warn = '';
+        if (already.length) {
+            warn += `<i class="fas fa-triangle-exclamation"></i> На эту дату и тип питания уже есть записи (дублирующиеся записи внутри одного приёма считаются одной) у ${already.length} из выбранных: `
+                 + `<strong>${already.map(e => escHtml(e.name)).join(', ')}</strong>. При проводке эти сотрудники будут пропущены.`;
+        }
+        if (blocked.length) {
+            warn += (warn ? '<br>' : '') + `<i class="fas fa-lock"></i> Организация заблокирована у ${blocked.length} из выбранных: `
+                 + `<strong>${blocked.map(e => escHtml(e.name)).join(', ')}</strong>. Эти сотрудники проведены не будут.`;
+        }
+        warnEl.innerHTML = warn;
     } catch (e) { /* тихо игнорируем — это лишь предупреждение */ }
 }
 
@@ -765,6 +861,12 @@ async function bpSubmit() {
             html += `<div class="notif" style="background:#fef2f2;border-color:#fecaca;margin-top:8px"><div class="notif-inner"><div class="notif-icon">⚠️</div><div class="notif-body">`
                   + `<div class="notif-title">Не проведено — лимит 4 будущих дней сухпая/выездного питания: ${data.limited.length}</div>`
                   + `<div style="font-size:12px;margin-top:4px">${data.limited.map(e => escHtml(e.name)).join(', ')}</div>`
+                  + `</div></div></div>`;
+        }
+        if (data.blocked && data.blocked.length) {
+            html += `<div class="notif" style="background:#fef2f2;border-color:#fecaca;margin-top:8px"><div class="notif-inner"><div class="notif-icon">🔒</div><div class="notif-body">`
+                  + `<div class="notif-title">Не проведено — организация заблокирована: ${data.blocked.length}</div>`
+                  + `<div style="font-size:12px;margin-top:4px">${data.blocked.map(e => escHtml(e.name)).join(', ')}</div>`
                   + `</div></div></div>`;
         }
         msgEl.innerHTML = html;
