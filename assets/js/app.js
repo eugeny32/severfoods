@@ -433,8 +433,9 @@ function renderOrgBlockPanel(org) {
     const canManage = !!window.isSuperAdmin;
     if (info) {
         const who  = [info.blocked_by, info.blocked_at].filter(Boolean).map(escHtml).join(' · ');
+        // .btn-sm в проекте — квадрат 30×30 под иконку, для текстовой кнопки нужен .btn
         const btn  = canManage
-            ? '<button class="btn-sm" style="margin-top:8px" data-org-action="unblock" data-org="' + escAttr(org) + '">Разблокировать организацию</button>'
+            ? '<button type="button" class="btn btn-secondary" style="margin-top:10px" data-org-action="unblock" data-org="' + escAttr(org) + '">Разблокировать организацию</button>'
             : '';
         return '<div style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px">'
             + '🔒 <strong>Организация заблокирована</strong> — питание не выдаётся: ни по скану, ни вручную, ни массовой проводкой, ни сухим пайком, ни на терминалах.'
@@ -442,8 +443,8 @@ function renderOrgBlockPanel(org) {
             + btn + '</div>';
     }
     if (!canManage) return '';
-    return '<div style="text-align:right;margin-bottom:10px">'
-        + '<button class="btn-sm danger" data-org-action="block" data-org="' + escAttr(org) + '">🔒 Заблокировать организацию</button></div>';
+    return '<div style="display:flex;justify-content:flex-end;flex-wrap:wrap;margin-bottom:12px">'
+        + '<button type="button" class="btn btn-secondary" style="color:#b91c1c;background:#fef2f2;border-color:#fecaca" data-org-action="block" data-org="' + escAttr(org) + '">🔒 Заблокировать организацию</button></div>';
 }
 
 async function changeOrgBlock(org, action) {
