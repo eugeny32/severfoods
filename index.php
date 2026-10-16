@@ -203,7 +203,7 @@ $allEmployeesJson = array_map(function($e) use ($todayLocal, $is_admin) {
 <title><?= htmlspecialchars(APP_NAME) ?></title>
 <?= Csrf::meta() ?>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/style.css?v=<?= @filemtime(__DIR__ . '/assets/css/style.css') ?: time() ?>">
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js" defer></script>
 </head>
 <body>

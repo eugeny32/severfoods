@@ -433,6 +433,16 @@ body.flash-error   { animation: flashError   .5s ease; }
 }
 .org-chip.active .org-chip-label { color: rgba(255,255,255,.6); }
 
+/* Заблокированная организация: красные цифры количества сотрудников и красная
+   подпись «заблокирована». Карточка остаётся обычной (фон, рамка, наведение,
+   выбранное состояние не переопределяются). У выбранной карточки тёмный фон —
+   там цвет светлее, чтобы цифры читались. */
+.org-chip.org-chip-blocked .org-chip-count,
+.org-chip.org-chip-blocked .org-chip-label { color: #dc2626; }
+.org-chip.org-chip-blocked .org-chip-label { font-weight: 600; }
+.org-chip.org-chip-blocked.active .org-chip-count,
+.org-chip.org-chip-blocked.active .org-chip-label { color: #fca5a5; }
+
 /* ─── Expiring block ─── */
 .expiring-block {
     background: #fff7ed;
